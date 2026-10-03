@@ -1,0 +1,7 @@
+- [x] Update INITIAL_FORM_STATE in RateItemSetting.jsx to include merchantRate and franchiseRate
+- [x] Update handleEdit to set rate values from existing data
+- [x] Update handleSubmit payload to include merchantRate and franchiseRate
+- [x] Add form inputs for merchantRate and franchiseRate in the modal
+- [x] Update table headers and rows to display merchantRate and franchiseRate
+- [x] Make brandName optional in form (remove required, update label)
+- [x] Update validation to require merchantRate and franchiseRate

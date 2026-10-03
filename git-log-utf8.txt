@@ -1,0 +1,85 @@
+﻿commit a18bf5d4c63c8e05e8e59648fc8fedeb3fe11050
+Author: Your Name <your.email@example.com>
+Date:   Fri Feb 20 18:10:48 2026 +0530
+
+    feat: Add Payout Report page with UI components and update layout routing
+
+A	src/Pages/AdminFranchiseRateSetting.jsx
+M	src/Pages/CommissionSettings.jsx
+A	src/Pages/PayoutReport.jsx
+M	src/Pages/Reports.jsx
+M	src/api/DashboardAndHeader.js
+M	src/api/FranchiseApi.js
+M	src/api/authApi.js
+M	src/api/reportsApi.js
+M	src/components/DynamicForm.jsx
+M	src/layouts/AdminLayout.jsx
+
+commit 6d61aca117af2c8cb6552a23f3f97db80574c203
+Author: Your Name <your.email@example.com>
+Date:   Wed Feb 18 16:56:41 2026 +0530
+
+    Feat: Add Commission Range Overlap Validation
+
+M	src/Pages/CommissionSettings.jsx
+
+commit 4a3e6ef6e013df1279dcab4bbe8187af9d63650b
+Author: Your Name <your.email@example.com>
+Date:   Wed Feb 18 16:08:09 2026 +0530
+
+    Refactor: Rename ledgerApi, fix franchise typos, and normalize props
+
+M	src/App.jsx
+M	src/Pages/AddUser.jsx
+M	src/Pages/AssignToFranchise.jsx
+M	src/Pages/Auth/Login.jsx
+M	src/Pages/CommissionSettings.jsx
+M	src/Pages/CreateUser.jsx
+M	src/Pages/CreateUserDetail.jsx
+M	src/Pages/Dashboard.jsx
+M	src/Pages/FranchiseList.jsx
+M	src/Pages/Ledger.jsx
+M	src/Pages/Merchant/MerchantLedger.jsx
+M	src/Pages/Settings.jsx
+M	src/Pages/StockPOSMachine.jsx
+M	src/Pages/TodayPayouts.jsx
+M	src/Pages/UserDetails.jsx
+M	src/api/FranchiseApi.js
+M	src/api/authApi.js
+A	src/api/commissionApi.js
+R100	src/api/ledgerApi.js	src/api/ledgerApi.js
+M	src/components/Auth/LoginForm.jsx
+M	src/components/DynamicForm.jsx
+M	src/constants.js
+M	src/layouts/AdminLayout.jsx
+M	src/layouts/FranchiseLayout.jsx
+M	src/layouts/MerchantLayout.jsx
+
+commit 02e7ea791ea20d9bb9775bcfd05e19094a45d583
+Author: Your Name <your.email@example.com>
+Date:   Tue Feb 17 17:55:29 2026 +0530
+
+    docs: Update README with feature and security details
+
+M	README.md
+
+commit b24bfcb71a8069dfc6a9bcc8755aca3eff4f3fe2
+Author: Your Name <your.email@example.com>
+Date:   Tue Feb 17 17:48:31 2026 +0530
+
+    feat: Implement User Commission Overrides & Detailed Rate Table\nfix: Prevent negative amounts in Wallet/Remitter transactions\nsecurity: Remove developer bypass & backdoor
+
+M	src/App.jsx
+M	src/Pages/Auth/Login.jsx
+A	src/Pages/CommissionSettings.jsx
+M	src/Pages/Merchant/RemitterDetails.jsx
+M	src/Pages/Wallet.jsx
+M	src/api/authApi.js
+A	src/api/mockCommissionApi.js
+M	src/components/DynamicForm.jsx
+M	src/components/FormInput.jsx
+M	src/components/Franchise/FranchiseSidebar.jsx
+M	src/components/Sidebar.jsx
+A	src/components/SlabEditor.jsx
+M	src/layouts/AdminLayout.jsx
+M	src/layouts/FranchiseLayout.jsx

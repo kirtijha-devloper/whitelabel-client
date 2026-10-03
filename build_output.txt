@@ -1,0 +1,116 @@
+
+> learn-project@0.0.0 build
+> vite build
+
+[36mvite v6.2.6 [32mbuilding for production...[36m[39m
+transforming...
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[32m✓[39m 2277 modules transformed.
+rendering chunks...
+[33m[plugin vite:reporter] 
+(!) C:/Users/91995/.gemini/antigravity/scratch/pos-client/src/api/commissionApi.js is dynamically imported by C:/Users/91995/.gemini/antigravity/scratch/pos-client/src/components/Commission/CommissionFormModal.jsx but also statically imported by C:/Users/91995/.gemini/antigravity/scratch/pos-client/src/Pages/CommissionSettings.jsx, C:/Users/91995/.gemini/antigravity/scratch/pos-client/src/components/Commission/CommissionFormModal.jsx, C:/Users/91995/.gemini/antigravity/scratch/pos-client/src/components/Commission/UserAssignmentView.jsx, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                                       [39m[1m[2m  0.48 kB[22m[1m[22m[2m │ gzip:  0.32 kB[22m
+[2mdist/[22m[32massets/pos-swipe-Bb1XX3hA.jpg                    [39m[1m[2m 53.71 kB[22m[1m[22m
+[2mdist/[22m[32massets/pos-machine-C7DFOzPm.jpeg                 [39m[1m[2m 59.28 kB[22m[1m[22m
+[2mdist/[22m[32massets/FORMAT-PNG-Lj3U1uY2.png                   [39m[1m[2m135.19 kB[22m[1m[22m
+[2mdist/[22m[32massets/pos-handshake-CzpzG941.jpg                [39m[1m[2m151.75 kB[22m[1m[22m
+[2mdist/[22m[32massets/POS Payment-D9FzPYLN.mp4                  [39m[1m[2m169.07 kB[22m[1m[22m
+[2mdist/[22m[32massets/pos-image-CjXuzuo5.jpg                    [39m[1m[2m451.75 kB[22m[1m[22m
+[2mdist/[22m[35massets/index-CKyFe2mg.css                        [39m[1m[2m 58.49 kB[22m[1m[22m[2m │ gzip: 10.14 kB[22m
+[2mdist/[22m[36massets/FORMAT-PNG-CeCl9QnP.js                    [39m[1m[2m  0.06 kB[22m[1m[22m[2m │ gzip:  0.08 kB[22m
+[2mdist/[22m[36massets/useSignup-CcEEdeNl.js                     [39m[1m[2m  0.23 kB[22m[1m[22m[2m │ gzip:  0.19 kB[22m
+[2mdist/[22m[36massets/check-DMEOI7zY.js                         [39m[1m[2m  0.30 kB[22m[1m[22m[2m │ gzip:  0.25 kB[22m
+[2mdist/[22m[36massets/FormInput-DVcVKR36.js                     [39m[1m[2m  0.32 kB[22m[1m[22m[2m │ gzip:  0.24 kB[22m
+[2mdist/[22m[36massets/index-D6-HXpRa.js                         [39m[1m[2m  0.33 kB[22m[1m[22m[2m │ gzip:  0.25 kB[22m
+[2mdist/[22m[36massets/loader-circle-BzT2yN-_.js                 [39m[1m[2m  0.33 kB[22m[1m[22m[2m │ gzip:  0.27 kB[22m
+[2mdist/[22m[36massets/plus-Bq9ep7fD.js                          [39m[1m[2m  0.34 kB[22m[1m[22m[2m │ gzip:  0.26 kB[22m
+[2mdist/[22m[36massets/x-DYHBUsQA.js                             [39m[1m[2m  0.34 kB[22m[1m[22m[2m │ gzip:  0.26 kB[22m
+[2mdist/[22m[36massets/arrow-left-ovHOYbtA.js                    [39m[1m[2m  0.35 kB[22m[1m[22m[2m │ gzip:  0.27 kB[22m
+[2mdist/[22m[36massets/circle-check-big-DT2MQfri.js              [39m[1m[2m  0.37 kB[22m[1m[22m[2m │ gzip:  0.29 kB[22m
+[2mdist/[22m[36massets/lock-D6OvCk52.js                          [39m[1m[2m  0.39 kB[22m[1m[22m[2m │ gzip:  0.30 kB[22m
+[2mdist/[22m[36massets/credit-card-B6DRLqXX.js                   [39m[1m[2m  0.39 kB[22m[1m[22m[2m │ gzip:  0.30 kB[22m
+[2mdist/[22m[36massets/eye-DGw75hmw.js                           [39m[1m[2m  0.44 kB[22m[1m[22m[2m │ gzip:  0.31 kB[22m
+[2mdist/[22m[36massets/upload-B242yjNM.js                        [39m[1m[2m  0.44 kB[22m[1m[22m[2m │ gzip:  0.33 kB[22m
+[2mdist/[22m[36massets/send-BLYUKQlz.js                          [39m[1m[2m  0.47 kB[22m[1m[22m[2m │ gzip:  0.34 kB[22m
+[2mdist/[22m[36massets/box-q0ezitp0.js                           [39m[1m[2m  0.49 kB[22m[1m[22m[2m │ gzip:  0.33 kB[22m
+[2mdist/[22m[36massets/square-pen-BpXgM9J4.js                    [39m[1m[2m  0.50 kB[22m[1m[22m[2m │ gzip:  0.35 kB[22m
+[2mdist/[22m[36massets/trash-2-Mul10px3.js                       [39m[1m[2m  0.54 kB[22m[1m[22m[2m │ gzip:  0.36 kB[22m
+[2mdist/[22m[36massets/StepIndicator-EvWx07Hy.js                 [39m[1m[2m  0.64 kB[22m[1m[22m[2m │ gzip:  0.36 kB[22m
+[2mdist/[22m[36massets/Modal-Bt4ndi03.js                         [39m[1m[2m  0.64 kB[22m[1m[22m[2m │ gzip:  0.39 kB[22m
+[2mdist/[22m[36massets/CreateFranchise-D8MbzLOx.js               [39m[1m[2m  0.82 kB[22m[1m[22m[2m │ gzip:  0.44 kB[22m
+[2mdist/[22m[36massets/DataCard-CuFBKbSY.js                      [39m[1m[2m  0.85 kB[22m[1m[22m[2m │ gzip:  0.45 kB[22m
+[2mdist/[22m[36massets/CreateMerchant-CwCdGdy6.js                [39m[1m[2m  0.91 kB[22m[1m[22m[2m │ gzip:  0.49 kB[22m
+[2mdist/[22m[36massets/settings-C-YheJVF.js                      [39m[1m[2m  0.91 kB[22m[1m[22m[2m │ gzip:  0.45 kB[22m
+[2mdist/[22m[36massets/TodayPayouts-DJcOuYkN.js                  [39m[1m[2m  0.97 kB[22m[1m[22m[2m │ gzip:  0.57 kB[22m
+[2mdist/[22m[36massets/ledgerApi-BRJ3i6Qy.js                     [39m[1m[2m  1.02 kB[22m[1m[22m[2m │ gzip:  0.48 kB[22m
+[2mdist/[22m[36massets/reportsApi-D3mLT5i1.js                    [39m[1m[2m  1.08 kB[22m[1m[22m[2m │ gzip:  0.43 kB[22m
+[2mdist/[22m[36massets/AllPOSTxnReports-B-szOYp3.js              [39m[1m[2m  1.21 kB[22m[1m[22m[2m │ gzip:  0.63 kB[22m
+[2mdist/[22m[36massets/Table-HBqsXeji.js                         [39m[1m[2m  1.21 kB[22m[1m[22m[2m │ gzip:  0.54 kB[22m
+[2mdist/[22m[36massets/MerchantCharges-lu6HRrfC.js               [39m[1m[2m  1.24 kB[22m[1m[22m[2m │ gzip:  0.66 kB[22m
+[2mdist/[22m[36massets/createLucideIcon-Dc3IVnRv.js              [39m[1m[2m  1.58 kB[22m[1m[22m[2m │ gzip:  0.66 kB[22m
+[2mdist/[22m[36massets/FranchiseApi-LSSDYmTH.js                  [39m[1m[2m  1.63 kB[22m[1m[22m[2m │ gzip:  0.55 kB[22m
+[2mdist/[22m[36massets/chargeSet-BSxAlsQT.js                     [39m[1m[2m  1.69 kB[22m[1m[22m[2m │ gzip:  0.57 kB[22m
+[2mdist/[22m[36massets/Signup-C9GXShM_.js                        [39m[1m[2m  1.87 kB[22m[1m[22m[2m │ gzip:  0.79 kB[22m
+[2mdist/[22m[36massets/AddPOSMachine-tquFn9HJ.js                 [39m[1m[2m  1.87 kB[22m[1m[22m[2m │ gzip:  0.84 kB[22m
+[2mdist/[22m[36massets/PosMachineList-CpW8STuI.js                [39m[1m[2m  1.95 kB[22m[1m[22m[2m │ gzip:  0.80 kB[22m
+[2mdist/[22m[36massets/DynamicForm-BWpCqIQe.js                   [39m[1m[2m  2.00 kB[22m[1m[22m[2m │ gzip:  0.95 kB[22m
+[2mdist/[22m[36massets/transactionApi-CfJpAeKe.js                [39m[1m[2m  2.04 kB[22m[1m[22m[2m │ gzip:  0.62 kB[22m
+[2mdist/[22m[36massets/userCreateApi-nRpOm6d8.js                 [39m[1m[2m  2.38 kB[22m[1m[22m[2m │ gzip:  0.92 kB[22m
+[2mdist/[22m[36massets/Dashboard-BpUMCoK7.js                     [39m[1m[2m  2.38 kB[22m[1m[22m[2m │ gzip:  1.01 kB[22m
+[2mdist/[22m[36massets/MerchantList-YDiDCjNx.js                  [39m[1m[2m  2.43 kB[22m[1m[22m[2m │ gzip:  0.99 kB[22m
+[2mdist/[22m[36massets/FranchiseDashboard-Cy3p4_X1.js            [39m[1m[2m  2.72 kB[22m[1m[22m[2m │ gzip:  1.06 kB[22m
+[2mdist/[22m[36massets/TransactionHistory-cq_kl1cN.js            [39m[1m[2m  2.77 kB[22m[1m[22m[2m │ gzip:  1.44 kB[22m
+[2mdist/[22m[36massets/Ledger-DBkin30H.js                        [39m[1m[2m  2.90 kB[22m[1m[22m[2m │ gzip:  1.24 kB[22m
+[2mdist/[22m[36massets/useMutation-DGkYqiHe.js                   [39m[1m[2m  2.91 kB[22m[1m[22m[2m │ gzip:  1.23 kB[22m
+[2mdist/[22m[36massets/FranchiseList-DB0oK2dH.js                 [39m[1m[2m  3.05 kB[22m[1m[22m[2m │ gzip:  1.29 kB[22m
+[2mdist/[22m[36massets/FranchiseLedger-CImG8I5y.js               [39m[1m[2m  3.06 kB[22m[1m[22m[2m │ gzip:  1.25 kB[22m
+[2mdist/[22m[36massets/financialApi-z4IhvBLG.js                  [39m[1m[2m  3.19 kB[22m[1m[22m[2m │ gzip:  0.93 kB[22m
+[2mdist/[22m[36massets/Sidebar-BvF0xPzx.js                       [39m[1m[2m  3.21 kB[22m[1m[22m[2m │ gzip:  1.26 kB[22m
+[2mdist/[22m[36massets/UserRateSetting-C6TVcA4n.js               [39m[1m[2m  3.26 kB[22m[1m[22m[2m │ gzip:  1.24 kB[22m
+[2mdist/[22m[36massets/AdminLedger-vVwRaMXA.js                   [39m[1m[2m  3.66 kB[22m[1m[22m[2m │ gzip:  1.49 kB[22m
+[2mdist/[22m[36massets/posMachine-CHH0U837.js                    [39m[1m[2m  4.09 kB[22m[1m[22m[2m │ gzip:  1.05 kB[22m
+[2mdist/[22m[36massets/CreateUser-fb_DL8kZ.js                    [39m[1m[2m  4.14 kB[22m[1m[22m[2m │ gzip:  1.41 kB[22m
+[2mdist/[22m[36massets/ComplaintBox-BxQSj_Tj.js                  [39m[1m[2m  4.31 kB[22m[1m[22m[2m │ gzip:  1.75 kB[22m
+[2mdist/[22m[36massets/DefaultRateSetting-DyYO4Mxp.js            [39m[1m[2m  4.36 kB[22m[1m[22m[2m │ gzip:  1.35 kB[22m
+[2mdist/[22m[36massets/Login-Csv-OQ0N.js                         [39m[1m[2m  4.37 kB[22m[1m[22m[2m │ gzip:  1.87 kB[22m
+[2mdist/[22m[36massets/AssignToFranchise-C7KV_eCR.js             [39m[1m[2m  4.69 kB[22m[1m[22m[2m │ gzip:  1.91 kB[22m
+[2mdist/[22m[36massets/CreateUserPosDetails-BVypS68y.js          [39m[1m[2m  4.90 kB[22m[1m[22m[2m │ gzip:  2.04 kB[22m
+[2mdist/[22m[36massets/TransactionDetails-CneyLcJ0.js            [39m[1m[2m  5.44 kB[22m[1m[22m[2m │ gzip:  1.69 kB[22m
+[2mdist/[22m[36massets/FranchiseRateSettings-D3sk2SeR.js         [39m[1m[2m  5.70 kB[22m[1m[22m[2m │ gzip:  1.49 kB[22m
+[2mdist/[22m[36massets/MerchantTransactionCharges-DqDn5nWe.js    [39m[1m[2m  6.22 kB[22m[1m[22m[2m │ gzip:  2.06 kB[22m
+[2mdist/[22m[36massets/MerchantPayoutLogin-nH75jscg.js           [39m[1m[2m  6.31 kB[22m[1m[22m[2m │ gzip:  2.57 kB[22m
+[2mdist/[22m[36massets/PayoutReport-S-IQytCt.js                  [39m[1m[2m  6.54 kB[22m[1m[22m[2m │ gzip:  2.35 kB[22m
+[2mdist/[22m[36massets/CreateChargeSet-DClzfXET.js               [39m[1m[2m  6.62 kB[22m[1m[22m[2m │ gzip:  2.11 kB[22m
+[2mdist/[22m[36massets/POSRazorPayReport-C5oB8wG-.js             [39m[1m[2m  6.84 kB[22m[1m[22m[2m │ gzip:  2.41 kB[22m
+[2mdist/[22m[36massets/RazorpayNotification-B3OCJqrF.js          [39m[1m[2m  6.90 kB[22m[1m[22m[2m │ gzip:  2.34 kB[22m
+[2mdist/[22m[36massets/Reports-CbQEa40M.js                       [39m[1m[2m  6.95 kB[22m[1m[22m[2m │ gzip:  2.07 kB[22m
+[2mdist/[22m[36massets/CreateUserDetail-BizHJjus.js              [39m[1m[2m  7.71 kB[22m[1m[22m[2m │ gzip:  1.70 kB[22m
+[2mdist/[22m[36massets/MerchantLayout-BDznoqZb.js                [39m[1m[2m  8.37 kB[22m[1m[22m[2m │ gzip:  2.95 kB[22m
+[2mdist/[22m[36massets/Wallet-D6l18mGw.js                        [39m[1m[2m  8.47 kB[22m[1m[22m[2m │ gzip:  2.79 kB[22m
+[2mdist/[22m[36massets/rateSettingsApi-Oa8cg__u.js               [39m[1m[2m  8.62 kB[22m[1m[22m[2m │ gzip:  1.77 kB[22m
+[2mdist/[22m[36massets/FranchiseMerchantRateSetting-DGs5EFe1.js  [39m[1m[2m  9.33 kB[22m[1m[22m[2m │ gzip:  2.82 kB[22m
+[2mdist/[22m[36massets/AdminLayout-C3JtmlMT.js                   [39m[1m[2m 10.08 kB[22m[1m[22m[2m │ gzip:  2.95 kB[22m
+[2mdist/[22m[36massets/RateItemSetting-D8Wa00P3.js               [39m[1m[2m 10.09 kB[22m[1m[22m[2m │ gzip:  2.65 kB[22m
+[2mdist/[22m[36massets/FranchiseLayout-B8FILjRu.js               [39m[1m[2m 11.26 kB[22m[1m[22m[2m │ gzip:  3.46 kB[22m
+[2mdist/[22m[36massets/AllTransactionReport-yXpJ8xUV.js          [39m[1m[2m 12.24 kB[22m[1m[22m[2m │ gzip:  3.63 kB[22m
+[2mdist/[22m[36massets/AddUser-B2oG8d-5.js                       [39m[1m[2m 13.01 kB[22m[1m[22m[2m │ gzip:  2.96 kB[22m
+[2mdist/[22m[36massets/StockPOSMachine-BpZvUz2q.js               [39m[1m[2m 13.12 kB[22m[1m[22m[2m │ gzip:  3.57 kB[22m
+[2mdist/[22m[36massets/RateSetting-CBpbn3_g.js                   [39m[1m[2m 13.19 kB[22m[1m[22m[2m │ gzip:  3.93 kB[22m
+[2mdist/[22m[36massets/UserCreationContext-DS2HLk0N.js           [39m[1m[2m 13.48 kB[22m[1m[22m[2m │ gzip:  5.07 kB[22m
+[2mdist/[22m[36massets/RemitterDetails-BK85YeJq.js               [39m[1m[2m 14.52 kB[22m[1m[22m[2m │ gzip:  3.59 kB[22m
+[2mdist/[22m[36massets/Loader-DcV5180U.js                        [39m[1m[2m 14.85 kB[22m[1m[22m[2m │ gzip:  5.33 kB[22m
+[2mdist/[22m[36massets/AdminFranchiseRateSetting-Bsnwiz1Z.js     [39m[1m[2m 15.64 kB[22m[1m[22m[2m │ gzip:  4.08 kB[22m
+[2mdist/[22m[36massets/UserDetails-B1qD6Mee.js                   [39m[1m[2m 17.21 kB[22m[1m[22m[2m │ gzip:  4.74 kB[22m
+[2mdist/[22m[36massets/Settings-CcJD6Q5S.js                      [39m[1m[2m 19.14 kB[22m[1m[22m[2m │ gzip:  3.88 kB[22m
+[2mdist/[22m[36massets/RateSettings-Dr1RUPAY.js                  [39m[1m[2m 22.53 kB[22m[1m[22m[2m │ gzip:  3.88 kB[22m
+[2mdist/[22m[36massets/CommissionSettings-Cbd8_2yE.js            [39m[1m[2m 37.47 kB[22m[1m[22m[2m │ gzip: 10.02 kB[22m
+[2mdist/[22m[36massets/authApi-CBJ64ltA.js                       [39m[1m[2m 38.04 kB[22m[1m[22m[2m │ gzip: 14.86 kB[22m
+[2mdist/[22m[36massets/react-select.esm-TNQi76Y1.js              [39m[1m[2m 87.44 kB[22m[1m[22m[2m │ gzip: 30.98 kB[22m
+[2mdist/[22m[36massets/Logout-BCim0c1z.js                        [39m[1m[2m115.54 kB[22m[1m[22m[2m │ gzip: 38.46 kB[22m
+[2mdist/[22m[36massets/index-DiO1AMvr.js                         [39m[1m[2m284.72 kB[22m[1m[22m[2m │ gzip: 90.63 kB[22m
+[2mdist/[22m[36massets/FileSaver.min-oxufppNl.js                 [39m[1m[2m285.39 kB[22m[1m[22m[2m │ gzip: 96.05 kB[22m
+[32m✓ built in 29.93s[39m
