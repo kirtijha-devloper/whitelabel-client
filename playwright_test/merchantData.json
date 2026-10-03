@@ -1,0 +1,31 @@
+{
+  "auth": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxNSwibmFtZSI6IlNoYXJtYSBGcmFuY2hpc2UiLCJtb2JpbGVfbnVtYmVyIjoiOTY5NjU0MzIxMCIsInJvbGUiOiJmcmFuY2hhaXNlIiwiaXBheV9vdXRsZXRfaWQiOm51bGx9LCJpYXQiOjE3OTEwMDQzODcsImV4cCI6MTc5MTAyMjM4N30.LhfRLLZwcbggrs8fra7BRb1JgZgE92cdtGMRAJuysvU"
+  },
+  "merchant": {
+    "name": "Rohan Sharma",
+    "company_or_shop_name": "Sharma Electronics and General Store",
+    "email": "roan.shrma.test@abheepay.com",
+    "mobile_number": "9788543210",
+    "gender": "male",
+    "dob": "1994-08-15",
+    "password": "Password@123",
+    "address1": "Shop No. 12, Ground Floor, Main Market",
+    "address2": "Near City Metro Station",
+    "city": "Lucknow",
+    "district": "Lucknow",
+    "pincode": "226001",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aadhar_number": "367291827364",
+    "pan_number": "ABCDE1234F",
+    "settlement_type": "today_settlement"
+  },
+  "documents": {
+    "aadhar_photo": "",
+    "aadhar_back_photo": "",
+    "pan_photo": "",
+    "bank_passbook": "",
+    "shop_photo": ""
+  }
+}

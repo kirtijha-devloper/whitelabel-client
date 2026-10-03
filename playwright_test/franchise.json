@@ -1,0 +1,31 @@
+{
+  "auth": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjo4LCJuYW1lIjoiU3VwZXJtYW4iLCJtb2JpbGVfbnVtYmVyIjoiOTkxMjM0NTY3OCIsInJvbGUiOiJzdXBlcl9mcmFuY2hpc2UiLCJpcGF5X291dGxldF9pZCI6bnVsbH0sImlhdCI6MTc5MDgzMTEyNCwiZXhwIjoxNzkwODQ5MTI0fQ.mlJBIKPIJ5UK47Z-ICJsxM_PIHjCyAEitsujRKaK7ms"
+  },
+  "merchant": {
+    "name": "Sharma Franchise",
+    "company_or_shop_name": "Sharma Electronics and General Store",
+    "email": "rohan.test@abheepay.com",
+    "mobile_number": "9696543210",
+    "gender": "male",
+    "dob": "1994-08-15",
+    "password": "Password@123",
+    "address1": "Shop No. 12, Ground Floor, Main Market",
+    "address2": "Near City Metro Station",
+    "city": "Lucknow",
+    "district": "Lucknow",
+    "pincode": "226001",
+    "state": "Uttar Pradesh",
+    "country": "India",
+    "aadhar_number": "367291827364",
+    "pan_number": "ABCDE1234F",
+    "settlement_type": "today_settlement"
+  },
+  "documents": {
+    "aadhar_photo": "",
+    "aadhar_back_photo": "",
+    "pan_photo": "",
+    "bank_passbook": "",
+    "shop_photo": ""
+  }
+}
