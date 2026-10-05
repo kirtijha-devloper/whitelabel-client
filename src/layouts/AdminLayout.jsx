@@ -24,6 +24,7 @@ import {
 } from "../utils/accessControl";
 import { normalizeUserRole } from "../utils/userAccess";
 import LoginPopupOverlay from "../components/LoginPopupOverlay";
+import  SuperAdminDashboard  from "../Pages/Superadmin/SuperAdminDashboard";
 
 // Lazy Load Pages
 const Dashboard = lazy(() => import("../Pages/Dashboard"));
@@ -251,11 +252,7 @@ export default function AdminLayout() {
                 path="dashboard"
                 element={
                   isSuperAdminViewer ? (
-                    <div className="p-6">
-                      <h1 className="text-2xl font-bold">
-                        Super Admin Dashboard
-                      </h1>
-                    </div>
+                    <SuperAdminDashboard />
                   ) : isAdminViewer || isEmployeeViewer ? (
                     <Dashboard dashboardData={dashboard} />
                   ) : (
