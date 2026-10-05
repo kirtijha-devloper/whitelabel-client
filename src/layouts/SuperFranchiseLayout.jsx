@@ -8,6 +8,8 @@ import HeaderInfo from '../components/HeaderInfo';
 import LoginPopupOverlay from '../components/LoginPopupOverlay';
 import { UserCreationProvider } from '../context/UserCreationContext';
 import SuperFranchiseSidebar from '../components/SuperFranchise/SuperFranchiseSidebar';
+import { getServiceFlagValue } from '../utils/serviceFlags';
+
 
 // Lazy Load Pages
 const SuperFranchiseDashboard = lazy(() => import('../Pages/SuperFranchiseDashboard'));
@@ -25,6 +27,7 @@ const Reports = lazy(() => import('../Pages/Reports'));
 const PayoutReport = lazy(() => import('../Pages/PayoutReport'));
 const CCBillPaymentReports = lazy(() => import('../Pages/CCBillPaymentReports'));
 const BillAvenueCCBillPayReports = lazy(() => import('../Pages/BillAvenueCCBillPayReports'));
+const ComplaintBox = lazy(() => import('../Pages/Merchant/ComplaintBox'));
 const Settings = lazy(() => import('../Pages/Settings'));
 const PosSetting = lazy(() => import('../Pages/PosSetting'));
 const SuperFranchiseRateSettings = lazy(() => import('../Pages/SuperFranchiseRateSettings'));
@@ -33,6 +36,11 @@ const FranchiseRateSettings = lazy(() => import('../Pages/FranchiseRateSettings'
 const Ledger = lazy(() => import('../Pages/Ledger'));
 const FranchiseLedger = lazy(() => import('../Pages/FranchiseLedger'));
 const Logout = lazy(() => import('../Pages/Logout'));
+const SevenPayPayout = lazy(() => import('../Pages/SevenPayPayout'));
+const VimoPayout = lazy(() => import('../Pages/VimoPayout'));
+const BranchXPayout = lazy(() => import('../Pages/BranchXPayout'));
+const CCBillPay = lazy(() => import("../Pages/CCBillPay"));
+const BillAvenueCCBillPay = lazy(() => import('../Pages/BillAvenueCCBillPay'));
 
 export default function SuperFranchiseLayout() {
   const navigate = useNavigate();
@@ -54,6 +62,11 @@ export default function SuperFranchiseLayout() {
       console.error('Failed to fetch dashboard data:', error.message);
     },
   });
+
+  console.log("dashboard loading:", dashboardQueryLoading);
+  console.log("error:", dashboardQueryError);
+  // console.log("error details:", dashboardError);
+  console.log("dashboard dashboard -------->>>>>>>>>>> : ", dashboard)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -80,10 +93,16 @@ export default function SuperFranchiseLayout() {
       normalizedRole === 'admin'
         ? '/admin/dashboard'
         : normalizedRole === 'franchise' || normalizedRole === 'franchaise'
-        ? '/franchise/dashboard'
-        : '/merchant/dashboard';
+          ? '/franchise/dashboard'
+          : '/merchant/dashboard';
     return <Navigate to={redirectPath} replace />;
   }
+
+  const dashboardPath = "/super-franchise/dashboard";
+  const guardServiceRoute = (serviceKey, element) =>
+    getServiceFlagValue(currentUser?.service_flags, serviceKey, true)
+      ? element
+      : <Navigate to={dashboardPath} replace />;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -105,6 +124,32 @@ export default function SuperFranchiseLayout() {
               <Route path="franchise-list" element={<UserList currentUser={currentUser} roleFilter="franchise" />} />
               <Route path="list" element={<UserList currentUser={currentUser} />} />
               <Route path="merchant-list" element={<MerchantList />} />
+
+              <Route
+                path='vimo-payout'
+                element={guardServiceRoute('vimo_payout', <VimoPayout currentUser={currentUser} />)}
+              />
+
+              <Route
+                path='branchx-payout'
+                element={guardServiceRoute('branchx_payout', <BranchXPayout currentUser={currentUser} />)}
+              />
+
+              <Route
+                path='sevenpay-payout'
+                element={guardServiceRoute('sevenpay_payout', <SevenPayPayout currentUser={currentUser} />)}
+              />
+
+              <Route
+                path="cc-bill-pay"
+                element={guardServiceRoute('cc_bill_pay', <CCBillPay currentUser={currentUser} />)}
+              />
+
+              <Route
+                path='ba-cc-bill-pay'
+                element={guardServiceRoute('ba-cc-bill-pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
+              />
+
               <Route path="pos-machine-list" element={<PosMachineList />} />
               <Route path="stock-pos" element={<StockPOSMachine currentUser={currentUser} />} />
               <Route path="stock-pos/add" element={<AddPOSMachine currentUser={currentUser} />} />
@@ -115,6 +160,8 @@ export default function SuperFranchiseLayout() {
               <Route path="setting" element={<Settings currentUser={currentUser} />} />
               <Route path="pos-setting" element={<PosSetting currentUser={currentUser} />} />
               <Route path="rate-settings" element={<SuperFranchiseRateSettings currentUser={currentUser} />} />
+              <Route path="rate-settings" element={<FranchiseRateSettings />} />
+              <Route path='complaint-box' element={<ComplaintBox currentUser={currentUser} />} />
               <Route path="merchant-rates" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               <Route path="ledger-entries" element={<FranchiseLedger currentUser={currentUser} />} />

@@ -398,6 +398,7 @@ const Ledger = ({ currentUser }) => {
   const roleOptions = [
     { value: "merchant", label: "Merchant" },
     { value: "franchise", label: "Franchise" },
+    { value: "franchise", label: "Super Franchise" },
   ];
 
   const transactionTypeOptions = [
@@ -417,7 +418,9 @@ const Ledger = ({ currentUser }) => {
 
   const filteredRoleOptions =
     userRole === "merchant"
-      ? roleOptions.filter((option) => option.value === "merchant")
+      ? roleOptions.filter((option) => option.value === "merchant") 
+      : userRole === "franchise"
+      ? roleOptions.filter((option) => option.value === "franchise")
       : roleOptions;
 
   useEffect(() => {

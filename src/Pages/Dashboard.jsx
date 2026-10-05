@@ -7,6 +7,7 @@ import DashboardChartLauncher from "../components/DashboardChartLauncher";
 const Dashboard = ({ dashboardData = {} }) => {
   const navigate = useNavigate();
   const rawData = dashboardData?.data ?? dashboardData ?? {};
+  console.log("Admin dashboard ------->>>>> ,:" , rawData);
   const merchants = rawData.merchants ?? { count: rawData.merchantCount ?? 0 };
   const franchises = rawData.franchaises ?? { count: rawData.franchiseCount ?? 0 };
   const pos_machines =

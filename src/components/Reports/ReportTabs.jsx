@@ -11,7 +11,7 @@ const REPORT_TAB_CONFIG = [
 ];
 
 const getTargetPath = (basePath, tabKey) => {
-  if (tabKey === "pos" || tabKey === "wallet") {
+if (tabKey === "pos" || tabKey === "wallet") {
     return `${basePath}?tab=${tabKey}`;
   }
 

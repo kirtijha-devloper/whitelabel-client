@@ -9,6 +9,7 @@ import Loader from "../components/Loader";
 import { getDashboard } from "../api/DashboardAndHeader";
 
 export default function SuperFranchiseDashboard({ dashboardData: propDashboardData }) {
+  console.log("Dashbord data abc ----->> : ", propDashboardData);
   const navigate = useNavigate();
   const { data: dashboardQueryData, isLoading } = useQuery({
     queryKey: ["superFranchiseDashboard"],
@@ -25,8 +26,10 @@ export default function SuperFranchiseDashboard({ dashboardData: propDashboardDa
   }
 
   const rawData = dashboardQueryData?.data ?? dashboardQueryData ?? propDashboardData ?? {};
+  // console.log("dashboardQueryData.data --->> ", dashboardQueryData , "dashboardQueryData --->>  : ", dashboardQueryData , "PropdashboardData --------->>>> : ", propDashboardData);
   const merchants = rawData.merchants ?? rawData.assigned_merchants ?? { count: rawData.merchant_count ?? rawData.total_merchants ?? 0 };
   const franchises = rawData.franchaises ?? { count: rawData.franchise_count ?? rawData.total_franchises ?? 0 };
+  console.log("franchises---------->>>>>>>", franchises);
   const pos_machines =
     rawData.pos_machines ??
     ({
@@ -94,6 +97,8 @@ export default function SuperFranchiseDashboard({ dashboardData: propDashboardDa
       ],
     },
   ];
+
+  console.log("sections -------->>>>>>>>>> ", sections);
 
   const stats = [
     { title: "Today POS", amount: pos_transactions.total || 0 },
