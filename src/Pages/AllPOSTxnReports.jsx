@@ -8,11 +8,13 @@ import { Loader2 } from "lucide-react";
 const AllPOSTxnReport = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const reportsHomePath = location.pathname.startsWith('/franchise')
-    ? '/franchise/reports'
-    : location.pathname.startsWith('/merchant')
-      ? '/merchant/reports'
-      : '/admin/reports';
+  const reportsHomePath = location.pathname.startsWith('/super-franchise')
+    ? '/super-franchise/reports'
+    : location.pathname.startsWith('/franchise')
+      ? '/franchise/reports'
+      : location.pathname.startsWith('/merchant')
+        ? '/merchant/reports'
+        : '/admin/reports';
   const [filters, setFilters] = useState({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],

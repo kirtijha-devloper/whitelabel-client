@@ -260,7 +260,7 @@ const buildBaseFilters = (today) => ({
 const Reports = ({ currentUser }) => {
   const location = useLocation();
   const today = new Date().toISOString().split('T')[0];
-  const roleBase = normalizeRole(currentUser?.role);
+  const roleBase = normalizeRole(currentUser?.role).replace('_', '-');
   const reportsBasePath = `/${roleBase}/reports`;
   const reportType = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab');

@@ -155,6 +155,7 @@ export default function SuperFranchiseLayout() {
               <Route path="stock-pos/add" element={<AddPOSMachine currentUser={currentUser} />} />
               <Route path="reports" element={<Reports currentUser={currentUser} />} />
               <Route path="reports/payout" element={<PayoutReport />} />
+              <Route path="reports/cc-bill-3" element={<PayoutReport reportVariant="cc-bill-3" />} />
               <Route path="reports/cc-bill" element={<CCBillPaymentReports />} />
               <Route path="reports/ba-cc-bill" element={<BillAvenueCCBillPayReports />} />
               <Route path="setting" element={<Settings currentUser={currentUser} />} />

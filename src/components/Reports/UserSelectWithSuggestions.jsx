@@ -7,6 +7,7 @@ import { extractUsersArray } from '../../utils/userAccess';
 const normalizeRoleBadge = (role) => {
   const r = String(role || '').trim().toLowerCase();
   if (r === 'admin') return { label: 'Admin', bg: 'bg-purple-100 text-purple-700' };
+  if (r === 'super_franchise') return { label: 'Super Franchise', bg: 'bg-indigo-100 text-indigo-700' };
   if (r === 'employee') return { label: 'Employee', bg: 'bg-blue-100 text-blue-700' };
   if (r === 'franchise' || r === 'franchaise') return { label: 'Franchise', bg: 'bg-amber-100 text-amber-700' };
   if (r === 'merchant') return { label: 'Merchant', bg: 'bg-emerald-100 text-emerald-700' };

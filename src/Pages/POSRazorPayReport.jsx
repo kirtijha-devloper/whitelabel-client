@@ -26,7 +26,9 @@ const POSRazarpayReport = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const transactionDetailsBasePath = location.pathname.startsWith("/franchise")
+  const transactionDetailsBasePath = location.pathname.startsWith("/super-franchise")
+    ? "/super-franchise/transaction"
+    : location.pathname.startsWith("/franchise")
     ? "/franchise/transaction"
     : "/admin/transaction";
 

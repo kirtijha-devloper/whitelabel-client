@@ -975,15 +975,18 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
   const location = useLocation();
   const isCcBill3Report = reportVariant === 'cc-bill-3';
 
+  const isSuperFranchise = location.pathname.startsWith('/super-franchise');
   const isFranchise = location.pathname.startsWith('/franchise');
   const isMerchant = location.pathname.startsWith('/merchant');
-  const canFilterByUser = !isMerchant; // admin and franchise can filter by merchant user_id
+  const canFilterByUser = !isMerchant; // admin, super-franchise, franchise can filter
   const canSelectUserSuggestions = location.pathname.startsWith('/admin') || location.pathname.startsWith('/employee');
-  const reportsBasePath = isFranchise
-    ? '/franchise/reports'
-    : isMerchant
-      ? '/merchant/reports'
-      : '/admin/reports';
+  const reportsBasePath = isSuperFranchise
+    ? '/super-franchise/reports'
+    : isFranchise
+      ? '/franchise/reports'
+      : isMerchant
+        ? '/merchant/reports'
+        : '/admin/reports';
 
   const today = new Date().toISOString().split('T')[0];
   const [selectedUser, setSelectedUser] = useState(null);

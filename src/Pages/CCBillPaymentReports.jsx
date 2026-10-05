@@ -125,7 +125,9 @@ const mapCcBillRowsToExport = (rows = [], startIndex = 1) =>
 
 const CCBillPaymentReports = () => {
   const location = useLocation();
-  const reportsBasePath = location.pathname.startsWith("/franchise")
+  const reportsBasePath = location.pathname.startsWith("/super-franchise")
+    ? "/super-franchise/reports"
+    : location.pathname.startsWith("/franchise")
     ? "/franchise/reports"
     : location.pathname.startsWith("/merchant")
       ? "/merchant/reports"
