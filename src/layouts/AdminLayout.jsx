@@ -42,9 +42,7 @@ const AllPOSTxnReport = lazy(() => import("../Pages/AllPOSTxnReports"));
 const AddPOSMachine = lazy(() => import("../Pages/AddPOSMachine"));
 const UserDetails = lazy(() => import("../Pages/UserDetails"));
 const CreateUserDetail = lazy(() => import("../Pages/CreateUserDetail"));
-const CreateUserPosDetails = lazy(
-  () => import("../Pages/CreateUserPosDetails"),
-);
+const CreateUserPosDetails = lazy(() => import("../Pages/CreateUserPosDetails"));
 const CreateChargeSet = lazy(() => import("../Pages/CreateChargeSet"));
 const TransactionDetails = lazy(() => import("../Pages/TransactionDetails"));
 const Ledger = lazy(() => import("../Pages/Ledger"));
@@ -79,20 +77,16 @@ const MerchantTransactionCharges = lazy(
 const RazorpayNotification = lazy(
   () => import("../Pages/RazorpayNotification"),
 );
-const CCBillPaymentReports = lazy(
-  () => import("../Pages/CCBillPaymentReports"),
-);
-const BillAvenueCCBillPayReports = lazy(
-  () => import("../Pages/BillAvenueCCBillPayReports"),
-);
-const BillAvenueBillerUpload = lazy(
-  () => import("../Pages/BillAvenueBillerUpload"),
-);
+const CCBillPaymentReports = lazy(() => import("../Pages/CCBillPaymentReports"));
+const BillAvenueCCBillPayReports = lazy(() => import("../Pages/BillAvenueCCBillPayReports"));
+const BillAvenueBillerUpload = lazy(() => import("../Pages/BillAvenueBillerUpload"));
 const SystemActivityLog = lazy(() => import("../Pages/SystemActivityLog"));
 const SetLimit = lazy(() => import("../Pages/SetLimit"));
 const PosSetting = lazy(() => import("../Pages/PosSetting"));
 
 const CreateAdmin = lazy(() => import("../Pages/Superadmin/CreateAdmin"));
+
+const AdminList = lazy(() => import('../Pages/AdminList'))
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -274,9 +268,7 @@ export default function AdminLayout() {
                 path="admin-list"
                 element={
                   isSuperAdminViewer ? (
-                    <div className="p-6">
-                      <h1 className="text-2xl font-bold">Admin List</h1>
-                    </div>
+                    <AdminList currentUser={currentUser}/>
                   ) : (
                     <Navigate to="/login" replace />
                   )
@@ -665,7 +657,7 @@ export default function AdminLayout() {
                 path="no-access"
                 element={
                   isEmployeeViewer &&
-                  employeeLandingPath !== "/admin/no-access" ? (
+                    employeeLandingPath !== "/admin/no-access" ? (
                     <Navigate to={employeeLandingPath} replace />
                   ) : (
                     noAccessElement

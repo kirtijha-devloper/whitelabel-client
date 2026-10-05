@@ -56,6 +56,8 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
         ? "Employee" 
         : normalizedRole === "franchise" 
           ? "Franchise"
+          : normalizedRole === "super_admin"
+          ? "Super Admin"
           : "Super Franchise";
 
   const userId = currentUser?.id;
