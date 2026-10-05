@@ -34,6 +34,9 @@ export default function App() {
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={<AdminLayout />} />
+          {/* {super admin routes} */}
+          <Route path="/super-admin/*" element={<AdminLayout />} />
+
 
           {/* Super Franchise Routes */}
           <Route path="/super-franchise/*" element={<SuperFranchiseLayout />} />

@@ -43,7 +43,7 @@ const userCreationReducer = (state, action) => {
     case 'NEXT_STEP':
       return {
         ...state,
-        currentStep: Math.min(state.currentStep + 1, 3),
+        currentStep: Math.min(state.currentStep + 1, 4),
       };
     case 'PREV_STEP':
       return {

@@ -220,6 +220,8 @@ export const normalizePermissions = (value) => {
 
 export const isAdminUser = (user) => normalizeUserRole(user?.role) === "admin";
 
+export const isSuperAdminUser = (user) => normalizeUserRole(user?.role) === "super_admin";
+
 export const isEmployeeUser = (user) => normalizeUserRole(user?.role) === "employee";
 
 const getResolvedUserPermissions = (user) => {
@@ -308,6 +310,10 @@ export const buildPermissionsFromModuleKeys = (moduleKeys = []) => {
 };
 
 export const getAdminLandingPathForUser = (user) => {
+  if (isSuperAdminUser(user)) {
+    return "/super-admin/dashboard";
+  }
+
   if (isAdminUser(user) || isEmployeeUser(user)) {
     return "/admin/dashboard";
   }

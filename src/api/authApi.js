@@ -895,9 +895,9 @@ export const sendOtp = async ({ mobile, purpose }) => {
   }
 };
 
-export const verifyOtp = async ({ mobile_number, otp, purpose }) => {
+export const verifyOtp = async ({ mobile_number, otp, purpose,company_id}) => {
   try {
-    const response = await api.post('/user/verify-otp', { mobile_number, otp, purpose });
+    const response = await api.post('/user/verify-otp', { mobile_number, otp, purpose,company_id });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Failed to verify OTP');
@@ -1007,12 +1007,13 @@ export const forgotPassword = async ({ mobile_number }) => {
   }
 };
 
-export const verifyForgotPasswordOtp = async ({ mobile_number, otp }) => {
+export const verifyForgotPasswordOtp = async ({ mobile_number, otp,company_id }) => {
   try {
     const response = await api.post('/user/verify-otp', {
       mobile_number,
       otp,
-      purpose: 'forgot_password'
+      purpose: 'forgot_password',
+      company_id
     });
     return response.data;
   } catch (error) {
