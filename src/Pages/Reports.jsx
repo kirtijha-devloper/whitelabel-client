@@ -99,7 +99,8 @@ const mobilePosSearchOptions = [
 const normalizeRole = (role) => {
   const value = String(role || '').trim().toLowerCase();
   if (value === 'franchaise') return 'franchise';
-  if (value === 'admin' || value === 'franchise' || value === 'merchant') return value;
+  if(value === 'super_franchise') return 'super-franchise'
+  if (value === 'admin' || value === 'franchise' || value === 'merchant' || value === 'super-franchise') return value;
   return 'admin';
 };
 

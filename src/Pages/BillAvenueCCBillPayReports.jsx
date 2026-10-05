@@ -26,9 +26,12 @@ const BillAvenueCCBillPayReports = () => {
   const location = useLocation();
   const reportsBasePath = location.pathname.startsWith("/franchise")
     ? "/franchise/reports"
+    : location.pathname.startsWith("/super-franchise")
+    ? "/super-franchise/reports"
     : location.pathname.startsWith("/merchant")
-      ? "/merchant/reports"
-      : "/admin/reports";
+    ? "/merchant/reports"
+    : "/admin/reports"
+  ;
 
   const getTodayDate = () => {
     const d = new Date();
