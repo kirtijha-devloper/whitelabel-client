@@ -45,40 +45,71 @@ const COLORS = [
 ];
 
 /* =========================================
-   PIE CHART LABEL
+   PERCENTAGE OUTSIDE PIE
    ========================================= */
 
 const renderCustomizedLabel = ({
   cx,
   cy,
   midAngle,
-  innerRadius,
   outerRadius,
   percent,
+  index,
 }) => {
   const RADIAN = Math.PI / 180;
 
-  const radius =
-    innerRadius + (outerRadius - innerRadius) * 0.55;
+  // Percentage position
+  const labelRadius = outerRadius + 28;
 
   const x =
-    cx + radius * Math.cos(-midAngle * RADIAN);
+    cx + labelRadius * Math.cos(-midAngle * RADIAN);
 
   const y =
-    cy + radius * Math.sin(-midAngle * RADIAN);
+    cy + labelRadius * Math.sin(-midAngle * RADIAN);
+
+  // Line start
+  const lineStartRadius = outerRadius + 5;
+
+  const lineStartX =
+    cx + lineStartRadius * Math.cos(-midAngle * RADIAN);
+
+  const lineStartY =
+    cy + lineStartRadius * Math.sin(-midAngle * RADIAN);
+
+  // Line end
+  const lineEndRadius = outerRadius + 18;
+
+  const lineEndX =
+    cx + lineEndRadius * Math.cos(-midAngle * RADIAN);
+
+  const lineEndY =
+    cy + lineEndRadius * Math.sin(-midAngle * RADIAN);
 
   return (
-    <text
-      x={x}
-      y={y}
-      fill="white"
-      textAnchor={x > cx ? "start" : "end"}
-      dominantBaseline="central"
-      fontSize={13}
-      fontWeight="700"
-    >
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
+    <g>
+      {/* Connector line */}
+      <line
+        x1={lineStartX}
+        y1={lineStartY}
+        x2={lineEndX}
+        y2={lineEndY}
+        stroke={COLORS[index % COLORS.length]}
+        strokeWidth={1.5}
+      />
+
+      {/* Percentage */}
+      <text
+        x={x}
+        y={y}
+        fill="#374151"
+        textAnchor={x > cx ? "start" : "end"}
+        dominantBaseline="central"
+        fontSize={13}
+        fontWeight="700"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    </g>
   );
 };
 
@@ -146,7 +177,7 @@ const ServiceUsageChart = () => {
               dataKey="value"
               nameKey="name"
 
-              /* PERMANENT PERCENTAGE */
+              /* PERCENTAGE OUTSIDE */
               label={renderCustomizedLabel}
               labelLine={false}
             >

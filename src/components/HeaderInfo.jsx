@@ -245,15 +245,15 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
 
             return (
               <div className="flex flex-col gap-2 min-w-[240px]">
-                <div className="flex flex-col gap-1 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 p-3 shadow-sm text-xs">
+                {/* <div className="flex flex-col gap-1 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 p-3 shadow-sm text-xs"> */}
                   {/* Total Row */}
-                  <div className="flex justify-between items-center gap-3">
+                  {/* <div className="flex justify-between items-center gap-3">
                     <span className="text-slate-500 font-medium">Total</span>
                     <span className="font-bold text-slate-900">₹{walletNum.toFixed(2)}</span>
-                  </div>
+                  </div> */}
 
                   {/* On Settlement Hold Row */}
-                  {(() => {
+                  {/* {(() => {
                     const holdAmt = Math.max(0, walletNum - usableBal);
                     return holdAmt > 0 ? (
                       <div className="flex justify-between items-center gap-3">
@@ -261,14 +261,14 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
                         <span className="font-bold text-amber-600">- ₹{holdAmt.toFixed(2)}</span>
                       </div>
                     ) : null;
-                  })()}
+                  })()} */}
 
                   {/* Available Row */}
-                  <div className="flex justify-between items-center gap-3 pt-1 border-t border-slate-200">
+                  {/* <div className="flex justify-between items-center gap-3 pt-1 border-t border-slate-200">
                     <span className="text-emerald-700 font-medium">Available</span>
                     <span className="font-bold text-emerald-700">₹{usableBal.toFixed(2)}</span>
                   </div>
-                </div>
+                </div> */}
               </div>
             );
           })()}
