@@ -87,6 +87,11 @@ const PosSetting = lazy(() => import("../Pages/PosSetting"));
 
 const CreateAdmin = lazy(() => import("../Pages/Superadmin/CreateAdmin"));
 const AdminProfile = lazy(() => import("../Pages/Superadmin/AdminProfile"));
+const SuperAdminInventoryHub = lazy(() => import("../Pages/Superadmin/SuperAdminInventoryHub"));
+const SuperAdminPOSInventory = lazy(() => import("../Pages/Superadmin/SuperAdminPOSInventory"));
+const SuperAdminQRInventory = lazy(() => import("../Pages/Superadmin/SuperAdminQRInventory"));
+const SuperAdminPGInventory = lazy(() => import("../Pages/Superadmin/SuperAdminPGInventory"));
+const SuperAdminServiceManagement = lazy(() => import("../Pages/Superadmin/SuperAdminServiceManagement"));
 
 const AdminList = lazy(() => import('../Pages/AdminList'))
 
@@ -320,9 +325,40 @@ export default function AdminLayout() {
                 path="inventory"
                 element={
                   isSuperAdminViewer ? (
-                    <div className="p-6">
-                      <h1 className="text-2xl font-bold">Inventory</h1>
-                    </div>
+                    <SuperAdminInventoryHub />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="inventory/pos"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminPOSInventory />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="inventory/qr"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminQRInventory />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="inventory/pg"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminPGInventory />
                   ) : (
                     <Navigate to="/login" replace />
                   )
@@ -344,9 +380,7 @@ export default function AdminLayout() {
                 path="service-management"
                 element={
                   isSuperAdminViewer ? (
-                    <div className="p-6">
-                      <h1 className="text-2xl font-bold">Service Management</h1>
-                    </div>
+                    <SuperAdminServiceManagement />
                   ) : (
                     <Navigate to="/login" replace />
                   )

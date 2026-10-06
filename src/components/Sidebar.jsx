@@ -160,6 +160,20 @@ const Sidebar = ({ currentUser }) => {
       name: "Inventory",
       path: "/super-admin/inventory",
       icon: <FaBox />,
+      subMenu: [
+        {
+          name: "POS Inventory",
+          path: "/super-admin/inventory/pos",
+        },
+        {
+          name: "QR Inventory",
+          path: "/super-admin/inventory/qr",
+        },
+        {
+          name: "PG Inventory",
+          path: "/super-admin/inventory/pg",
+        },
+      ],
     },
     {
       name: "Service Management",
@@ -261,28 +275,45 @@ const Sidebar = ({ currentUser }) => {
               <li key={item.path}>
                 {item.subMenu ? (
                   <>
-                    {/* Setting - only opens submenu */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenSubMenu(
-                          openSubMenu === item.name ? null : item.name,
-                        )
-                      }
-                      className="w-full flex items-center px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-                    >
-                      <span className="flex-shrink-0">{item.icon}</span>
+                    <div className="flex items-center w-full">
+                      <Link
+                        to={item.path}
+                        onClick={() =>
+                          setOpenSubMenu(
+                            openSubMenu === item.name ? null : item.name,
+                          )
+                        }
+                        className={`flex-1 flex items-center px-3 py-2 rounded-lg transition-colors ${
+                          isActivePath(item.path)
+                            ? "bg-[#00D3CD] text-white"
+                            : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <span className="flex-shrink-0">{item.icon}</span>
 
-                      {!isCollapsed && (
-                        <>
+                        {!isCollapsed && (
                           <span className="ml-3 flex-1 text-left">
                             {item.name}
                           </span>
+                        )}
+                      </Link>
 
-                          <span>{openSubMenu === item.name ? "−" : "+"}</span>
-                        </>
+                      {!isCollapsed && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenSubMenu(
+                              openSubMenu === item.name ? null : item.name,
+                            );
+                          }}
+                          className="px-3 py-2 text-gray-400 hover:text-white"
+                        >
+                          {openSubMenu === item.name ? "−" : "+"}
+                        </button>
                       )}
-                    </button>
+                    </div>
 
                     {/* Submenu */}
                     {!isCollapsed &&
