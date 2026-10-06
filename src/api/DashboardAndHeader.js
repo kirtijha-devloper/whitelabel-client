@@ -11,7 +11,7 @@ const api = axios.create({
 
 export const getDashboard = async () => {
   try {
-    console.log("🔥 getDashboard STARTED");
+     
 
     const token = getAuthToken();
     if (!token) throw new Error("User Not Authorized");
@@ -21,7 +21,7 @@ export const getDashboard = async () => {
         'Authorization': `Bearer ${token}`
       }
     });
-    console.log("🔥 getDashboard RESPONSE:", response);
+    
     return response.data;
   }
   catch (error) {

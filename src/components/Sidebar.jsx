@@ -148,6 +148,11 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaCube />,
     },
     {
+      name: "Create Admin",
+      path: "/super-admin/create-admin",
+      icon: <FaUserPlus />,
+    },
+    {
       name: "Admin List",
       path: "/super-admin/admin-list",
       icon: <FaUsers />,
@@ -156,11 +161,6 @@ const Sidebar = ({ currentUser }) => {
       name: "Inventory",
       path: "/super-admin/inventory",
       icon: <FaBox />,
-    },
-    {
-      name: "Create Admin",
-      path: "/super-admin/create-admin",
-      icon: <FaUserPlus />,
     },
     {
       name: "Service Management",

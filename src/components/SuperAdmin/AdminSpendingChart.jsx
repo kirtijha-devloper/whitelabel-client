@@ -9,14 +9,40 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const AdminSpendingChart = ({ spending = [] }) => {
-  return (
-    <div className="rounded-xl bg-white p-6 shadow-sm">
+const adminSpendingData = [
+  {
+    adminName: "Admin 1",
+    amount: 25000,
+  },
+  {
+    adminName: "Admin 2",
+    amount: 18000,
+  },
+  {
+    adminName: "Admin 3",
+    amount: 42000,
+  },
+  {
+    adminName: "Admin 4",
+    amount: 12000,
+  },
+  {
+    adminName: "Admin 5",
+    amount: 30000,
+  },
+];
 
+const AdminSpendingChart = () => {
+  const formatCurrency = (value) => {
+    return `₹${Number(value).toLocaleString("en-IN")}`;
+  };
+
+  return (
+    <div className="w-full rounded-2xl bg-white p-6 shadow-sm">
       {/* HEADER */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800">
-          Admin Spending
+      <div className="mb-5">
+        <h3 className="text-xl font-semibold text-gray-900">
+          User Spending
         </h3>
 
         <p className="mt-1 text-sm text-gray-500">
@@ -25,43 +51,39 @@ const AdminSpendingChart = ({ spending = [] }) => {
       </div>
 
       {/* CHART */}
-      <div className="h-[400px] w-full">
-
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
+      <div className="h-[360px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={spending}
+            data={adminSpendingData}
             margin={{
               top: 20,
-              right: 30,
-              left: 20,
-              bottom: 30,
+              right: 20,
+              left: 10,
+              bottom: 20,
             }}
           >
-
             <CartesianGrid
               strokeDasharray="3 3"
+              vertical={false}
             />
 
             <XAxis
               dataKey="adminName"
+              tick={{
+                fontSize: 12,
+              }}
             />
 
             <YAxis
-              tickFormatter={(value) =>
-                `₹${Number(value).toLocaleString(
-                  "en-IN"
-                )}`
-              }
+              tickFormatter={formatCurrency}
+              tick={{
+                fontSize: 12,
+              }}
             />
 
             <Tooltip
               formatter={(value) => [
-                `₹${Number(value).toLocaleString(
-                  "en-IN"
-                )}`,
+                formatCurrency(value),
                 "Amount Spent",
               ]}
             />
@@ -69,14 +91,13 @@ const AdminSpendingChart = ({ spending = [] }) => {
             <Bar
               dataKey="amount"
               name="Amount Spent"
+              fill="#00D3CD"
               radius={[6, 6, 0, 0]}
+              barSize={45}
             />
-
           </BarChart>
         </ResponsiveContainer>
-
       </div>
-
     </div>
   );
 };

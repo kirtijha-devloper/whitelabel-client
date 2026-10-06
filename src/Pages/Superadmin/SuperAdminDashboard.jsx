@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AdminStatCard from "../../components/SuperAdmin/AdminStatCard";
+import ServiceUsageChart from "../../components/SuperAdmin/ServiceUsageChart";
 import AdminSpendingChart from "../../components/SuperAdmin/AdminSpendingChart";
 
 const SuperAdminDashboard = () => {
@@ -78,10 +79,15 @@ const SuperAdminDashboard = () => {
       </div>
 
       {/* ADMIN SPENDING */}
-      <AdminSpendingChart
-        spending={dashboardData.spending}
-      />
+       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
+        {/* LEFT - SERVICE USAGE */}
+        <ServiceUsageChart />
+
+        {/* RIGHT - ADMIN SPENDING */}
+        <AdminSpendingChart />
+
+      </div>
     </div>
   );
 };
