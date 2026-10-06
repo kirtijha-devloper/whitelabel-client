@@ -186,8 +186,8 @@ function AddUser({ currentUser }) {
   const [selectedMachines, setSelectedMachines] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const normalizedRole = String(currentUser?.role || "").trim().toLowerCase();
-  const isActualAdminUser = normalizedRole === "admin";
-  const isAdminArea = location.pathname.startsWith("/admin/");
+  const isActualAdminUser = normalizedRole === "admin" || normalizedRole === "super_admin";
+  const isAdminArea = location.pathname.startsWith("/admin/") || location.pathname.startsWith("/super-admin/");
   const isFranchiseUser = normalizedRole === "franchise" || location.pathname.startsWith("/franchise/");
   const isSuperFranchiseUser = normalizedRole === "super_franchise" || location.pathname.startsWith("super-frenchise");
   const parsedEditUserId = Number(routeUserId);
@@ -276,9 +276,20 @@ function AddUser({ currentUser }) {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isEditMode || !editableUserResponse?.user) return;
+    if (!isEditMode) return;
 
-    const user = editableUserResponse.user;
+    const storedUser = (() => {
+      try {
+        const raw = localStorage.getItem("selectedUser");
+        const parsed = raw ? JSON.parse(raw) : null;
+        return String(parsed?.id) === String(routeUserId) ? parsed : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    const user = editableUserResponse?.user || editableUserResponse?.data || storedUser;
+    if (!user) return;
     dispatch({
       type: "UPDATE_FORM",
       payload: {

@@ -86,6 +86,7 @@ const SetLimit = lazy(() => import("../Pages/SetLimit"));
 const PosSetting = lazy(() => import("../Pages/PosSetting"));
 
 const CreateAdmin = lazy(() => import("../Pages/Superadmin/CreateAdmin"));
+const AdminProfile = lazy(() => import("../Pages/Superadmin/AdminProfile"));
 
 const AdminList = lazy(() => import('../Pages/AdminList'))
 
@@ -154,10 +155,10 @@ export default function AdminLayout() {
   const isSuperAdminViewer = isSuperAdminUser(currentUser);
 
   const employeeLandingPath = getAdminLandingPathForUser(currentUser);
-  const canCreateUsers = hasPermission(currentUser, "users.create");
-  const canViewUsers = hasPermission(currentUser, "users.list");
-  const canReadUsers = hasPermission(currentUser, "users.read");
-  const canUpdateUsers = hasPermission(currentUser, "users.update");
+  const canCreateUsers = isSuperAdminViewer || hasPermission(currentUser, "users.create");
+  const canViewUsers = isSuperAdminViewer || hasPermission(currentUser, "users.list");
+  const canReadUsers = isSuperAdminViewer || hasPermission(currentUser, "users.read");
+  const canUpdateUsers = isSuperAdminViewer || hasPermission(currentUser, "users.update");
   const canViewStockPos = hasAnyPermission(currentUser, [
     "stock.pos.read",
     "stock.pos.manage",
@@ -265,6 +266,50 @@ export default function AdminLayout() {
                 element={
                   isSuperAdminViewer ? (
                     <AdminList currentUser={currentUser}/>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="user/:id"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminProfile currentUser={currentUser} />
+                  ) : (
+                    guardRoute(canReadUsers, <UserDetails currentUser={currentUser} />)
+                  )
+                }
+              />
+
+              <Route
+                path="admin/:id"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminProfile currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="user/:id/edit"
+                element={
+                  isSuperAdminViewer ? (
+                    <CreateAdmin />
+                  ) : (
+                    guardRoute(canUpdateUsers, <AddUser currentUser={currentUser} />)
+                  )
+                }
+              />
+
+              <Route
+                path="create-admin/:id"
+                element={
+                  isSuperAdminViewer ? (
+                    <CreateAdmin />
                   ) : (
                     <Navigate to="/login" replace />
                   )
