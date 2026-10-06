@@ -288,6 +288,7 @@ function Settings({ currentUser }) {
     return EMPLOYEE_PERMISSION_MODULES.filter(
       (module) =>
         module.permissions.every((permission) => availableSlugs.has(permission)) ||
+        (module.key === 'pos-settlement' && module.permissions.some((permission) => availableSlugs.has(permission))) ||
         module.permissions.some((p) => String(p).startsWith('set_limit'))
     );
   }, [accessRolePermissions]);
@@ -763,6 +764,9 @@ function Settings({ currentUser }) {
 
     const moduleKeys = Array.from(selectedRoleModuleKeys);
     const selectedPermissions = buildPermissionsFromModuleKeys(moduleKeys);
+    const settlementPermissions = moduleKeys.includes('pos-settlement')
+      ? ['settlement.read', 'settlement.manage']
+      : [];
 
     const saveCustomRolePermissions = (roleId) => {
       if (roleId) {
@@ -776,9 +780,12 @@ function Settings({ currentUser }) {
     };
 
     const validBackendSlugs = new Set(accessRolePermissions.map((p) => p.slug));
-    const backendPermissions = selectedPermissions.filter(
-      (p) => validBackendSlugs.size === 0 || validBackendSlugs.has(p)
-    );
+    const backendPermissions = Array.from(new Set([
+      ...selectedPermissions.filter(
+        (p) => validBackendSlugs.size === 0 || validBackendSlugs.has(p)
+      ),
+      ...settlementPermissions,
+    ]));
 
     const payload = {
       name: trimmedName,

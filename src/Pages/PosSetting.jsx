@@ -38,6 +38,7 @@ import { recordLimitAuditLog, calculateFranchisePoolStats, dispatchLimitChangeEv
 import { clearAllTestTransactionData, getTodayDateKey, dispatchSettlementChangeEvent } from "../utils/userSettlement";
 import { fetchServiceSettings } from "../api/serviceSettingsApi";
 import { useServiceSettingsPolling } from "../hooks/useServiceSettingsPolling";
+import { hasAnyPermission, hasPermission } from "../utils/accessControl";
 
 export default function PosSetting({ currentUser }) {
   const queryClient = useQueryClient();
@@ -45,21 +46,24 @@ export default function PosSetting({ currentUser }) {
 
   const userRole = normalizeUserRole(currentUser?.role);
   const isAdmin = userRole === "admin";
+  const isEmployee = userRole === "employee";
   const isSuperFranchise = userRole === "super_franchise";
   const isFranchise = userRole === "franchise";
+  const canManageSettlement = isAdmin || hasPermission(currentUser, "settlement.manage");
+  const canViewSettlement = isAdmin || hasAnyPermission(currentUser, ["settlement.read", "settlement.manage"]);
+  const canReadServiceSettings = isAdmin || hasPermission(currentUser, "rate.settings.read");
 
   // Fetch global service settings with direct 5s polling for instant cross-tab disable/enable
   const { data: serviceSettingsData, refetch: refetchServiceSettings } = useQuery({
     queryKey: ["admin-service-settings"],
     queryFn: fetchServiceSettings,
+    enabled: canReadServiceSettings,
     refetchInterval: 5000,
     staleTime: 3 * 1000,
     refetchOnWindowFocus: true,
   });
 
-  useServiceSettingsPolling();
-
-  const isPosServiceActive = getServiceFlagValue(serviceSettingsData, "pos_t0_settlement", true);
+  useServiceSettingsPolling(canReadServiceSettings);
 
   const { data: posTodayTxns } = useQuery({
     queryKey: ["posSettingTodayTxns", currentUser?.id],
@@ -187,17 +191,26 @@ export default function PosSetting({ currentUser }) {
   });
 
   // Fetch POS Settings Data (Auto-polls every 3 seconds for instant live updates)
-  const { data: posData, isLoading: isPosLoading, refetch: refetchPos } = useQuery({
+  const { data: posData, isLoading: isPosLoading, error: posError, refetch: refetchPos } = useQuery({
     queryKey: ["posSettings"],
     queryFn: fetchPosSettings,
     refetchInterval: 3000,
     refetchOnWindowFocus: true,
   });
 
+  const posSettlementEnabled =
+    posData?.data?.summary?.is_pos_t0_settlement_enabled ??
+    posData?.stats?.is_pos_t0_settlement_enabled;
+  const serviceSettingsForPos = canReadServiceSettings
+    ? serviceSettingsData
+    : { pos_t0_settlement: posSettlementEnabled };
+  const isPosServiceActive = getServiceFlagValue(serviceSettingsForPos, "pos_t0_settlement", true);
+
   // Fetch All Users List from System (Auto-polls every 3 seconds)
-  const { data: allUsersData, isLoading: isUsersLoading, refetch: refetchUsers } = useQuery({
+  const { data: allUsersData, isLoading: isUsersLoading, error: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ["allUsersListForPosSetting"],
     queryFn: () => AllUsers({ limit: 1000 }),
+    enabled: !isEmployee,
     refetchInterval: 3000,
     refetchOnWindowFocus: true,
   });
@@ -305,10 +318,14 @@ export default function PosSetting({ currentUser }) {
   });
 
   const rawUsersList = useMemo(() => {
-    const fromPos = Array.isArray(posData?.customers) ? posData.customers : [];
+    const fromPos = Array.isArray(posData?.data?.customers)
+      ? posData.data.customers
+      : Array.isArray(posData?.customers)
+        ? posData.customers
+        : [];
     const fromAllUsers = extractUsersArray(allUsersData);
 
-    const baseList = fromAllUsers.length > 0 ? fromAllUsers : fromPos;
+    const baseList = isEmployee ? fromPos : fromAllUsers.length > 0 ? fromAllUsers : fromPos;
     const posMap = new Map(fromPos.map((item) => [String(item.id), item]));
 
     // Exclude admin, superadmin, subadmin, employee, and staff accounts completely from Settlement Page
@@ -332,7 +349,7 @@ export default function PosSetting({ currentUser }) {
         t0_daily_limit: u.t0_daily_limit ?? posItem.t0_daily_limit ?? null,
       };
     });
-  }, [posData?.customers, allUsersData]);
+  }, [posData?.data?.customers, posData?.customers, allUsersData, isEmployee]);
 
   // Map of Franchise ID -> array of child Merchants
   const franchiseMerchantsMap = useMemo(() => {
@@ -411,8 +428,8 @@ export default function PosSetting({ currentUser }) {
       });
     }
 
-    if (isAdmin) {
-      // Direct admin children: Super Franchises + Franchises (not under SF) + Direct Merchants with no parent franchise
+    if (isAdmin || isEmployee) {
+      // Direct admin/employee children: Super Franchises + standalone Franchises + Direct Merchants
       return rawUsersList.filter((u) => {
         const uRole = normalizeUserRole(u.role);
         if (
@@ -444,7 +461,7 @@ export default function PosSetting({ currentUser }) {
         uRole !== "staff"
       );
     });
-  }, [rawUsersList, isSuperFranchise, isFranchise, isAdmin, currentUser?.id]);
+  }, [rawUsersList, isSuperFranchise, isFranchise, isAdmin, isEmployee, currentUser?.id]);
 
   const stats = useMemo(() => {
     const total = scopedUsersList.length;
@@ -1358,7 +1375,7 @@ export default function PosSetting({ currentUser }) {
         ? franchiseMerchantsMap.get(String(user.id)) || []
         : [];
     const hasChildUsers = childUsers.length > 0;
-    const canExpand = (isAdmin || isSuperFranchise) && (isSuperFranchiseRole || isFranchiseRole) && hasChildUsers;
+    const canExpand = (isAdmin || isSuperFranchise || (isEmployee && canViewSettlement)) && (isSuperFranchiseRole || isFranchiseRole) && hasChildUsers;
     const isExpanded = Boolean(canExpand && (expandedFranchiseMap[user.id] || (searchTerm && childUsers.length > 0)));
 
     const childRoleLabel = isSuperFranchiseRole ? "Franchises" : "Merchants";
@@ -1468,38 +1485,44 @@ export default function PosSetting({ currentUser }) {
 
           {/* T0 Daily Limit */}
           <td className="p-3.5">
-            <div className="flex items-center gap-1.5 max-w-[180px]">
-              <span className="text-slate-400 font-semibold text-xs">₹</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="Unassigned (T1)"
-                value={currentEditValue}
-                onChange={(e) => handleLimitInputChange(user.id, e.target.value)}
-                onWheel={(e) => e.target.blur()}
-                onKeyDown={(e) => {
-                  if (e.key === "-" || e.key === "." || e.key === "e" || e.key === "E") {
-                    e.preventDefault();
-                  }
-                }}
-                disabled={!isPosServiceActive}
-                className={`w-full px-2.5 py-1 text-xs font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#00D3CD] focus:outline-none ${!isPosServiceActive ? "opacity-50 cursor-not-allowed bg-slate-100" : ""}`}
-                title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
-              />
-            </div>
+            {canManageSettlement ? (
+              <div className="flex items-center gap-1.5 max-w-[180px]">
+                <span className="text-slate-400 font-semibold text-xs">₹</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Unassigned (T1)"
+                  value={currentEditValue}
+                  onChange={(e) => handleLimitInputChange(user.id, e.target.value)}
+                  onWheel={(e) => e.target.blur()}
+                  onKeyDown={(e) => {
+                    if (e.key === "-" || e.key === "." || e.key === "e" || e.key === "E") {
+                      e.preventDefault();
+                    }
+                  }}
+                  disabled={!isPosServiceActive}
+                  className={`w-full px-2.5 py-1 text-xs font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#00D3CD] focus:outline-none ${!isPosServiceActive ? "opacity-50 cursor-not-allowed bg-slate-100" : ""}`}
+                  title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
+                />
+              </div>
+            ) : (
+              <span>{isLimitSet ? `₹${rawLimit}` : "Unassigned (T1)"}</span>
+            )}
           </td>
 
           {/* Action */}
           <td className="p-3.5 text-right">
-            <button
-              onClick={() => handleSaveCustomerLimit(user)}
-              disabled={updateLimitMutation.isPending || !isPosServiceActive}
-              className={`px-3.5 py-1.5 text-xs font-semibold text-white bg-[#00D3CD] hover:bg-[#00bdb7] rounded-lg transition-colors shadow-sm disabled:opacity-50 ${!isPosServiceActive ? "cursor-not-allowed" : ""}`}
-              title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
-            >
-              Save Limit
-            </button>
+            {canManageSettlement && (
+              <button
+                onClick={() => handleSaveCustomerLimit(user)}
+                disabled={updateLimitMutation.isPending || !isPosServiceActive}
+                className={`px-3.5 py-1.5 text-xs font-semibold text-white bg-[#00D3CD] hover:bg-[#00bdb7] rounded-lg transition-colors shadow-sm disabled:opacity-50 ${!isPosServiceActive ? "cursor-not-allowed" : ""}`}
+                title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
+              >
+                Save Limit
+              </button>
+            )}
           </td>
         </tr>
 
@@ -1617,7 +1640,16 @@ export default function PosSetting({ currentUser }) {
     );
   };
 
-  const isLoading = isPosLoading && isUsersLoading;
+  const isLoading = isEmployee ? isPosLoading : isPosLoading && isUsersLoading;
+
+  if (posError || (!isEmployee && usersError)) {
+    const error = posError || usersError;
+    return (
+      <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+        Failed to load Settlement data: {error.message || "Please try again."}
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -1659,22 +1691,26 @@ export default function PosSetting({ currentUser }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessingExcel || !isPosServiceActive}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 ${!isPosServiceActive ? "cursor-not-allowed" : ""}`}
-            title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
-          >
-            <Upload className="w-4 h-4" />
-            {isProcessingExcel ? "Uploading Excel..." : "Upload Excel Limits"}
-          </button>
-          <button
-            onClick={handleDownloadFormat}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors border border-slate-200"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Download Format
-          </button>
+          {canManageSettlement && (
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingExcel || !isPosServiceActive}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 ${!isPosServiceActive ? "cursor-not-allowed" : ""}`}
+                title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
+              >
+                <Upload className="w-4 h-4" />
+                {isProcessingExcel ? "Uploading Excel..." : "Upload Excel Limits"}
+              </button>
+              <button
+                onClick={handleDownloadFormat}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors border border-slate-200"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                Download Format
+              </button>
+            </>
+          )}
         </div>
       </div>
 
