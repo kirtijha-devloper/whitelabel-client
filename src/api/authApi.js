@@ -548,7 +548,6 @@ export const fetchUserDetails = async () => {
     const token = getAuthToken();
 
     if (!token) throw new Error("No token found");
-    console.info("[auth] current token:", token);
 
     const response = await api.get(`/user/current`, {
       headers: {

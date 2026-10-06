@@ -167,9 +167,9 @@ export const EMPLOYEE_PERMISSION_MODULES = [
   {
     key: "pos-settlement",
     section: "Settlement",
-    label: "POS Settlement & Daily Limits",
-    description: "Allow employee to access the Settlement page, set/override user daily limits, and manage settlement modes.",
-    permissions: ["pos.settlement.read", "pos.settlement.manage"],
+    label: "Manage Settlement",
+    description: "Allow employee to view and manage Settlement, including daily limits and settlement modes.",
+    permissions: ["settlement.read", "settlement.manage"],
     landingPath: "/admin/pos-setting",
   },
 ];

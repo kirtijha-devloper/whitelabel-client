@@ -26,36 +26,26 @@ const getAuthHeaders = () => {
  */
 export const fetchPosSettings = async () => {
   try {
-    const token = getAuthToken();
-    if (!token) return { success: true, stats: {}, customers: [] };
-
     // Try primary POS Setting endpoint
     try {
       const response = await api.get("/admin/pos-setting", getAuthHeaders());
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || "Failed to fetch Settlement data");
+      }
       return response.data;
     } catch (err) {
       try {
         const pgResp = await api.get("/admin/pg-setting", getAuthHeaders());
+        if (pgResp.data?.success === false) {
+          throw new Error(pgResp.data?.message || "Failed to fetch Settlement data");
+        }
         return pgResp.data;
-      } catch (err2) {
-        return {
-          success: true,
-          stats: {},
-          customers: [],
-        };
+      } catch (fallbackError) {
+        throw fallbackError;
       }
     }
   } catch (error) {
-    return {
-      success: true,
-      stats: {
-        total_customers: 0,
-        t0_active_count: 0,
-        t1_active_count: 0,
-        t0_limit_configured_count: 0,
-      },
-      customers: [],
-    };
+    throw error;
   }
 };
 
@@ -96,11 +86,7 @@ export const updateCustomerT0Limit = async (customerId, t0DailyLimit) => {
     }
   } catch (error) {
     console.error("Failed to update T0 limit on server:", error);
-    return {
-      success: true,
-      message: "T0 daily limit saved successfully",
-      t0_daily_limit: numericLimit,
-    };
+    throw error;
   }
 };
 
@@ -140,11 +126,7 @@ export const updateUserSettlementType = async (customerId, settlementType) => {
     }
   } catch (error) {
     console.error("Failed to update settlement type on server:", error);
-    return {
-      success: true,
-      message: `Settlement mode updated to ${settlementType}`,
-      settlement_type: settlementType,
-    };
+    throw error;
   }
 };
 
@@ -169,9 +151,6 @@ export const bulkSetSettlementType = async (settlementType) => {
       return userResp.data;
     }
   } catch (error) {
-    return {
-      success: true,
-      message: `All users updated to ${settlementType} settlement mode`,
-    };
+    throw error;
   }
 };

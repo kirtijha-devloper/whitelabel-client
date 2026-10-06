@@ -73,7 +73,7 @@ const LoginForm = () => {
       console.log(user, 'User details fetched');
       const role = normalizeRole(user?.role);
 
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'super_admin') {
         navigate('/admin/dashboard');
       } else if (role === 'employee') {
         navigate(getAdminLandingPathForUser(user));
