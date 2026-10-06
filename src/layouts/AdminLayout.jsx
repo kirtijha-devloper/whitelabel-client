@@ -195,9 +195,8 @@ export default function AdminLayout() {
     "set_limit.excel",
   ]);
   const canViewPosSetting = hasAnyPermission(currentUser, [
-    "pos.settlement.read",
-    "pos.settlement.manage",
-    "set_limit.read",
+    "settlement.read",
+    "settlement.manage",
   ]);
 
   if (
@@ -317,7 +316,10 @@ export default function AdminLayout() {
                       <h1 className="text-2xl font-bold">Setting</h1>
                     </div>
                   ) : (
-                    <Navigate to="/login" replace />
+                    guardRoute(
+                      isAdminViewer,
+                      <Settings currentUser={currentUser} />,
+                    )
                   )
                 }
               />
@@ -472,13 +474,6 @@ export default function AdminLayout() {
                 element={guardRoute(
                   canViewComplaints,
                   <ComplaintBox currentUser={currentUser} />,
-                )}
-              />
-              <Route
-                path="setting"
-                element={guardRoute(
-                  isAdminViewer,
-                  <Settings currentUser={currentUser} />,
                 )}
               />
               <Route

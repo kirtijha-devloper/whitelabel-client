@@ -127,9 +127,8 @@ const Sidebar = ({ currentUser }) => {
       path: "/admin/pos-setting",
       icon: <FaSlidersH />,
       permissions: [
-        "pos.settlement.read",
-        "pos.settlement.manage",
-        "set_limit.read",
+        "settlement.read",
+        "settlement.manage",
       ],
     },
     { name: "Setting", path: "/admin/setting", icon: <FaCog /> },
