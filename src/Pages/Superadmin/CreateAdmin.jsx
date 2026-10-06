@@ -15,7 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 import { useUserCreation } from '../../context/UserCreationContext';
-import StepIndicator from '../../components/StepIndicator';
+// import StepIndicator from '../../components/StepIndicator';
 
 const steps = [
   'Basic Info',
@@ -87,15 +87,44 @@ function CreateAdmin() {
     }
   };
 
+  const FILE_FIELD_CONFIG = [
+  {
+    name: 'aadhar_photo',
+    label: 'Aadhaar Front Photo',
+    accept: 'image/*',
+  },
+  {
+    name: 'aadhar_back_photo',
+    label: 'Aadhaar Back Photo',
+    accept: 'image/*',
+  },
+  {
+    name: 'pan_photo',
+    label: 'PAN Card Photo',
+    accept: 'image/*',
+  },
+  {
+    name: 'bank_passbook',
+    label: 'Bank Passbook',
+    accept: 'image/*,application/pdf',
+  },
+  {
+    name: 'shop_photo',
+    label: 'Shop / Office Photo',
+    accept: 'image/*',
+    fullWidth: true,
+  },
+];
+
   return (
     <div className="min-h-screen p-4 md:p-6">
       {/* ==========================================
           STEP INDICATOR
       ========================================== */}
-      <StepIndicator
+      {/* <StepIndicator
         currentStep={state.currentStep}
         steps={steps}
-      />
+      /> */}
 
       <div className="max-w-4xl mx-auto">
         {/* ==========================================
@@ -109,9 +138,9 @@ function CreateAdmin() {
             <h1 className="text-2xl font-bold text-gray-900">
               Create Admin
             </h1>
-            <p className="text-sm text-gray-500">
+            {/* <p className="text-sm text-gray-500">
               Create a new admin account
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -135,7 +164,8 @@ function CreateAdmin() {
                     type="radio"
                     name="role"
                     value="admin"
-                    checked={state.formData.role === 'admin'}
+                    checked={true}
+                    disabled
                     onChange={handleChange}
                     className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
                   />
@@ -417,6 +447,9 @@ function CreateAdmin() {
             {/* ==========================================
                 KYC & DOCUMENT INFORMATION
             ========================================== */}
+            {/* ==========================================
+    KYC & DOCUMENT INFORMATION
+========================================== */}
             <div className="bg-gray-50 rounded-lg p-5">
               <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText size={18} />
@@ -424,11 +457,13 @@ function CreateAdmin() {
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* AADHAR NUMBER */}
-                <div>
+
+                {/* AADHAAR NUMBER */}
+                <div className="min-w-0">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Aadhaar Number
                   </label>
+
                   <input
                     type="text"
                     name="aadhar_number"
@@ -436,16 +471,24 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required
                     maxLength={12}
+                    inputMode="numeric"
+                    pattern="[0-9]{12}"
                     placeholder="Enter 12-digit Aadhaar number"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    title="Aadhaar number must contain exactly 12 digits"
+                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Only 12 digits allowed.
+                  </p>
                 </div>
 
                 {/* PAN NUMBER */}
-                <div>
+                <div className="min-w-0">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     PAN Number
                   </label>
+
                   <input
                     type="text"
                     name="pan_number"
@@ -453,80 +496,68 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required
                     maxLength={10}
+                    inputMode="text"
+                    pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
                     placeholder="Enter 10-char PAN number"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
+                    title="PAN must be 5 letters, 4 digits, and 1 letter"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
                   />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Format: ABCDE1234F
+                  </p>
                 </div>
 
-                {/* AADHAAR FRONT */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aadhaar Front Photo
-                  </label>
-                  <input
-                    type="file"
-                    name="aadhar_photo"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="w-full text-sm text-gray-700 px-3 py-2 border rounded-lg bg-white"
-                  />
-                </div>
+                {/* DOCUMENT FILES */}
+                {FILE_FIELD_CONFIG.map((field) => {
+                  const selectedFile = state.formData[field.name];
+                  const hasSelectedFile = selectedFile instanceof File;
+                  const inputId = `upload-${field.name}`;
 
-                {/* AADHAAR BACK */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aadhaar Back Photo
-                  </label>
-                  <input
-                    type="file"
-                    name="aadhar_back_photo"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="w-full text-sm text-gray-700 px-3 py-2 border rounded-lg bg-white"
-                  />
-                </div>
+                  return (
+                    <div
+                      key={field.name}
+                      className={`${field.fullWidth ? 'md:col-span-2 ' : ''}min-w-0`}
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {field.label}
+                      </label>
 
-                {/* PAN PHOTO */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PAN Card Photo
-                  </label>
-                  <input
-                    type="file"
-                    name="pan_photo"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="w-full text-sm text-gray-700 px-3 py-2 border rounded-lg bg-white"
-                  />
-                </div>
+                      {/* FILE BOX */}
+                      <div className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-3">
 
-                {/* BANK PASSBOOK */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bank Passbook
-                  </label>
-                  <input
-                    type="file"
-                    name="bank_passbook"
-                    onChange={handleFileChange}
-                    accept="image/*,application/pdf"
-                    className="w-full text-sm text-gray-700 px-3 py-2 border rounded-lg bg-white"
-                  />
-                </div>
+                          {/* SELECT / REPLACE FILE BUTTON */}
+                          <label
+                            htmlFor={inputId}
+                            className="cursor-pointer inline-flex items-center rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+                          >
+                            {hasSelectedFile ? 'Replace File' : 'Select File'}
+                          </label>
 
-                {/* SHOP PHOTO */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Shop / Office Photo
-                  </label>
-                  <input
-                    type="file"
-                    name="shop_photo"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="w-full text-sm text-gray-700 px-3 py-2 border rounded-lg bg-white"
-                  />
-                </div>
+                          {/* SELECTED FILE NAME */}
+                          <span className="min-w-0 break-all text-xs text-gray-600">
+                            {hasSelectedFile
+                              ? selectedFile.name
+                              : 'No file selected'}
+                          </span>
+                        </div>
+
+                        {/* HIDDEN FILE INPUT */}
+                        <input
+                          id={inputId}
+                          type="file"
+                          name={field.name}
+                          onChange={handleFileChange}
+                          accept={field.accept}
+                          className="hidden"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
