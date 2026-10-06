@@ -3,20 +3,15 @@ import { getAuthToken } from "../utils/auth";
 import { BASE_URL } from "../constants";
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL + "/super-admin",
 });
 
 /**
  * Create Admin + Company
- *
- * Super Admin creates:
- * 1. Company
- * 2. Admin User
- * 3. Company documents
- *
- * All data is sent in one multipart/form-data request.
+ * Super Admin creates Company and Admin User.
+ * Accepts either FormData (multipart) or plain JSON object.
  */
-export const createAdmin = async (formData) => {
+export const createAdmin = async (data) => {
   try {
     const token = getAuthToken();
 
@@ -24,78 +19,69 @@ export const createAdmin = async (formData) => {
       throw new Error("Unauthorized User");
     }
 
-    if (!(formData instanceof FormData)) {
-      throw new Error("Create Admin data must be FormData");
+    const headers = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    if (data instanceof FormData) {
+      headers["Content-Type"] = "multipart/form-data";
     }
 
-    const response = await api.post(
-      "/admin/create-admin",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await api.post("/createAdmin", data, { headers });
 
     return response.data;
   } catch (error) {
     console.error("[createAdmin] request failed", {
       status: error?.response?.status ?? null,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        null,
+      message: error?.response?.data?.message || error?.message || null,
       details: error?.response?.data ?? null,
     });
 
-    throw new Error(
-      error?.response?.data?.message ||
-      "Failed to create admin"
-    );
+    throw new Error(error?.response?.data?.message || "Failed to create admin");
   }
 };
 
 /**
  * Get Admin List
+ * Supports pagination, status, and search filters
  */
-export const getAdminList = async () => {
+export const getAdminList = async (params = {}) => {
   try {
     const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
 
-    if (!token) {
-      throw new Error("Unauthorized User");
-    }
+    const { page, limit, status, role, search, q } = params;
+    let url = "/getAllAdmins";
+    const query = [];
+    if (page) query.push(`page=${encodeURIComponent(page)}`);
+    if (limit) query.push(`limit=${encodeURIComponent(limit)}`);
+    if (status) query.push(`status=${encodeURIComponent(status)}`);
+    if (role) query.push(`role=${encodeURIComponent(role)}`);
+    const searchTerm = search || q;
+    if (searchTerm) query.push(`search=${encodeURIComponent(searchTerm)}`);
+    if (query.length) url += `?${query.join("&")}`;
 
-    const response = await api.get(
-      "/admin/list",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await api.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     return response.data;
   } catch (error) {
     console.error("[getAdminList] request failed", {
       status: error?.response?.status ?? null,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        null,
+      message: error?.response?.data?.message || error?.message || null,
       details: error?.response?.data ?? null,
     });
 
-    throw new Error(
-      error?.response?.data?.message ||
-      "Failed to fetch admin list"
-    );
+    throw new Error(error?.response?.data?.message || "Failed to fetch admin list");
   }
 };
 
 /**
  * Get Admin Details
+ * Accepts numeric ID, encrypted string ID, or raw identifier
  */
 export const getAdminDetails = async (id) => {
   try {
@@ -105,44 +91,36 @@ export const getAdminDetails = async (id) => {
       throw new Error("Unauthorized User");
     }
 
-    const adminId = Number(id);
-
-    if (!Number.isFinite(adminId)) {
-      throw new Error("Invalid admin id");
+    if (!id) {
+      throw new Error("Admin ID is required");
     }
 
-    const response = await api.get(
-      `/admin/${adminId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const safeId = encodeURIComponent(String(id));
+
+    const response = await api.get(`/admin/${safeId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     return response.data;
   } catch (error) {
     console.error("[getAdminDetails] request failed", {
       id,
       status: error?.response?.status ?? null,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        null,
+      message: error?.response?.data?.message || error?.message || null,
       details: error?.response?.data ?? null,
     });
 
-    throw new Error(
-      error?.response?.data?.message ||
-      "Failed to fetch admin details"
-    );
+    throw new Error(error?.response?.data?.message || "Failed to fetch admin details");
   }
 };
 
 /**
  * Update Admin + Company
+ * Accepts numeric ID, encrypted string ID, or raw identifier
  */
-export const updateAdmin = async (id, formData) => {
+export const updateAdmin = async (id, data) => {
   try {
     const token = getAuthToken();
 
@@ -150,47 +128,37 @@ export const updateAdmin = async (id, formData) => {
       throw new Error("Unauthorized User");
     }
 
-    const adminId = Number(id);
-
-    if (!Number.isFinite(adminId)) {
-      throw new Error("Invalid admin id");
+    if (!id) {
+      throw new Error("Admin ID is required");
     }
 
-    if (!(formData instanceof FormData)) {
-      throw new Error("Update Admin data must be FormData");
+    const safeId = encodeURIComponent(String(id));
+    const headers = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    if (data instanceof FormData) {
+      headers["Content-Type"] = "multipart/form-data";
     }
 
-    const response = await api.put(
-      `/admin/${adminId}`,
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await api.put(`/admin/${safeId}`, data, { headers });
 
     return response.data;
   } catch (error) {
     console.error("[updateAdmin] request failed", {
       id,
       status: error?.response?.status ?? null,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        null,
+      message: error?.response?.data?.message || error?.message || null,
       details: error?.response?.data ?? null,
     });
 
-    throw new Error(
-      error?.response?.data?.message ||
-      "Failed to update admin"
-    );
+    throw new Error(error?.response?.data?.message || "Failed to update admin");
   }
 };
 
 /**
  * Update Admin Status
+ * Accepts numeric ID, encrypted string ID, or raw identifier
  */
 export const updateAdminStatus = async (id, status) => {
   try {
@@ -200,17 +168,15 @@ export const updateAdminStatus = async (id, status) => {
       throw new Error("Unauthorized User");
     }
 
-    const adminId = Number(id);
-
-    if (!Number.isFinite(adminId)) {
-      throw new Error("Invalid admin id");
+    if (!id) {
+      throw new Error("Admin ID is required");
     }
 
+    const safeId = encodeURIComponent(String(id));
+
     const response = await api.patch(
-      `/admin/${adminId}/status`,
-      {
-        status,
-      },
+      `/admin/${safeId}/status`,
+      { status },
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -224,15 +190,44 @@ export const updateAdminStatus = async (id, status) => {
       id,
       status,
       responseStatus: error?.response?.status ?? null,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        null,
+      message: error?.response?.data?.message || error?.message || null,
     });
 
-    throw new Error(
-      error?.response?.data?.message ||
-      "Failed to update admin status"
-    );
+    throw new Error(error?.response?.data?.message || "Failed to update admin status");
+  }
+};
+
+/**
+ * Get POS Inventory for Super Admin
+ */
+export const getSuperAdminPosInventory = async (params = {}) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const { page, limit, status, search } = params;
+    let url = "/getPosInventory";
+    const query = [];
+    if (page) query.push(`page=${encodeURIComponent(page)}`);
+    if (limit) query.push(`limit=${encodeURIComponent(limit)}`);
+    if (status) query.push(`status=${encodeURIComponent(status)}`);
+    if (search) query.push(`search=${encodeURIComponent(search)}`);
+    if (query.length) url += `?${query.join("&")}`;
+
+    const response = await api.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("[getSuperAdminPosInventory] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+      details: error?.response?.data ?? null,
+    });
+
+    throw new Error(error?.response?.data?.message || "Failed to fetch POS inventory");
   }
 };
