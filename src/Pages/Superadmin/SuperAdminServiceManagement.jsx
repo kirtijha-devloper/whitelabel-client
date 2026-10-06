@@ -304,7 +304,7 @@ const SuperAdminServiceManagement = () => {
           </div>
 
           {/* Category Dropdown */}
-          <select
+          {/* <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-[#00D3CD] focus:outline-none text-gray-700"
@@ -315,7 +315,7 @@ const SuperAdminServiceManagement = () => {
                 {cat}
               </option>
             ))}
-          </select>
+          </select> */}
         </div>
       </div>
 

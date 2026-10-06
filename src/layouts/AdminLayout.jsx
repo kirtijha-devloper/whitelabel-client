@@ -24,7 +24,7 @@ import {
 } from "../utils/accessControl";
 import { normalizeUserRole } from "../utils/userAccess";
 import LoginPopupOverlay from "../components/LoginPopupOverlay";
-import  SuperAdminDashboard  from "../Pages/Superadmin/SuperAdminDashboard";
+import SuperAdminDashboard from "../Pages/Superadmin/SuperAdminDashboard";
 
 // Lazy Load Pages
 const Dashboard = lazy(() => import("../Pages/Dashboard"));
@@ -43,7 +43,9 @@ const AllPOSTxnReport = lazy(() => import("../Pages/AllPOSTxnReports"));
 const AddPOSMachine = lazy(() => import("../Pages/AddPOSMachine"));
 const UserDetails = lazy(() => import("../Pages/UserDetails"));
 const CreateUserDetail = lazy(() => import("../Pages/CreateUserDetail"));
-const CreateUserPosDetails = lazy(() => import("../Pages/CreateUserPosDetails"));
+const CreateUserPosDetails = lazy(
+  () => import("../Pages/CreateUserPosDetails"),
+);
 const CreateChargeSet = lazy(() => import("../Pages/CreateChargeSet"));
 const TransactionDetails = lazy(() => import("../Pages/TransactionDetails"));
 const Ledger = lazy(() => import("../Pages/Ledger"));
@@ -78,22 +80,38 @@ const MerchantTransactionCharges = lazy(
 const RazorpayNotification = lazy(
   () => import("../Pages/RazorpayNotification"),
 );
-const CCBillPaymentReports = lazy(() => import("../Pages/CCBillPaymentReports"));
-const BillAvenueCCBillPayReports = lazy(() => import("../Pages/BillAvenueCCBillPayReports"));
-const BillAvenueBillerUpload = lazy(() => import("../Pages/BillAvenueBillerUpload"));
+const CCBillPaymentReports = lazy(
+  () => import("../Pages/CCBillPaymentReports"),
+);
+const BillAvenueCCBillPayReports = lazy(
+  () => import("../Pages/BillAvenueCCBillPayReports"),
+);
+const BillAvenueBillerUpload = lazy(
+  () => import("../Pages/BillAvenueBillerUpload"),
+);
 const SystemActivityLog = lazy(() => import("../Pages/SystemActivityLog"));
 const SetLimit = lazy(() => import("../Pages/SetLimit"));
 const PosSetting = lazy(() => import("../Pages/PosSetting"));
 
 const CreateAdmin = lazy(() => import("../Pages/Superadmin/CreateAdmin"));
 const AdminProfile = lazy(() => import("../Pages/Superadmin/AdminProfile"));
-const SuperAdminInventoryHub = lazy(() => import("../Pages/Superadmin/SuperAdminInventoryHub"));
-const SuperAdminPOSInventory = lazy(() => import("../Pages/Superadmin/SuperAdminPOSInventory"));
-const SuperAdminQRInventory = lazy(() => import("../Pages/Superadmin/SuperAdminQRInventory"));
-const SuperAdminPGInventory = lazy(() => import("../Pages/Superadmin/SuperAdminPGInventory"));
-const SuperAdminServiceManagement = lazy(() => import("../Pages/Superadmin/SuperAdminServiceManagement"));
+const SuperAdminInventoryHub = lazy(
+  () => import("../Pages/Superadmin/SuperAdminInventoryHub"),
+);
+const SuperAdminPOSInventory = lazy(
+  () => import("../Pages/Superadmin/SuperAdminPOSInventory"),
+);
+const SuperAdminQRInventory = lazy(
+  () => import("../Pages/Superadmin/SuperAdminQRInventory"),
+);
+const SuperAdminPGInventory = lazy(
+  () => import("../Pages/Superadmin/SuperAdminPGInventory"),
+);
+const SuperAdminServiceManagement = lazy(
+  () => import("../Pages/Superadmin/SuperAdminServiceManagement"),
+);
 
-const AdminList = lazy(() => import('../Pages/AdminList'))
+const AdminList = lazy(() => import("../Pages/AdminList"));
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -160,10 +178,14 @@ export default function AdminLayout() {
   const isSuperAdminViewer = isSuperAdminUser(currentUser);
 
   const employeeLandingPath = getAdminLandingPathForUser(currentUser);
-  const canCreateUsers = isSuperAdminViewer || hasPermission(currentUser, "users.create");
-  const canViewUsers = isSuperAdminViewer || hasPermission(currentUser, "users.list");
-  const canReadUsers = isSuperAdminViewer || hasPermission(currentUser, "users.read");
-  const canUpdateUsers = isSuperAdminViewer || hasPermission(currentUser, "users.update");
+  const canCreateUsers =
+    isSuperAdminViewer || hasPermission(currentUser, "users.create");
+  const canViewUsers =
+    isSuperAdminViewer || hasPermission(currentUser, "users.list");
+  const canReadUsers =
+    isSuperAdminViewer || hasPermission(currentUser, "users.read");
+  const canUpdateUsers =
+    isSuperAdminViewer || hasPermission(currentUser, "users.update");
   const canViewStockPos = hasAnyPermission(currentUser, [
     "stock.pos.read",
     "stock.pos.manage",
@@ -270,7 +292,7 @@ export default function AdminLayout() {
                 path="admin-list"
                 element={
                   isSuperAdminViewer ? (
-                    <AdminList currentUser={currentUser}/>
+                    <AdminList currentUser={currentUser} />
                   ) : (
                     <Navigate to="/login" replace />
                   )
@@ -283,7 +305,10 @@ export default function AdminLayout() {
                   isSuperAdminViewer ? (
                     <AdminProfile currentUser={currentUser} />
                   ) : (
-                    guardRoute(canReadUsers, <UserDetails currentUser={currentUser} />)
+                    guardRoute(
+                      canReadUsers,
+                      <UserDetails currentUser={currentUser} />,
+                    )
                   )
                 }
               />
@@ -305,7 +330,10 @@ export default function AdminLayout() {
                   isSuperAdminViewer ? (
                     <CreateAdmin />
                   ) : (
-                    guardRoute(canUpdateUsers, <AddUser currentUser={currentUser} />)
+                    guardRoute(
+                      canUpdateUsers,
+                      <AddUser currentUser={currentUser} />,
+                    )
                   )
                 }
               />
@@ -404,12 +432,10 @@ export default function AdminLayout() {
               />
 
               <Route
-                path="setting/global-services"
+                path="/super-admin/service-management"
                 element={
                   isSuperAdminViewer ? (
-                    <div className="p-6">
-                      <h1 className="text-2xl font-bold">Global Services</h1>
-                    </div>
+                    <SuperAdminServiceManagement />
                   ) : (
                     <Navigate to="/login" replace />
                   )
@@ -728,7 +754,7 @@ export default function AdminLayout() {
                 path="no-access"
                 element={
                   isEmployeeViewer &&
-                    employeeLandingPath !== "/admin/no-access" ? (
+                  employeeLandingPath !== "/admin/no-access" ? (
                     <Navigate to={employeeLandingPath} replace />
                   ) : (
                     noAccessElement

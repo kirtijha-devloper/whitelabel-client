@@ -160,34 +160,35 @@ const Sidebar = ({ currentUser }) => {
       name: "Inventory",
       path: "/super-admin/inventory",
       icon: <FaBox />,
-      subMenu: [
-        {
-          name: "POS Inventory",
-          path: "/super-admin/inventory/pos",
-        },
-        {
-          name: "QR Inventory",
-          path: "/super-admin/inventory/qr",
-        },
-        {
-          name: "PG Inventory",
-          path: "/super-admin/inventory/pg",
-        },
-      ],
+      // subMenu: [
+      //   {
+      //     name: "POS Inventory",
+      //     path: "/super-admin/inventory/pos",
+      //   },
+      //   {
+      //     name: "QR Inventory",
+      //     path: "/super-admin/inventory/qr",
+      //   },
+      //   {
+      //     name: "PG Inventory",
+      //     path: "/super-admin/inventory/pg",
+      //   },
+      // ],
     },
-    {
-      name: "Service Management",
-      path: "/super-admin/service-management",
-      icon: <FaSlidersH />,
-    },
+    // {
+    //   name: "Service Management",
+    //   path: "/super-admin/service-management",
+    //   icon: <FaSlidersH />,
+    // },
     {
       name: "Setting",
-      path: "/super-admin/setting",
+      // path: "/super-admin/setting",
       icon: <FaCog />,
       subMenu: [
         {
-          name: "Global Services",
-          path: "/super-admin/setting/global-services",
+          name: "Service Management",
+          path: "/super-admin/service-management",
+          icon: <FaSlidersH />
         },
       ],
     },
