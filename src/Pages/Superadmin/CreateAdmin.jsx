@@ -15,14 +15,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 import { useUserCreation } from '../../context/UserCreationContext';
-// import StepIndicator from '../../components/StepIndicator';
-
-const steps = [
-  'Basic Info',
-  'Address & Documents',
-  'POS Assignment',
-  'ChargeSet',
-];
 
 function CreateAdmin() {
   const navigate = useNavigate();
@@ -121,10 +113,6 @@ function CreateAdmin() {
       {/* ==========================================
           STEP INDICATOR
       ========================================== */}
-      {/* <StepIndicator
-        currentStep={state.currentStep}
-        steps={steps}
-      /> */}
 
       <div className="max-w-4xl mx-auto">
         {/* ==========================================
@@ -138,9 +126,7 @@ function CreateAdmin() {
             <h1 className="text-2xl font-bold text-gray-900">
               Create Admin
             </h1>
-            {/* <p className="text-sm text-gray-500">
-              Create a new admin account
-            </p> */}
+
           </div>
         </div>
 
@@ -584,32 +570,6 @@ function CreateAdmin() {
             </div>
 
             {/* ==========================================
-                SETTLEMENT TYPE
-            ========================================== */}
-            <div className="bg-gray-50 rounded-lg p-5">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <CreditCard size={18} />
-                Settlement Type
-              </h2>
-
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
-                  <input
-                    type="radio"
-                    name="settlement_type"
-                    value="today_settlement"
-                    checked={
-                      state.formData.settlement_type === 'today_settlement'
-                    }
-                    onChange={handleChange}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-                  Today Settlement
-                </label>
-              </div>
-            </div>
-
-            {/* ==========================================
                 BUTTONS
             ========================================== */}
             <div className="flex justify-between pt-4">
@@ -624,9 +584,9 @@ function CreateAdmin() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium transition-colors"
+                className="px-6 py-2 bg-primary text-white rounded-lg disabled:opacity-50 font-medium transition-colors"
               >
-                {loading ? 'Processing...' : 'Next Step'}
+                {loading ? 'Processing...' : 'Submit'}
               </button>
             </div>
           </form>
