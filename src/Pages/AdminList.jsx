@@ -326,6 +326,29 @@ const AdminList = ({ currentUser, title = "Admin List" }) => {
     },
   ];
 
+  // ── Navigation with LocalStorage Persistence ──────────────────────────────
+  const handleViewAdmin = (admin) => {
+    if (!admin?.id) return;
+    try {
+      localStorage.setItem("selectedUser", JSON.stringify(admin));
+      localStorage.setItem("selectedAdmin", JSON.stringify(admin));
+    } catch (e) {
+      console.warn("Failed to store admin in localStorage", e);
+    }
+    navigate(`/super-admin/user/${admin.id}`);
+  };
+
+  const handleEditAdmin = (admin) => {
+    if (!admin?.id) return;
+    try {
+      localStorage.setItem("selectedUser", JSON.stringify(admin));
+      localStorage.setItem("selectedAdmin", JSON.stringify(admin));
+    } catch (e) {
+      console.warn("Failed to store admin in localStorage", e);
+    }
+    navigate(`/super-admin/user/${admin.id}/edit`);
+  };
+
   // ── Action Buttons (View with Eye, Edit, Status Toggle) ─────────────────────
   const actions = [];
 
@@ -334,7 +357,7 @@ const AdminList = ({ currentUser, title = "Admin List" }) => {
       label: (
         <Eye className="text-blue-500 text-xl hover:text-blue-700 transition-colors" />
       ),
-      onClick: (row) => navigate(`/super-admin/user/${row.id}`),
+      onClick: (row) => handleViewAdmin(row),
     });
   }
 
@@ -343,7 +366,7 @@ const AdminList = ({ currentUser, title = "Admin List" }) => {
       label: (
         <SquarePen className="text-primary text-xl hover:opacity-80 transition-colors" />
       ),
-      onClick: (row) => navigate(`/super-admin/user/${row.id}/edit`),
+      onClick: (row) => handleEditAdmin(row),
     });
   }
 
@@ -545,7 +568,7 @@ const AdminList = ({ currentUser, title = "Admin List" }) => {
                         {canReadUsers && (
                           <button
                             type="button"
-                            onClick={() => navigate(`/super-admin/user/${admin.id}`)}
+                            onClick={() => handleViewAdmin(admin)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="View Admin"
                           >
@@ -555,7 +578,7 @@ const AdminList = ({ currentUser, title = "Admin List" }) => {
                         {canUpdateUsers && (
                           <button
                             type="button"
-                            onClick={() => navigate(`/super-admin/user/${admin.id}/edit`)}
+                            onClick={() => handleEditAdmin(admin)}
                             className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Edit Admin"
                           >
