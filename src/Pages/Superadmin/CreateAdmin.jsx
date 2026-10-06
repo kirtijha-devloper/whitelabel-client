@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import {
   UserPlus,
+  UserCheck,
   Users,
   Mail,
   Lock,
@@ -11,11 +12,16 @@ import {
   FileText,
   Building,
   Calendar,
+  Eye,
+  EyeOff,
+  RefreshCw,
 } from 'lucide-react';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 import { useUserCreation } from '../../context/UserCreationContext';
+import { createAdmin, getAdminDetails, updateAdmin } from '../../api/superAdminApi';
 
 
 // ==========================================
@@ -53,10 +59,97 @@ const FILE_FIELD_CONFIG = [
 
 function CreateAdmin() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
 
   const { state, dispatch } = useUserCreation();
 
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // ==========================================
+  // FETCH ADMIN IN EDIT MODE
+  // ==========================================
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    let isMounted = true;
+    const fetchAdmin = async () => {
+      try {
+        setFetching(true);
+        const res = await getAdminDetails(id);
+        const adminData = res?.data || res;
+        if (!adminData || !isMounted) return;
+
+        const comp = adminData.company || {};
+        dispatch({
+          type: 'UPDATE_FORM',
+          payload: {
+            name: adminData.name || '',
+            email: adminData.email || '',
+            mobile_number: adminData.mobile_number || '',
+            password: '', // Blank on edit unless explicitly changing
+            gender: adminData.gender || '',
+            dob: adminData.dob ? String(adminData.dob).slice(0, 10) : '',
+            address1: adminData.address1 || comp.address1 || '',
+            address2: adminData.address2 || comp.address2 || '',
+            city: adminData.city || comp.city || '',
+            district: adminData.district || comp.district || '',
+            pincode: adminData.pincode || comp.pincode || '',
+            state: adminData.state || comp.state || '',
+            country: adminData.country || comp.country || 'India',
+            aadhar_number: adminData.aadhar_number || '',
+            pan_number: adminData.pan_number || comp.pan_number || '',
+            gst_number: comp.gst_number || '',
+            company_or_shop_name: adminData.company_or_shop_name || comp.company_name || '',
+            company_id: adminData.company_id || comp.company_id || '',
+            domain_name: comp.domain_name || '',
+            settlement_type: adminData.settlement_type || 'today_settlement',
+          },
+        });
+      } catch (err) {
+        console.error('Failed to fetch admin details:', err);
+        toast.error(err?.message || 'Failed to load Admin details.');
+      } finally {
+        if (isMounted) setFetching(false);
+      }
+    };
+
+    fetchAdmin();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isEditMode, dispatch]);
+
+
+  // ==========================================
+  // PASSWORD GENERATOR
+  // ==========================================
+  const generateRandomPassword = () => {
+    const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijkmnopqrstuvwxyz';
+    const numbers = '23456789';
+    const symbols = '!@#$%^&*';
+    const allChars = uppercase + lowercase + numbers + symbols;
+
+    let generated = '';
+    generated += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+    generated += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+    generated += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    generated += symbols.charAt(Math.floor(Math.random() * symbols.length));
+
+    for (let i = 4; i < 12; i++) {
+      generated += allChars.charAt(Math.floor(Math.random() * allChars.length));
+    }
+
+    const shuffled = generated.split('').sort(() => 0.5 - Math.random()).join('');
+    dispatch({
+      type: 'UPDATE_FORM',
+      payload: { password: shuffled },
+    });
+  };
 
 
   // ==========================================
@@ -86,7 +179,7 @@ function CreateAdmin() {
     // PAN Number
     if (name === 'pan_number') {
       nextValue = value
-        .replace(/[^a-zA-Z0-9]/g, '')
+        .replace(/[^a-zA-Z0-9]/g)
         .toUpperCase()
         .slice(0, 10);
     }
@@ -94,9 +187,16 @@ function CreateAdmin() {
     // GST Number
     if (name === 'gst_number') {
       nextValue = value
-        .replace(/[^a-zA-Z0-9]/g, '')
+        .replace(/[^a-zA-Z0-9]/g)
         .toUpperCase()
         .slice(0, 15);
+    }
+
+    // Company ID
+    if (name === 'company_id') {
+      nextValue = value
+        .replace(/[^a-zA-Z0-9_-]/g)
+        .toUpperCase();
     }
 
     dispatch({
@@ -112,73 +212,163 @@ function CreateAdmin() {
   // HANDLE FILE CHANGE
   // ==========================================
 
-const handleFileChange = (e, fieldName) => {
-  const file = e.target.files?.[0];
+  const handleFileChange = (e, fieldName) => {
+    const targetField = fieldName || e.target.name;
+    const file = e.target.files?.[0];
 
-  if (!file) return;
+    if (!file) return;
 
-  // Allowed file types
-  const allowedTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp',
-  ];
+    // Allowed file types
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ];
 
-  // Validate file type
-  if (!allowedTypes.includes(file.type)) {
-    alert('Only JPG, JPEG, PNG, and WEBP images are allowed.');
+    // Validate file type
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPG, JPEG, PNG, WEBP, and PDF files are allowed.');
+      e.target.value = '';
+      return;
+    }
 
-    // Clear selected file
-    e.target.value = '';
-
-    return;
-  }
-
-  // File is valid
-  dispatch({
-    type: 'UPDATE_FORM',
-    payload: {
-      [fieldName]: file,
-    },
-  });
-};
+    // File is valid
+    dispatch({
+      type: 'UPDATE_FORM',
+      payload: {
+        [targetField]: file,
+      },
+    });
+  };
 
 
   // ==========================================
-  // HANDLE FORM SUBMIT
+  // HANDLE FORM SUBMIT (CREATE OR EDIT)
   // ==========================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const form = state.formData;
+
+    if (!form.name?.trim()) {
+      toast.error('Director name is required');
+      return;
+    }
+    if (!form.email?.trim()) {
+      toast.error('Email address is required');
+      return;
+    }
+    if (!form.mobile_number?.trim() || form.mobile_number.length !== 10) {
+      toast.error('Valid 10-digit Indian mobile number is required');
+      return;
+    }
+    if (!isEditMode && (!form.password || form.password.length < 8)) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+    if (isEditMode && form.password && form.password.length < 8) {
+      toast.error('New password must be at least 8 characters long');
+      return;
+    }
+    if (!form.company_or_shop_name?.trim()) {
+      toast.error('Company / Shop Name is required');
+      return;
+    }
+    if (!isEditMode && !form.company_id?.trim()) {
+      toast.error('Company ID is required');
+      return;
+    }
+    if (!form.domain_name?.trim()) {
+      toast.error('Domain Name is required');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      // Ensure required default values are present
-      dispatch({
-        type: 'UPDATE_FORM',
-        payload: {
-          role: 'admin',
-          country: state.formData.country || 'India',
-          mobile_number_country_code:
-            state.formData.mobile_number_country_code || '+91',
-        },
-      });
+      if (isEditMode) {
+        // EDIT MODE: PUT /api/super-admin/admin/:id
+        const updatePayload = {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          mobile_number: form.mobile_number.trim(),
+          gender: form.gender || null,
+          dob: form.dob || null,
+          address1: form.address1 || null,
+          address2: form.address2 || null,
+          city: form.city || null,
+          district: form.district || null,
+          pincode: form.pincode || null,
+          state: form.state || null,
+          country: form.country || 'India',
+          aadhar_number: form.aadhar_number || null,
+          pan_number: form.pan_number || null,
+          gst_number: form.gst_number || null,
+          company_name: form.company_or_shop_name.trim(),
+          company_or_shop_name: form.company_or_shop_name.trim(),
+          domain_name: form.domain_name.trim(),
+          settlement_type: form.settlement_type || 'today_settlement',
+        };
 
-      // Move to next step
-      dispatch({
-        type: 'NEXT_STEP',
-      });
+        if (form.password && form.password.trim()) {
+          updatePayload.password = form.password.trim();
+        }
 
-      // Navigate to next step
-      navigate('/super-admin/create-admin/address');
-    } catch (error) {
-      console.error('Error in step 1 completion:', error);
+        const res = await updateAdmin(id, updatePayload);
+        toast.success(res?.message || 'Admin updated successfully!');
+        dispatch({ type: 'RESET' });
+        navigate('/super-admin/admin-list');
+      } else {
+        // CREATE MODE: POST /api/super-admin/createAdmin (multipart/form-data)
+        const formData = new FormData();
+
+        Object.entries(form).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && !(value instanceof File)) {
+            if (Array.isArray(value) || typeof value === 'object') {
+              formData.append(key, JSON.stringify(value));
+            } else {
+              formData.append(key, String(value));
+            }
+          }
+        });
+
+        formData.set('role', 'admin');
+        formData.set('company_name', form.company_or_shop_name.trim());
+        formData.set('company_or_shop_name', form.company_or_shop_name.trim());
+        formData.set('company_id', form.company_id.trim().toUpperCase());
+        formData.set('country', form.country || 'India');
+        formData.set('mobile_number_country_code', form.mobile_number_country_code || '+91');
+
+        FILE_FIELD_CONFIG.forEach((field) => {
+          const file = form[field.name];
+          if (file instanceof File) {
+            formData.append(field.name, file);
+          }
+        });
+
+        const res = await createAdmin(formData);
+        toast.success(res?.message || 'Admin and Company created successfully!');
+        dispatch({ type: 'RESET' });
+        navigate('/super-admin/admin-list');
+      }
+    } catch (err) {
+      console.error(isEditMode ? 'Error updating admin:' : 'Error creating admin:', err);
+      toast.error(err?.message || (isEditMode ? 'Failed to update Admin.' : 'Failed to create Admin.'));
     } finally {
       setLoading(false);
     }
   };
+
+
+  if (fetching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
 
   return (
@@ -197,13 +387,18 @@ const handleFileChange = (e, fieldName) => {
         <div className="flex gap-4 items-center mb-6">
 
           <div className="bg-primary text-white p-3 rounded-lg">
-            <UserPlus size={22} />
+            {isEditMode ? <UserCheck size={22} /> : <UserPlus size={22} />}
           </div>
 
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Create Admin
+              {isEditMode ? 'Edit Admin' : 'Create Admin'}
             </h1>
+            <p className="text-sm text-gray-500">
+              {isEditMode
+                ? 'Update administrator profile and company details'
+                : 'Register a new administrator and white-label company'}
+            </p>
           </div>
 
         </div>
@@ -354,21 +549,53 @@ const handleFileChange = (e, fieldName) => {
 
                 <div>
 
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                    <Lock size={15} />
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Lock size={15} />
+                      {isEditMode ? 'New Password (Optional)' : 'Password'}
+                      {!isEditMode && <span className="text-red-500">*</span>}
+                    </label>
 
-                  <input
-                    type="password"
-                    name="password"
-                    value={state.formData.password || ''}
-                    onChange={handleChange}
-                    required
-                    minLength={8}
-                    placeholder="Enter password (min 8 chars)"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
+                    <button
+                      type="button"
+                      onClick={generateRandomPassword}
+                      className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                    >
+                      <RefreshCw size={12} />
+                      Generate
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={state.formData.password || ''}
+                      onChange={handleChange}
+                      required={!isEditMode}
+                      minLength={8}
+                      placeholder={
+                        isEditMode
+                          ? 'Leave blank to keep existing password'
+                          : 'Enter password (min 8 chars)'
+                      }
+                      className="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+
+                  {isEditMode && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Only fill this if you want to reset the admin password.
+                    </p>
+                  )}
 
                 </div>
 
@@ -781,7 +1008,7 @@ const handleFileChange = (e, fieldName) => {
                           id={inputId}
                           type="file"
                           name={field.name}
-                          onChange={handleFileChange}
+                          onChange={(e) => handleFileChange(e, field.name)}
                           accept={field.accept}
                           className="hidden"
                         />
@@ -817,7 +1044,7 @@ const handleFileChange = (e, fieldName) => {
                 <div className="md:col-span-2">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company / Shop Name
+                    Company / Shop Name <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -825,6 +1052,7 @@ const handleFileChange = (e, fieldName) => {
                     name="company_or_shop_name"
                     value={state.formData.company_or_shop_name || ''}
                     onChange={handleChange}
+                    required
                     placeholder="Enter company or shop name"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -837,7 +1065,7 @@ const handleFileChange = (e, fieldName) => {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company ID
+                    Company ID {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -845,9 +1073,21 @@ const handleFileChange = (e, fieldName) => {
                     name="company_id"
                     value={state.formData.company_id || ''}
                     onChange={handleChange}
-                    placeholder="Enter company ID"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    disabled={isEditMode}
+                    required={!isEditMode}
+                    placeholder="e.g. COMP_001 or BRAND_PAY"
+                    className={`w-full px-4 py-2 border rounded-lg uppercase ${
+                      isEditMode
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200'
+                        : 'focus:ring-2 focus:ring-indigo-500'
+                    }`}
                   />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    {isEditMode
+                      ? 'Company ID is permanent and cannot be modified.'
+                      : 'Primary tenant ID. Super Admin enters it once; child sessions inherit it automatically.'}
+                  </p>
 
                 </div>
 
@@ -857,7 +1097,7 @@ const handleFileChange = (e, fieldName) => {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Domain Name
+                    Domain Name <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -865,9 +1105,14 @@ const handleFileChange = (e, fieldName) => {
                     name="domain_name"
                     value={state.formData.domain_name || ''}
                     onChange={handleChange}
-                    placeholder="Enter domain name"
+                    required
+                    placeholder="e.g. pay.example.com"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    White-label web portal domain (without https://)
+                  </p>
 
                 </div>
 
@@ -894,9 +1139,9 @@ const handleFileChange = (e, fieldName) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-primary text-white rounded-lg disabled:opacity-50 font-medium transition-colors"
+                className="px-6 py-2 bg-primary text-white rounded-lg disabled:opacity-50 font-medium transition-colors hover:bg-primary-hover shadow-sm"
               >
-                {loading ? 'Processing...' : 'Submit'}
+                {loading ? 'Processing...' : (isEditMode ? 'Update Admin' : 'Submit')}
               </button>
 
             </div>

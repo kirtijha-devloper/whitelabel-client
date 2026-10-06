@@ -22,6 +22,8 @@ const initialState = {
     aadhar_number: '',
     pan_number: '',
     company_or_shop_name: '',
+    company_id: '',
+    domain_name: '',
     aadhar_photo: null,
     aadhar_back_photo: null,
     pan_photo: null,
