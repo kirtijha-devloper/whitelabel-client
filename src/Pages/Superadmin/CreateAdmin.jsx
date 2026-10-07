@@ -56,6 +56,37 @@ const FILE_FIELD_CONFIG = [
   },
 ];
 
+// ==========================================
+// DOMAIN NORMALIZER
+// ==========================================
+
+const normalizeDomain = (value = '') => {
+  const input = value.trim();
+
+  if (!input) return '';
+
+  try {
+    const url = new URL(
+      /^https?:\/\//i.test(input)
+        ? input
+        : `https://${input}`
+    );
+
+    return url.hostname
+      .replace(/^www\./i, '')
+      .toLowerCase();
+  } catch {
+    return input
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0]
+      .split('?')[0]
+      .split('#')[0]
+      .replace(/:\d+$/, '')
+      .toLowerCase();
+  }
+};
+
 
 function CreateAdmin() {
   const navigate = useNavigate();
@@ -89,7 +120,7 @@ function CreateAdmin() {
             name: adminData.name || '',
             email: adminData.email || '',
             mobile_number: adminData.mobile_number || '',
-            password: '', // Blank on edit unless explicitly changing
+            password: '',
             gender: adminData.gender || '',
             dob: adminData.dob ? String(adminData.dob).slice(0, 10) : '',
             address1: adminData.address1 || comp.address1 || '',
@@ -102,10 +133,14 @@ function CreateAdmin() {
             aadhar_number: adminData.aadhar_number || '',
             pan_number: adminData.pan_number || comp.pan_number || '',
             gst_number: comp.gst_number || '',
-            company_or_shop_name: adminData.company_or_shop_name || comp.company_name || '',
-            company_id: adminData.company_id || comp.company_id || '',
+            company_or_shop_name:
+              adminData.company_or_shop_name ||
+              comp.company_name ||
+              '',
             domain_name: comp.domain_name || '',
-            settlement_type: adminData.settlement_type || 'today_settlement',
+            company_title: comp.company_title || '',
+            settlement_type:
+              adminData.settlement_type || 'today_settlement',
           },
         });
       } catch (err) {
@@ -179,7 +214,7 @@ function CreateAdmin() {
     // PAN Number
     if (name === 'pan_number') {
       nextValue = value
-        .replace(/[^a-zA-Z0-9]/g)
+        .replace(/[^a-zA-Z0-9]/g, '')
         .toUpperCase()
         .slice(0, 10);
     }
@@ -187,16 +222,13 @@ function CreateAdmin() {
     // GST Number
     if (name === 'gst_number') {
       nextValue = value
-        .replace(/[^a-zA-Z0-9]/g)
+        .replace(/[^a-zA-Z0-9]/g, '')
         .toUpperCase()
         .slice(0, 15);
     }
 
-    // Company ID
-    if (name === 'company_id') {
-      nextValue = value
-        .replace(/[^a-zA-Z0-9_-]/g)
-        .toUpperCase();
+    if (name === 'domain_name') {
+      nextValue = normalizeDomain(value);
     }
 
     dispatch({
@@ -276,10 +308,6 @@ function CreateAdmin() {
       toast.error('Company / Shop Name is required');
       return;
     }
-    if (!isEditMode && !form.company_id?.trim()) {
-      toast.error('Company ID is required');
-      return;
-    }
     if (!form.domain_name?.trim()) {
       toast.error('Domain Name is required');
       return;
@@ -308,7 +336,8 @@ function CreateAdmin() {
           gst_number: form.gst_number || null,
           company_name: form.company_or_shop_name.trim(),
           company_or_shop_name: form.company_or_shop_name.trim(),
-          domain_name: form.domain_name.trim(),
+          company_title: form.company_title?.trim() || null,
+          domain_name: normalizeDomain(form.domain_name),
           settlement_type: form.settlement_type || 'today_settlement',
         };
 
@@ -335,11 +364,36 @@ function CreateAdmin() {
         });
 
         formData.set('role', 'admin');
-        formData.set('company_name', form.company_or_shop_name.trim());
-        formData.set('company_or_shop_name', form.company_or_shop_name.trim());
-        formData.set('company_id', form.company_id.trim().toUpperCase());
-        formData.set('country', form.country || 'India');
-        formData.set('mobile_number_country_code', form.mobile_number_country_code || '+91');
+
+        formData.set(
+          'company_name',
+          form.company_or_shop_name.trim()
+        );
+
+        formData.set(
+          'company_or_shop_name',
+          form.company_or_shop_name.trim()
+        );
+
+        formData.set(
+          'company_title',
+          form.company_title?.trim() || ''
+        );
+
+        formData.set(
+          'domain_name',
+          normalizeDomain(form.domain_name)
+        );
+
+        formData.set(
+          'country',
+          form.country || 'India'
+        );
+
+        formData.set(
+          'mobile_number_country_code',
+          form.mobile_number_country_code || '+91'
+        );
 
         FILE_FIELD_CONFIG.forEach((field) => {
           const file = form[field.name];
@@ -347,6 +401,11 @@ function CreateAdmin() {
             formData.append(field.name, file);
           }
         });
+
+        // Company Logo
+        if (form.company_logo instanceof File) {
+          formData.append('company_logo', form.company_logo);
+        }
 
         const res = await createAdmin(formData);
         toast.success(res?.message || 'Admin and Company created successfully!');
@@ -1021,7 +1080,6 @@ function CreateAdmin() {
 
             </div>
 
-
             {/* ==========================================
                 COMPANY / SHOP INFORMATION
             ========================================== */}
@@ -1030,21 +1088,15 @@ function CreateAdmin() {
 
               <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Building size={18} />
-                Company / Shop Information
+                Company Information
               </h2>
-
-
-              {/* 2 COLUMNS */}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 
-
-                {/* COMPANY / SHOP NAME */}
-
-                <div className="md:col-span-2">
-
+                {/* COMPANY NAME */}
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company / Shop Name <span className="text-red-500">*</span>
+                    Company Name <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1056,46 +1108,51 @@ function CreateAdmin() {
                     placeholder="Enter company or shop name"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
-
                 </div>
 
-
-                {/* COMPANY ID */}
-
-                <div>
+                {/* COMPANY LOGO */}
+                <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company ID {!isEditMode && <span className="text-red-500">*</span>}
+                    Company Logo
                   </label>
 
-                  <input
-                    type="text"
-                    name="company_id"
-                    value={state.formData.company_id || ''}
-                    onChange={handleChange}
-                    disabled={isEditMode}
-                    required={!isEditMode}
-                    placeholder="e.g. COMP_001 or BRAND_PAY"
-                    className={`w-full px-4 py-2 border rounded-lg uppercase ${
-                      isEditMode
-                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200'
-                        : 'focus:ring-2 focus:ring-indigo-500'
-                    }`}
-                  />
+                  <div className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3">
+                    <div className="flex flex-wrap items-center gap-3">
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    {isEditMode
-                      ? 'Company ID is permanent and cannot be modified.'
-                      : 'Primary tenant ID. Super Admin enters it once; child sessions inherit it automatically.'}
-                  </p>
+                      <label
+                        htmlFor="upload-company-logo"
+                        className="cursor-pointer inline-flex items-center rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        {state.formData.company_logo instanceof File
+                          ? 'Replace Image'
+                          : 'Select Image'}
+                      </label>
+
+                      <span className="min-w-0 break-all text-xs text-gray-600">
+                        {state.formData.company_logo instanceof File
+                          ? state.formData.company_logo.name
+                          : 'No image selected'}
+                      </span>
+
+                    </div>
+
+                    <input
+                      id="upload-company-logo"
+                      type="file"
+                      name="company_logo"
+                      onChange={(e) =>
+                        handleFileChange(e, 'company_logo')
+                      }
+                      accept=".jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                    />
+                  </div>
 
                 </div>
 
-
                 {/* DOMAIN NAME */}
-
                 <div>
-
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Domain Name <span className="text-red-500">*</span>
                   </label>
@@ -1106,18 +1163,33 @@ function CreateAdmin() {
                     value={state.formData.domain_name || ''}
                     onChange={handleChange}
                     required
-                    placeholder="e.g. pay.example.com"
+                    placeholder="e.g. google.com"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
 
                   <p className="mt-1 text-xs text-gray-500">
-                    White-label web portal domain (without https://)
+                    Enter domain like google.com. Protocol, www, path,
+                    query and trailing slash will be removed automatically.
                   </p>
+                </div>
 
+                {/* COMPANY TITLE */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Title
+                  </label>
+
+                  <input
+                    type="text"
+                    name="company_title"
+                    value={state.formData.company_title || ''}
+                    onChange={handleChange}
+                    placeholder="Enter company title"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
 
               </div>
-
             </div>
 
 
