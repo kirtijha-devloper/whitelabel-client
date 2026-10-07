@@ -1,5 +1,7 @@
 import { Loader2, X } from 'lucide-react';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import Select from "react-select";
 import { assignPosMachineToFranchise, getAllPosMachines } from '../api/posMachine';
 import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +24,8 @@ const extractPagination = (payload) => {
     return payload?.pagination || payload?.data?.pagination || {};
 };
 
-const AssignToFranchise = () => {
+const AssignToFranchise = ({ returnPath }) => {
+    const navigate = useNavigate();
     const [selectedMachines, setSelectedMachines] = useState([]);
     const [selectedFranchise, setSelectedFranchise] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
@@ -120,10 +123,15 @@ const AssignToFranchise = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["franchises"] });
             queryClient.invalidateQueries({ queryKey: ["posMachines"] });
-            setShowSuccess(true);
             setSelectedMachines([]);
             setSelectedFranchise(null);
             setSearchTerm("");
+            if (returnPath) {
+                toast.success("POS machines assigned successfully");
+                navigate(returnPath);
+                return;
+            }
+            setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 3000);
         },
         onError: (error) => {

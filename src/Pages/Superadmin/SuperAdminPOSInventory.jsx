@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   FaSearch,
   FaPlus,
@@ -10,174 +13,164 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { getSuperAdminPosInventory } from "../../api/superAdminApi";
+import { bulkCreatePosMachines, getPosMachine } from "../../api/posMachine";
+import { createCompanyName, getCompanyNames } from "../../api/companyName";
+import Modal from "../../components/Modal";
+import FormInput from "../../components/FormInput";
+
+const INVENTORY_FETCH_LIMIT = 1000;
+
+const extractMachineRows = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.rows)) return response.rows;
+  if (Array.isArray(response?.list)) return response.list;
+  if (Array.isArray(response?.data?.rows)) return response.data.rows;
+  if (Array.isArray(response?.data?.list)) return response.data.list;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  return [];
+};
+
+const extractInventoryPagination = (response) =>
+  response?.pagination || response?.data?.pagination || {};
+
+const getResponseTotalPages = (response, rowCount, limit) => {
+  const pagination = extractInventoryPagination(response);
+  const pages = Number(
+    pagination.totalPages || pagination.total_pages || pagination.pages || pagination.last_page
+  );
+  if (Number.isFinite(pages) && pages > 0) return pages;
+  const total = Number(pagination.total || pagination.count || rowCount || 0);
+  return total > 0 ? Math.ceil(total / limit) : 1;
+};
+
+const getAssignedMachineName = (machine) =>
+  machine?.assigned_user?.name ||
+  machine?.franchise_name ||
+  machine?.franchise?.name ||
+  machine?.assigned_to ||
+  "Unassigned";
 
 const SuperAdminPOSInventory = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [machines, setMachines] = useState([]);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [companyRecords, setCompanyRecords] = useState([]);
+  const [companyName, setCompanyName] = useState("");
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [showCompanyConfirmation, setShowCompanyConfirmation] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadResult, setBulkUploadResult] = useState(null);
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    tid_number: "",
-    serial_number: "",
-    model: "Pax A920",
-    company_name: "AGRO-AXIS",
-    status: "available",
-  });
+  const companyOptions = useMemo(
+    () => Array.from(new Set(companyRecords.map((company) => String(company?.name || "").trim()).filter(Boolean))),
+    [companyRecords]
+  );
 
-  // MOCK DATA
+  const getSerialNumber = (machine) => machine?.device_serial_number || machine?.serial_number || "-";
+  const getMachineModel = (machine) => machine?.model || machine?.device_model || "-";
+  const getMachineStatus = (machine) =>
+    String(machine?.status || (machine?.assigned_to ? "active" : "available"))
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
 
-  const mockMachines = [
-    {
-      id: "pos-101",
-      tid_number: "TID9928101",
-      serial_number: "SN-PAX-882101",
-      model: "Pax A920",
-      company_name: "AGRO-AXIS",
-      assigned_to: "Admin Alpha (Global Pay)",
-      status: "active",
-      created_at: "2026-09-15",
-    },
-    {
-      id: "pos-102",
-      tid_number: "TID9928102",
-      serial_number: "SN-PAX-882102",
-      model: "Verifone X990",
-      company_name: "AGRO-HDFC",
-      assigned_to: "Unassigned",
-      status: "available",
-      created_at: "2026-09-18",
-    },
-    {
-      id: "pos-103",
-      tid_number: "TID9928103",
-      serial_number: "SN-MF-773401",
-      model: "MoreFun POS",
-      company_name: "Everlife",
-      assigned_to: "Merchant Retail Hub",
-      status: "active",
-      created_at: "2026-09-20",
-    },
-    {
-      id: "pos-104",
-      tid_number: "TID9928104",
-      serial_number: "SN-ING-112099",
-      model: "Ingenico DX8000",
-      company_name: "AGRO-AXIS",
-      assigned_to: "Returned - Defect",
-      status: "returned-initiated",
-      created_at: "2026-09-22",
-    },
-    {
-      id: "pos-105",
-      tid_number: "TID9928105",
-      serial_number: "SN-PAX-882105",
-      model: "Pax A920",
-      company_name: "AGRO-HDFC",
-      assigned_to: "Unassigned",
-      status: "available",
-      created_at: "2026-09-25",
-    },
-  ];
-
-  // FETCH INVENTORY
-
-  const fetchPosData = async () => {
+  const fetchPosData = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
 
     try {
-      const res = await getSuperAdminPosInventory({
-        search: searchTerm,
-        status: statusFilter !== "all" ? statusFilter : "",
-      });
-
-      if (res && res.data && res.data.length > 0) {
-        setMachines(res.data);
-      } else {
-        setMachines(mockMachines);
-      }
+      const params = {
+        page: 1,
+        limit: INVENTORY_FETCH_LIMIT,
+        ...(searchTerm ? { search: searchTerm } : {}),
+        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      };
+      const firstResponse = await getSuperAdminPosInventory(params);
+      const firstRows = extractMachineRows(firstResponse);
+      const totalPages = getResponseTotalPages(firstResponse, firstRows.length, INVENTORY_FETCH_LIMIT);
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
+          getSuperAdminPosInventory({ ...params, page: index + 2 })
+        )
+      );
+      const allMachines = [...firstRows, ...remainingPages.flatMap(extractMachineRows)];
+      setMachines(allMachines);
+      const pagination = extractInventoryPagination(firstResponse);
+      setInventoryTotal(Number(pagination.total || pagination.count || allMachines.length));
     } catch (error) {
-      console.warn("Using fallback POS inventory data", error);
-      setMachines(mockMachines);
+      setMachines([]);
+      setInventoryTotal(0);
+      setLoadError(error?.message || "Failed to fetch POS inventory");
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchPosData();
-  }, [statusFilter]);
+  }, [fetchPosData]);
 
-  // ADD MACHINE
+  useEffect(() => {
+    let cancelled = false;
+    getCompanyNames()
+      .then((records) => {
+        if (!cancelled) setCompanyRecords(Array.isArray(records) ? records : []);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error?.message || "Unable to load company names");
+      });
+    return () => { cancelled = true; };
+  }, []);
 
-  const handleAddSubmit = (e) => {
-    e.preventDefault();
-
-    if (!formData.tid_number || !formData.serial_number) {
-      toast.error("Please fill in TID Number and Serial Number");
-      return;
-    }
-
-    const newEntry = {
-      id: `pos-${Date.now()}`,
-      ...formData,
-      assigned_to: "Unassigned",
-      created_at: new Date().toISOString().split("T")[0],
-    };
-
-    setMachines((prev) => [newEntry, ...prev]);
-
-    toast.success("POS Machine added successfully!");
-
-    setIsAddModalOpen(false);
-
-    setFormData({
-      tid_number: "",
-      serial_number: "",
-      model: "Pax A920",
-      company_name: "AGRO-AXIS",
-      status: "available",
-    });
-  };
-
-  // FILTER
-
-  const filteredMachines = machines.filter((item) => {
+  const filteredMachines = useMemo(() => {
     const search = searchTerm.toLowerCase();
+    return machines.filter((machine) => {
+      const values = [
+        machine?.tid_number,
+        machine?.mid_number,
+        machine?.device_serial_number,
+        machine?.company_name,
+        machine?.bank_name,
+        machine?.razorpay_id,
+        machine?.status,
+        machine?.remarks,
+        machine?.assigned_user?.name,
+        machine?.assigned_to,
+      ];
+      const matchesSearch = !search || values.some((value) => String(value || "").toLowerCase().includes(search));
+      const status = getMachineStatus(machine);
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "available" ? !machine?.assigned_to && !status.includes("return") :
+          statusFilter === "active" ? Boolean(machine?.assigned_to) || status === "active" :
+            statusFilter === "returned" ? status.includes("return") : status === statusFilter);
+      return matchesSearch && matchesStatus;
+    });
+  }, [machines, searchTerm, statusFilter]);
 
-    const matchesSearch =
-      item.tid_number?.toLowerCase().includes(search) ||
-      item.serial_number?.toLowerCase().includes(search) ||
-      item.company_name?.toLowerCase().includes(search) ||
-      item.model?.toLowerCase().includes(search) ||
-      item.assigned_to?.toLowerCase().includes(search);
-
-    const matchesStatus =
-      statusFilter === "all" || item.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // STATS
-
-  const totalCompanies = new Set(
-    machines.map((machine) => machine.company_name)
-  ).size;
-
-  const totalMachines = machines.length;
-
-  const totalActive = machines.filter(
-    (machine) => machine.status === "active"
-  ).length;
-
-  const totalInactive = machines.filter(
-    (machine) =>
-      machine.status !== "active" &&
-      machine.status !== "available" &&
-      !machine.status?.includes("return")
-  ).length;
+  const totalMachines = inventoryTotal || machines.length;
+  const totalCompanies = companyOptions.length;
+  const totalActive = machines.filter((machine) => getMachineStatus(machine) === "active").length;
+  const totalInactive = machines.filter((machine) => {
+    const status = getMachineStatus(machine);
+    return status !== "active" && status !== "available" && !status.includes("return");
+  }).length;
   // STATUS BADGE
 
   const getStatusBadge = (status) => {
@@ -219,19 +212,162 @@ const SuperAdminPOSInventory = () => {
   // ACTION HANDLERS
 
   const handleAddCompany = () => {
-    toast.info("Add Company Name functionality coming soon.");
+    setCompanyName("");
+    setShowCompanyConfirmation(false);
+    setShowCompanyModal(true);
+  };
+
+  const handleCreateCompany = async () => {
+    const trimmedName = companyName.trim();
+    if (!trimmedName) {
+      toast.error("Please enter a company name.");
+      return;
+    }
+    if (companyOptions.some((name) => name.toLowerCase() === trimmedName.toLowerCase())) {
+      toast.error(`Company name already exists: ${trimmedName}`);
+      return;
+    }
+
+    setIsCreatingCompany(true);
+    try {
+      const response = await createCompanyName(trimmedName);
+      const refreshedCompanies = await getCompanyNames();
+      setCompanyRecords(Array.isArray(refreshedCompanies) ? refreshedCompanies : []);
+      setShowCompanyModal(false);
+      setShowCompanyConfirmation(false);
+      setCompanyName("");
+      toast.success(response?.message || "Company name created successfully");
+    } catch (error) {
+      toast.error(error?.message || "Failed to create company name");
+    } finally {
+      setIsCreatingCompany(false);
+    }
   };
 
   const handleBulkUpload = () => {
-    toast.info("Bulk Upload functionality coming soon.");
+    setBulkUploadFile(null);
+    setBulkUploadResult(null);
+    setShowBulkUploadModal(true);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    const fileName = String(file?.name || "").toLowerCase();
+    if (file && (fileName.endsWith(".xlsx") || fileName.endsWith(".xls"))) {
+      setBulkUploadFile(file);
+      setBulkUploadResult(null);
+    } else {
+      setBulkUploadFile(null);
+      setBulkUploadResult({
+        success: false,
+        message: "Please upload a valid Excel file (.xlsx, .xls)",
+        errors: [],
+      });
+    }
+  };
+
+  const handleBulkUploadSubmit = async () => {
+    if (!companyRecords.length) {
+      toast.error("No company names are available. Add company names before bulk upload.");
+      return;
+    }
+    if (!bulkUploadFile) {
+      toast.error("Please select an Excel file.");
+      return;
+    }
+
+    setIsBulkUploading(true);
+    try {
+      const response = await bulkCreatePosMachines(bulkUploadFile, companyRecords);
+      setBulkUploadResult(response);
+      setBulkUploadFile(null);
+      await fetchPosData();
+      if (response?.success === false) {
+        toast.error(response?.message || "Bulk upload completed with errors");
+      } else {
+        toast.success(response?.message || "Bulk upload completed");
+      }
+    } catch (error) {
+      const result = {
+        success: false,
+        message: error?.message || "Failed to bulk create POS machines",
+        errors: error?.validationErrors || [],
+      };
+      setBulkUploadResult(result);
+      toast.error(result.message);
+    } finally {
+      setIsBulkUploading(false);
+    }
+  };
+
+  const handleDownloadSampleFormat = () => {
+    try {
+      const worksheet = XLSX.utils.aoa_to_sheet([
+        ["SL", "Company Name", "Device SL No", "TID", "MID", "Bank Name"],
+      ]);
+      worksheet["!cols"] = [
+        { wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Bulk_Upload_Format");
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      saveAs(new Blob([buffer], { type: "application/octet-stream" }), "POS_Machine_Bulk_Upload_Format.xlsx");
+      toast.success("Excel format downloaded successfully");
+    } catch {
+      toast.error("Failed to download Excel format");
+    }
   };
 
   const handleExportExcel = () => {
-    toast.info("Export Excel functionality coming soon.");
+    if (!filteredMachines.length) {
+      toast.info("No POS machines available to export.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const exportData = filteredMachines.map((machine, index) => ({
+        "SL No": index + 1,
+        "Company Name": machine.company_name || "-",
+        "Bank Name": machine.bank_name || "-",
+        "Device Serial Number": machine.device_serial_number || "-",
+        "TID Number": machine.tid_number || "-",
+        "MID Number": machine.mid_number || "-",
+        Status: machine.status || "-",
+        "Assigned To": machine.assigned_user?.name || machine.assigned_to || "Unassigned",
+        "Razorpay ID": machine.razorpay_id || "-",
+        Remarks: machine.remarks || "-",
+        "Created At": machine.created_at || machine.createdAt || "-",
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "POS_Machines");
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      saveAs(new Blob([buffer], { type: "application/octet-stream" }), `POS_Machines_${Date.now()}.xlsx`);
+      toast.success("POS export started.");
+    } catch {
+      toast.error("Failed to export POS machines.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleViewMachine = async (machine) => {
+    setSelectedMachine(machine);
+    if (!machine?.id) return;
+    setDetailLoading(true);
+    try {
+      const response = await getPosMachine(machine.id);
+      const details = response?.data?.data || response?.data || response;
+      if (details && typeof details === "object") setSelectedMachine(details);
+    } catch (error) {
+      toast.error(error?.message || "Unable to load POS machine details");
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handleAssignFranchise = () => {
-    toast.info("Assign To Franchise functionality coming soon.");
+    navigate("/super-admin/inventory/pos/add-to-franchise");
   };
 
 
@@ -268,7 +404,7 @@ const SuperAdminPOSInventory = () => {
             {/* ADD MACHINE */}
             <button
               type="button"
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => navigate("/super-admin/inventory/pos/add")}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
             >
               <FaPlus />
@@ -289,6 +425,7 @@ const SuperAdminPOSInventory = () => {
             <button
               type="button"
               onClick={handleExportExcel}
+              disabled={isExporting}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-sm"
             >
               <FaDownload />
@@ -364,9 +501,7 @@ const SuperAdminPOSInventory = () => {
             <p className="text-sm mt-4">
               This page:{" "}
               {
-                filteredMachines.filter(
-                  (machine) => machine.status === "active"
-                ).length
+                filteredMachines.filter((machine) => getMachineStatus(machine) === "active").length
               }
             </p>
           </div>
@@ -384,12 +519,10 @@ const SuperAdminPOSInventory = () => {
             <p className="text-sm mt-4">
               This page:{" "}
               {
-                filteredMachines.filter(
-                  (machine) =>
-                    machine.status !== "active" &&
-                    machine.status !== "available" &&
-                    !machine.status?.includes("return")
-                ).length
+                filteredMachines.filter((machine) => {
+                  const status = getMachineStatus(machine);
+                  return status !== "active" && status !== "available" && !status.includes("return");
+                }).length
               }
             </p>
           </div>
@@ -409,8 +542,8 @@ const SuperAdminPOSInventory = () => {
 
             <input
               type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search TID, Serial No, Company..."
               className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
             />
@@ -523,6 +656,12 @@ const SuperAdminPOSInventory = () => {
                     Loading POS inventory...
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-10 text-center text-red-600">
+                    {loadError}
+                  </td>
+                </tr>
               ) : filteredMachines.length === 0 ? (
                 <tr>
                   <td
@@ -548,29 +687,29 @@ const SuperAdminPOSInventory = () => {
 
                     {/* SERIAL */}
                     <td className="px-6 py-5 text-gray-600">
-                      {machine.serial_number}
+                      {getSerialNumber(machine)}
                     </td>
 
                     {/* MODEL */}
                     <td className="px-6 py-5 text-gray-900">
-                      {machine.model}
+                      {getMachineModel(machine)}
                     </td>
 
                     {/* COMPANY */}
                     <td className="px-6 py-5">
                       <span className="inline-flex px-3 py-1 rounded-md bg-gray-100 text-gray-800 text-sm font-semibold">
-                        {machine.company_name}
+                        {machine.company_name || "-"}
                       </span>
                     </td>
 
                     {/* ASSIGNED TO */}
                     <td className="px-6 py-5 text-gray-700">
-                      {machine.assigned_to || "Unassigned"}
+                      {getAssignedMachineName(machine)}
                     </td>
 
                     {/* STATUS */}
                     <td className="px-6 py-5">
-                      {getStatusBadge(machine.status)}
+                      {getStatusBadge(getMachineStatus(machine))}
                     </td>
 
                     {/* ACTION */}
@@ -578,7 +717,7 @@ const SuperAdminPOSInventory = () => {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedMachine(machine)}
+                        onClick={() => handleViewMachine(machine)}
                         className="inline-flex items-center justify-center w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition"
                         title="View Machine"
                       >
@@ -595,193 +734,79 @@ const SuperAdminPOSInventory = () => {
         </div>
       </div>
 
-      {/* add model */}
-
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl">
-
-            {/* MODAL HEADER */}
-            <div className="flex items-center justify-between px-6 py-5 border-b">
-
-              <h2 className="text-xl font-bold text-gray-900">
-                Add New POS Machine
-              </h2>
-
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 text-2xl"
-              >
-                ×
-              </button>
-
+      <Modal
+        isOpen={showCompanyModal}
+        onClose={() => { setShowCompanyModal(false); setShowCompanyConfirmation(false); }}
+        title={showCompanyConfirmation ? "Confirm Company Name" : "Add Company Name"}
+        className="max-w-lg"
+      >
+        {showCompanyConfirmation ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">Are you sure you want to add <strong>{companyName.trim()}</strong>?</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCompanyConfirmation(false)} disabled={isCreatingCompany} className="rounded-lg border px-4 py-2 text-sm">Back</button>
+              <button type="button" onClick={handleCreateCompany} disabled={isCreatingCompany} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{isCreatingCompany ? "Saving..." : "Yes, Add Company"}</button>
             </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <FormInput type="text" name="company_name" placeholder="Enter company name" value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCompanyModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+              <button type="button" onClick={() => {
+                const trimmedName = companyName.trim();
+                if (!trimmedName) {
+                  toast.error("Please enter a company name.");
+                  return;
+                }
+                if (companyOptions.some((name) => name.toLowerCase() === trimmedName.toLowerCase())) {
+                  toast.error(`Company name already exists: ${trimmedName}`);
+                  return;
+                }
+                setCompanyName(trimmedName);
+                setShowCompanyConfirmation(true);
+              }} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-white">Continue</button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
-            {/* FORM */}
-            <form
-              onSubmit={handleAddSubmit}
-              className="p-6 space-y-5"
-            >
-
-              {/* TID */}
+      <Modal
+        isOpen={showBulkUploadModal}
+        onClose={() => { setShowBulkUploadModal(false); setBulkUploadFile(null); setBulkUploadResult(null); }}
+        title="Bulk Upload POS Machines"
+        className="max-w-3xl max-h-[90vh] flex flex-col"
+      >
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="rounded-r-lg border-l-4 border-yellow-400 bg-yellow-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  TID Number
-                </label>
-
-                <input
-                  type="text"
-                  value={formData.tid_number}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      tid_number: e.target.value,
-                    })
-                  }
-                  placeholder="Enter TID Number"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                />
+                <p className="text-sm font-semibold text-yellow-800">Required Excel Format</p>
+                <p className="mt-1 rounded bg-yellow-100 p-2 font-mono text-sm text-yellow-700">SL, Company Name, Device SL No, TID, MID, Bank Name</p>
+                <p className="mt-1 text-xs text-red-600">Use the exact header order shown. The Admin upload service validates the workbook.</p>
               </div>
-
-              {/* SERIAL */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Serial Number
-                </label>
-
-                <input
-                  type="text"
-                  value={formData.serial_number}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      serial_number: e.target.value,
-                    })
-                  }
-                  placeholder="Enter Serial Number"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                />
-              </div>
-
-              {/* MODEL */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Model
-                </label>
-
-                <select
-                  value={formData.model}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      model: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                >
-                  <option value="Pax A920">Pax A920</option>
-                  <option value="Verifone X990">
-                    Verifone X990
-                  </option>
-                  <option value="MoreFun POS">
-                    MoreFun POS
-                  </option>
-                  <option value="Ingenico DX8000">
-                    Ingenico DX8000
-                  </option>
-                </select>
-              </div>
-
-              {/* COMPANY */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Company Provider
-                </label>
-
-                <select
-                  value={formData.company_name}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      company_name: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                >
-                  <option value="AGRO-AXIS">
-                    AGRO-AXIS
-                  </option>
-
-                  <option value="AGRO-HDFC">
-                    AGRO-HDFC
-                  </option>
-
-                  <option value="Everlife">
-                    Everlife
-                  </option>
-                </select>
-              </div>
-
-              {/* STATUS */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Status
-                </label>
-
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      status: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                >
-                  <option value="available">
-                    Available
-                  </option>
-
-                  <option value="active">
-                    Active
-                  </option>
-
-                  <option value="returned">
-                    Returned
-                  </option>
-                </select>
-              </div>
-
-              {/* BUTTONS */}
-              <div className="flex justify-end gap-3 pt-3">
-
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-5 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold"
-                >
-                  Add Machine
-                </button>
-
-              </div>
-
-            </form>
+              <button type="button" onClick={handleDownloadSampleFormat} className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white"><FaDownload />Download Format</button>
+            </div>
+          </div>
+          <label className="block text-sm font-medium text-gray-700">
+            Upload Excel File
+            <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="mt-2 block w-full text-sm" />
+          </label>
+          {!companyOptions.length && <p className="text-xs text-amber-700">Add at least one company name before bulk upload.</p>}
+          {bulkUploadResult && (
+            <div className={`rounded-lg p-4 text-sm ${bulkUploadResult.success === false ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+              <p>{bulkUploadResult.message}</p>
+              {bulkUploadResult.errors?.length > 0 && <ul className="mt-2 list-disc pl-5">{bulkUploadResult.errors.map((item, index) => <li key={index}>{item.error || item.message || String(item)}</li>)}</ul>}
+            </div>
+          )}
+          <div className="mt-auto flex justify-end gap-2 border-t pt-3">
+            <button type="button" onClick={() => setShowBulkUploadModal(false)} className="rounded-lg border px-4 py-2 text-sm">Close</button>
+            <button type="button" onClick={handleBulkUploadSubmit} disabled={!bulkUploadFile || !companyOptions.length || isBulkUploading} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isBulkUploading ? "Uploading..." : "Upload Excel"}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* =====================================================
-          VIEW MACHINE MODAL
-      ====================================================== */}
+      {/* VIEW MACHINE MODAL */}
 
       {selectedMachine && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -814,7 +839,7 @@ const SuperAdminPOSInventory = () => {
                 </span>
 
                 <span className="font-semibold">
-                  {selectedMachine.tid_number}
+                  {selectedMachine.tid_number || "-"}
                 </span>
               </div>
 
@@ -824,7 +849,7 @@ const SuperAdminPOSInventory = () => {
                 </span>
 
                 <span className="font-semibold">
-                  {selectedMachine.serial_number}
+                  {getSerialNumber(selectedMachine)}
                 </span>
               </div>
 
@@ -834,18 +859,13 @@ const SuperAdminPOSInventory = () => {
                 </span>
 
                 <span className="font-semibold">
-                  {selectedMachine.model}
+                  {getMachineModel(selectedMachine)}
                 </span>
               </div>
 
               <div className="flex justify-between border-b pb-3">
-                <span className="text-gray-500">
-                  Company Provider
-                </span>
-
-                <span className="font-semibold">
-                  {selectedMachine.company_name}
-                </span>
+                <span className="text-gray-500">Company Provider</span>
+                <span className="font-semibold">{selectedMachine.company_name || "-"}</span>
               </div>
 
               <div className="flex justify-between border-b pb-3">
@@ -854,7 +874,7 @@ const SuperAdminPOSInventory = () => {
                 </span>
 
                 <span className="font-semibold">
-                  {selectedMachine.assigned_to || "Unassigned"}
+                  {getAssignedMachineName(selectedMachine)}
                 </span>
               </div>
 
@@ -863,7 +883,7 @@ const SuperAdminPOSInventory = () => {
                   Status
                 </span>
 
-                {getStatusBadge(selectedMachine.status)}
+                {detailLoading ? <span className="text-sm text-gray-500">Loading details...</span> : getStatusBadge(getMachineStatus(selectedMachine))}
               </div>
 
             </div>

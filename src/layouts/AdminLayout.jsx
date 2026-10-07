@@ -384,6 +384,28 @@ export default function AdminLayout() {
               />
 
               <Route
+                path="inventory/pos/add"
+                element={
+                  isSuperAdminViewer ? (
+                    <AddPOSMachine currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="inventory/pos/add-to-franchise"
+                element={
+                  isSuperAdminViewer ? (
+                    <AssignToFranchise returnPath="/super-admin/inventory/pos" />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
                 path="inventory/qr"
                 element={
                   isSuperAdminViewer ? (

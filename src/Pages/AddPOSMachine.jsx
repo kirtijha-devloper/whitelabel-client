@@ -21,7 +21,12 @@ const AddPOSMachine = ({ currentUser }) => {
     bank_name: "",
   });
 
-  const redirectUrl = currentUser.role === "admin" ? "/admin/stock-pos" : "/franchise/stock-pos";
+  const normalizedRole = String(currentUser?.role || "").trim().toLowerCase();
+  const redirectUrl = normalizedRole === "admin"
+    ? "/admin/stock-pos"
+    : normalizedRole === "super_admin"
+      ? "/super-admin/inventory/pos"
+      : "/franchise/stock-pos";
 
   const {
     data: companyRecords = [],
