@@ -23,10 +23,6 @@ export const createAdmin = async (data) => {
       Authorization: `Bearer ${token}`,
     };
 
-    if (data instanceof FormData) {
-      headers["Content-Type"] = "multipart/form-data";
-    }
-
     const response = await api.post("/createAdmin", data, { headers });
 
     return response.data;
@@ -136,10 +132,6 @@ export const updateAdmin = async (id, data) => {
     const headers = {
       Authorization: `Bearer ${token}`,
     };
-
-    if (data instanceof FormData) {
-      headers["Content-Type"] = "multipart/form-data";
-    }
 
     const response = await api.put(`/admin/${safeId}`, data, { headers });
 

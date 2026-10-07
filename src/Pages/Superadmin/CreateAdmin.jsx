@@ -22,6 +22,7 @@ import { toast } from 'react-toastify';
 
 import { useUserCreation } from '../../context/UserCreationContext';
 import { createAdmin, getAdminDetails, updateAdmin } from '../../api/superAdminApi';
+import { useRef } from 'react';
 
 
 // ==========================================
@@ -98,6 +99,7 @@ function CreateAdmin() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const initialDataRef = useRef({});
 
   // ==========================================
   // FETCH ADMIN IN EDIT MODE
@@ -114,34 +116,38 @@ function CreateAdmin() {
         if (!adminData || !isMounted) return;
 
         const comp = adminData.company || {};
+        const loadedForm = {
+          name: adminData.name || '',
+          email: adminData.email || '',
+          mobile_number: adminData.mobile_number || '',
+          password: '',
+          gender: adminData.gender || '',
+          dob: adminData.dob ? String(adminData.dob).slice(0, 10) : '',
+          address1: adminData.address1 || comp.address1 || '',
+          address2: adminData.address2 || comp.address2 || '',
+          city: adminData.city || comp.city || '',
+          district: adminData.district || comp.district || '',
+          pincode: adminData.pincode || comp.pincode || '',
+          state: adminData.state || comp.state || '',
+          country: adminData.country || comp.country || 'India',
+          aadhar_number: adminData.aadhar_number || '',
+          pan_number: adminData.pan_number || comp.pan_number || '',
+          gst_number: comp.gst_number || '',
+          company_or_shop_name:
+            adminData.company_or_shop_name ||
+            comp.company_name ||
+            '',
+          domain_name: comp.domain_name || '',
+          company_title: comp.company_title || '',
+          settlement_type:
+            adminData.settlement_type || 'today_settlement',
+          company_logo: comp.company_logo || adminData.shop_with_photo_url || null,
+        };
+
+        initialDataRef.current = loadedForm;
         dispatch({
           type: 'UPDATE_FORM',
-          payload: {
-            name: adminData.name || '',
-            email: adminData.email || '',
-            mobile_number: adminData.mobile_number || '',
-            password: '',
-            gender: adminData.gender || '',
-            dob: adminData.dob ? String(adminData.dob).slice(0, 10) : '',
-            address1: adminData.address1 || comp.address1 || '',
-            address2: adminData.address2 || comp.address2 || '',
-            city: adminData.city || comp.city || '',
-            district: adminData.district || comp.district || '',
-            pincode: adminData.pincode || comp.pincode || '',
-            state: adminData.state || comp.state || '',
-            country: adminData.country || comp.country || 'India',
-            aadhar_number: adminData.aadhar_number || '',
-            pan_number: adminData.pan_number || comp.pan_number || '',
-            gst_number: comp.gst_number || '',
-            company_or_shop_name:
-              adminData.company_or_shop_name ||
-              comp.company_name ||
-              '',
-            domain_name: comp.domain_name || '',
-            company_title: comp.company_title || '',
-            settlement_type:
-              adminData.settlement_type || 'today_settlement',
-          },
+          payload: loadedForm,
         });
       } catch (err) {
         console.error('Failed to fetch admin details:', err);
@@ -318,34 +324,111 @@ function CreateAdmin() {
     try {
       if (isEditMode) {
         // EDIT MODE: PUT /api/super-admin/admin/:id
-        const updatePayload = {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          mobile_number: form.mobile_number.trim(),
-          gender: form.gender || null,
-          dob: form.dob || null,
-          address1: form.address1 || null,
-          address2: form.address2 || null,
-          city: form.city || null,
-          district: form.district || null,
-          pincode: form.pincode || null,
-          state: form.state || null,
-          country: form.country || 'India',
-          aadhar_number: form.aadhar_number || null,
-          pan_number: form.pan_number || null,
-          gst_number: form.gst_number || null,
-          company_name: form.company_or_shop_name.trim(),
-          company_or_shop_name: form.company_or_shop_name.trim(),
-          company_title: form.company_title?.trim() || null,
-          domain_name: normalizeDomain(form.domain_name),
-          settlement_type: form.settlement_type || 'today_settlement',
+        const initial = initialDataRef.current || {};
+        const changedData = {};
+
+        const checkDiff = (key, currentVal, initialVal) => {
+          const cur = currentVal !== undefined && currentVal !== null ? String(currentVal).trim() : '';
+          const init = initialVal !== undefined && initialVal !== null ? String(initialVal).trim() : '';
+          return cur !== init;
         };
 
+        if (checkDiff('name', form.name, initial.name)) {
+          changedData.name = form.name.trim();
+        }
+        if (checkDiff('email', form.email, initial.email)) {
+          changedData.email = form.email.trim();
+        }
+        if (checkDiff('mobile_number', form.mobile_number, initial.mobile_number)) {
+          changedData.mobile_number = form.mobile_number.trim();
+        }
         if (form.password && form.password.trim()) {
-          updatePayload.password = form.password.trim();
+          changedData.password = form.password.trim();
+        }
+        if (checkDiff('gender', form.gender, initial.gender)) {
+          changedData.gender = form.gender;
+        }
+        if (checkDiff('dob', form.dob, initial.dob)) {
+          changedData.dob = form.dob;
+        }
+        if (checkDiff('address1', form.address1, initial.address1)) {
+          changedData.address1 = form.address1.trim();
+        }
+        if (checkDiff('address2', form.address2, initial.address2)) {
+          changedData.address2 = form.address2.trim();
+        }
+        if (checkDiff('city', form.city, initial.city)) {
+          changedData.city = form.city.trim();
+        }
+        if (checkDiff('district', form.district, initial.district)) {
+          changedData.district = form.district.trim();
+        }
+        if (checkDiff('state', form.state, initial.state)) {
+          changedData.state = form.state.trim();
+        }
+        if (checkDiff('country', form.country, initial.country)) {
+          changedData.country = form.country.trim();
+        }
+        if (checkDiff('pincode', form.pincode, initial.pincode)) {
+          changedData.pincode = form.pincode.trim();
+        }
+        if (checkDiff('aadhar_number', form.aadhar_number, initial.aadhar_number)) {
+          changedData.aadhar_number = form.aadhar_number.trim();
+        }
+        if (checkDiff('pan_number', form.pan_number, initial.pan_number)) {
+          changedData.pan_number = form.pan_number.trim();
+        }
+        if (checkDiff('gst_number', form.gst_number, initial.gst_number)) {
+          changedData.gst_number = form.gst_number.trim();
+        }
+        if (checkDiff('company_or_shop_name', form.company_or_shop_name, initial.company_or_shop_name)) {
+          changedData.company_name = form.company_or_shop_name.trim();
+          changedData.company_or_shop_name = form.company_or_shop_name.trim();
+        }
+        const cleanDomain = normalizeDomain(form.domain_name);
+        const cleanInitDomain = normalizeDomain(initial.domain_name);
+        if (cleanDomain && cleanDomain !== cleanInitDomain) {
+          changedData.domain_name = cleanDomain;
+        }
+        if (checkDiff('settlement_type', form.settlement_type, initial.settlement_type)) {
+          changedData.settlement_type = form.settlement_type;
         }
 
-        const res = await updateAdmin(id, updatePayload);
+        const hasFiles = Boolean(
+          form.company_logo instanceof File ||
+          FILE_FIELD_CONFIG.some((f) => form[f.name] instanceof File)
+        );
+
+        // If nothing at all changed, avoid useless API call
+        if (Object.keys(changedData).length === 0 && !hasFiles) {
+          toast.info('No changes detected.');
+          setLoading(false);
+          return;
+        }
+
+        let dataToSend;
+        if (hasFiles) {
+          const formData = new FormData();
+          Object.entries(changedData).forEach(([key, value]) => {
+            formData.append(key, value);
+          });
+
+          if (form.company_logo instanceof File) {
+            formData.append('company_logo', form.company_logo);
+          }
+
+          FILE_FIELD_CONFIG.forEach((field) => {
+            if (form[field.name] instanceof File) {
+              formData.append(field.name, form[field.name]);
+            }
+          });
+
+          dataToSend = formData;
+        } else {
+          dataToSend = changedData;
+        }
+
+        const res = await updateAdmin(id, dataToSend);
         toast.success(res?.message || 'Admin updated successfully!');
         dispatch({ type: 'RESET' });
         navigate('/super-admin/admin-list');
@@ -1124,7 +1207,7 @@ function CreateAdmin() {
                         htmlFor="upload-company-logo"
                         className="cursor-pointer inline-flex items-center rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
                       >
-                        {state.formData.company_logo instanceof File
+                        {state.formData.company_logo
                           ? 'Replace Image'
                           : 'Select Image'}
                       </label>
@@ -1132,6 +1215,8 @@ function CreateAdmin() {
                       <span className="min-w-0 break-all text-xs text-gray-600">
                         {state.formData.company_logo instanceof File
                           ? state.formData.company_logo.name
+                          : typeof state.formData.company_logo === 'string' && state.formData.company_logo
+                          ? 'Current logo set'
                           : 'No image selected'}
                       </span>
 
