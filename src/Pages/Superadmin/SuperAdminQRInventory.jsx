@@ -138,20 +138,20 @@ const SuperAdminQRInventory = () => {
     switch (status) {
       case "active":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <FaCheckCircle className="w-3 h-3 text-emerald-500" /> Active VPA
           </span>
         );
       case "unassigned":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-            <FaLayerGroup className="w-3 h-3 text-purple-500" /> Stock Ready
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            <FaLayerGroup className="w-3 h-3 text-blue-500" /> Stock Ready
           </span>
         );
       case "damaged":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <FaExclamationTriangle className="w-3 h-3 text-rose-500" /> Damaged / Defect
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+            <FaExclamationTriangle className="w-3 h-3 text-red-500" /> Damaged / Defect
           </span>
         );
       default:
@@ -165,21 +165,22 @@ const SuperAdminQRInventory = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       {/* BREADCRUMB & HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
         <div>
           <button
             onClick={() => navigate("/super-admin/inventory")}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-[#00D3CD] mb-2 transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-cyan-600 mb-2 transition-colors"
           >
             <FaArrowLeft className="w-3 h-3" /> Back to Inventory Overview
           </button>
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+            <div className="p-3 bg-cyan-50 text-cyan-600 rounded-xl">
               <FaQrcode className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900">
                 QR & Soundbox Inventory
               </h1>
               <p className="text-xs text-gray-500 mt-0.5">
@@ -192,7 +193,7 @@ const SuperAdminQRInventory = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-md transition-all"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
           >
             <FaPlus className="w-4 h-4" /> Add QR Stock
           </button>
@@ -200,53 +201,55 @@ const SuperAdminQRInventory = () => {
       </div>
 
       {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-400 font-medium">Total QR Stock</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{qrList.length}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
+        <div className="rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Total QR Stock</p>
+          <p className="text-3xl font-bold mt-2">{qrList.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-400 font-medium">Active VPAs</p>
-          <p className="text-xl font-bold text-emerald-600 mt-1">
+        <div className="rounded-2xl bg-green-500 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Active VPAs</p>
+          <p className="text-3xl font-bold mt-2">
             {qrList.filter((q) => q.status === "active").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-400 font-medium">Unassigned Stock</p>
-          <p className="text-xl font-bold text-purple-600 mt-1">
+        <div className="rounded-2xl bg-blue-600 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Unassigned Stock</p>
+          <p className="text-3xl font-bold mt-2">
             {qrList.filter((q) => q.status === "unassigned").length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-400 font-medium">Voice Soundboxes</p>
-          <p className="text-xl font-bold text-indigo-600 mt-1">
+        <div className="rounded-2xl bg-cyan-600 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Voice Soundboxes</p>
+          <p className="text-3xl font-bold mt-2">
             {qrList.filter((q) => q.type.includes("Soundbox")).length}
           </p>
         </div>
       </div>
+      </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative w-full md:w-80">
-          <FaSearch className="absolute left-3.5 top-3 text-gray-400 w-4 h-4" />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="relative w-full md:max-w-md">
+          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search QR Code, VPA, Bank..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto">
           {["all", "Acrylic Standee", "4G Soundbox", "NFC QR Card", "Sticker"].map((t) => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+              className={`px-5 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition ${
                 typeFilter === t
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               {t === "all" ? "All Media" : t}
@@ -254,20 +257,21 @@ const SuperAdminQRInventory = () => {
           ))}
         </div>
       </div>
+      </div>
 
       {/* DATA TABLE */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500 border-b border-gray-100">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4">QR Code ID</th>
-                <th className="px-6 py-4">Media Type</th>
-                <th className="px-6 py-4">VPA / UPI ID</th>
-                <th className="px-6 py-4">Partner Bank</th>
-                <th className="px-6 py-4">Assigned Entity</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">QR Code ID</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Media Type</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">VPA / UPI ID</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Partner Bank</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Assigned Entity</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -278,9 +282,9 @@ const SuperAdminQRInventory = () => {
                       {q.qr_code}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-cyan-50 text-cyan-800">
                         {q.type.includes("Soundbox") && (
-                          <FaVolumeUp className="w-3 h-3 text-purple-600" />
+                          <FaVolumeUp className="w-3 h-3 text-cyan-700" />
                         )}
                         {q.type}
                       </span>
@@ -298,7 +302,7 @@ const SuperAdminQRInventory = () => {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => setSelectedQR(q)}
-                        className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors"
                         title="View Details"
                       >
                         <FaEye className="w-4 h-4" />
@@ -308,7 +312,7 @@ const SuperAdminQRInventory = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
+                  <td colSpan="7" className="px-6 py-10 text-center text-gray-500">
                     No QR items found matching filter criteria.
                   </td>
                 </tr>
@@ -339,7 +343,7 @@ const SuperAdminQRInventory = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, qr_code: e.target.value })
                   }
-                  className="w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-400 focus:outline-none"
                 />
               </div>
 
@@ -355,7 +359,7 @@ const SuperAdminQRInventory = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, vpa_id: e.target.value })
                   }
-                  className="w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-400 focus:outline-none"
                 />
               </div>
 
@@ -369,7 +373,7 @@ const SuperAdminQRInventory = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, type: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-400 focus:outline-none"
                   >
                     <option value="Acrylic Standee">Acrylic Standee</option>
                     <option value="4G Soundbox">4G Soundbox</option>
@@ -387,7 +391,7 @@ const SuperAdminQRInventory = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, partner_bank: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-400 focus:outline-none"
                   >
                     <option value="HDFC Bank">HDFC Bank</option>
                     <option value="ICICI Bank">ICICI Bank</option>
@@ -407,7 +411,7 @@ const SuperAdminQRInventory = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-sm bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
                 >
                   Save QR Item
                 </button>
@@ -440,7 +444,7 @@ const SuperAdminQRInventory = () => {
               </div>
               <div className="flex justify-between border-b pb-2">
                 <span className="text-gray-500">Media Type:</span>
-                <span className="font-semibold text-purple-700">
+                <span className="font-semibold text-cyan-700">
                   {selectedQR.type}
                 </span>
               </div>
@@ -471,7 +475,7 @@ const SuperAdminQRInventory = () => {
             <div className="pt-4 border-t flex justify-end">
               <button
                 onClick={() => setSelectedQR(null)}
-                className="px-4 py-2 bg-gray-900 text-white text-xs font-semibold rounded-xl"
+                className="px-5 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800"
               >
                 Close
               </button>

@@ -9,6 +9,7 @@ import {
   FaWallet,
   FaCommentDots,
   FaMoneyBillWave,
+  FaCoins,
   FaChartBar,
   FaDatabase,
   FaCog,
@@ -90,6 +91,12 @@ const Sidebar = ({ currentUser }) => {
       name: "Set Charges",
       path: "/admin/set-charges",
       icon: <FaMoneyBillWave />,
+      adminOnly: true,
+    },
+    {
+      name: "My Charges",
+      path: "/admin/my-charges",
+      icon: <FaCoins />,
       adminOnly: true,
     },
     {
