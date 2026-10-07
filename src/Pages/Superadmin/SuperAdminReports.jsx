@@ -536,7 +536,7 @@ export default function SuperAdminReports({ currentUser }) {
           <span>Service Wise Reports</span>
         </button>
 
-        <button
+        {/* <button
           type="button"
           onClick={() => handleTabSwitch("service_management")}
           className={`flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition-all shadow-sm ${
@@ -547,7 +547,7 @@ export default function SuperAdminReports({ currentUser }) {
         >
           <SlidersHorizontal className="h-4 w-4" />
           <span>Service Management</span>
-        </button>
+        </button> */}
       </div>
 
       {activeTab === "service_reports" && (

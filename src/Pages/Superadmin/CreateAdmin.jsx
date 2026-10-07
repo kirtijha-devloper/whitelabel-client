@@ -228,7 +228,7 @@ function CreateAdmin() {
     }
 
     if (name === 'domain_name') {
-      nextValue = normalizeDomain(value);
+      nextValue = value.toLowerCase().replace(/\s+/g, '');
     }
 
     dispatch({
@@ -1162,6 +1162,16 @@ function CreateAdmin() {
                     name="domain_name"
                     value={state.formData.domain_name || ''}
                     onChange={handleChange}
+                    onBlur={() => {
+                      if (state.formData.domain_name) {
+                        dispatch({
+                          type: 'UPDATE_FORM',
+                          payload: {
+                            domain_name: normalizeDomain(state.formData.domain_name),
+                          },
+                        });
+                      }
+                    }}
                     required
                     placeholder="e.g. google.com"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"

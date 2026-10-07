@@ -12,9 +12,24 @@ import {
   Loader2,
   SquarePen,
   MoreHorizontal,
+  Building,
 } from "lucide-react";
 
 import { toast } from "react-toastify";
+import { BASE_SITE_URL } from "../constants";
+
+/**
+ * Resolves uploaded image path to full URL (supporting absolute URLs and /uploads/ paths)
+ */
+const resolveLogoUrl = (logoPath) => {
+  if (!logoPath || typeof logoPath !== "string") return null;
+  const trimmed = logoPath.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const clean = trimmed.replace(/\\/g, "/");
+  const slashPrefixed = clean.startsWith("/") ? clean : `/${clean}`;
+  return `${BASE_SITE_URL}${slashPrefixed}`;
+};
 
 import { extractUsersArray, normalizeUserRole } from "../utils/userAccess";
 import {
@@ -875,30 +890,48 @@ const AdminList = ({
       render: (
         _value,
         row
-      ) => (
+      ) => {
+        const companyName =
+          row.company?.company_name || row.company_or_shop_name || "-";
+        const domainName = row.company?.domain_name || "-";
+        const logoUrl = resolveLogoUrl(
+          row.company?.company_logo || row.shop_with_photo_url
+        );
 
-        <div className="space-y-0.5">
-
-          <div className="font-medium text-gray-900">
-
-            {row.company
-              ?.company_name ||
-              row.company_or_shop_name ||
-              "-"}
-
+        return (
+          <div className="flex items-center gap-3">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={companyName}
+                className="h-9 w-9 rounded-lg object-contain border border-gray-200 bg-white p-0.5 shadow-xs shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  const fallback = e.currentTarget.nextElementSibling;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+            ) : null}
+            <div
+              className={`h-9 w-9 rounded-lg bg-teal-50 border border-teal-200 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0 ${
+                logoUrl ? "hidden" : "flex"
+              }`}
+            >
+              {companyName && companyName !== "-"
+                ? companyName.charAt(0).toUpperCase()
+                : <Building className="h-4 w-4 text-teal-600" />}
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <div className="font-medium text-gray-900 truncate max-w-[200px]" title={companyName}>
+                {companyName}
+              </div>
+              <div className="text-xs text-blue-600 truncate max-w-[200px]" title={domainName}>
+                {domainName}
+              </div>
+            </div>
           </div>
-
-
-          <div className="text-xs text-blue-600">
-
-            {row.company
-              ?.domain_name ||
-              "-"}
-
-          </div>
-
-        </div>
-      ),
+        );
+      },
     },
 
 
@@ -1490,14 +1523,24 @@ const AdminList = ({
                               Company
                             </p>
 
-                            <p className="font-semibold text-blue-600">
-
-                              {admin.company
-                                ?.company_name ||
-                                admin.company_or_shop_name ||
-                                "-"}
-
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {resolveLogoUrl(admin.company?.company_logo || admin.shop_with_photo_url) ? (
+                                <img
+                                  src={resolveLogoUrl(admin.company?.company_logo || admin.shop_with_photo_url)}
+                                  alt="Logo"
+                                  className="h-6 w-6 rounded object-contain border border-gray-200 bg-white p-0.5 shrink-0"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              ) : null}
+                              <p className="font-semibold text-blue-600 truncate max-w-[140px]">
+                                {admin.company
+                                  ?.company_name ||
+                                  admin.company_or_shop_name ||
+                                  "-"}
+                              </p>
+                            </div>
 
                           </div>
 
