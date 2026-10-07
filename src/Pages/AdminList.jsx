@@ -29,6 +29,8 @@ import {
 } from "../api/superAdminApi";
 
 import ServiceManagementModal from "../components/SuperAdmin/ServiceManagementModal";
+import AdminActionMenuModal from "../components/SuperAdmin/AdminActionMenuModal";
+import AdminWalletModal from "../components/SuperAdmin/AdminWalletModal";
 
 
 /* =========================================================
@@ -66,9 +68,15 @@ const AdminList = ({
 
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
-  /* Service Modal */
+  /* Management Modals */
+
+  const [isAdminActionMenuOpen, setIsAdminActionMenuOpen] = useState(false);
+
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+
+  const [selectedAdminForAction, setSelectedAdminForAction] = useState(null);
 
   const [selectedCompany, setSelectedCompany] = useState(null);
 
@@ -407,39 +415,9 @@ const AdminList = ({
      VIEW ADMIN
   ========================================================= */
 
-  const handleViewAdmin = (
-    admin
-  ) => {
-
-    if (!admin?.id) {
-      return;
-    }
-
-
-    try {
-
-      localStorage.setItem(
-        "selectedUser",
-        JSON.stringify(admin)
-      );
-
-      localStorage.setItem(
-        "selectedAdmin",
-        JSON.stringify(admin)
-      );
-
-    } catch (e) {
-
-      console.warn(
-        "Failed to store admin in localStorage",
-        e
-      );
-    }
-
-
-    navigate(
-      `/super-admin/user/${admin.id}`
-    );
+  const handleViewAdmin = (admin) => {
+    if (!admin?.id) return;
+    navigate(`/super-admin/user/${admin.id}`);
   };
 
 
@@ -447,39 +425,54 @@ const AdminList = ({
      EDIT ADMIN
   ========================================================= */
 
-  const handleEditAdmin = (
-    admin
-  ) => {
+  const handleEditAdmin = (admin) => {
+    if (!admin?.id) return;
+    navigate(`/super-admin/user/${admin.id}/edit`);
+  };
 
-    if (!admin?.id) {
-      return;
+
+  /* =========================================================
+     ADMIN ACTION MENU (THREE DOTS)
+  ========================================================= */
+
+  const handleOpenAdminActionMenu = (row) => {
+    if (!row) return;
+    setSelectedAdminForAction(row);
+    setIsAdminActionMenuOpen(true);
+  };
+
+  const handleCloseAdminActionMenu = () => {
+    setIsAdminActionMenuOpen(false);
+  };
+
+  const handleSelectServiceManagement = (admin) => {
+    setIsAdminActionMenuOpen(false);
+    handleOpenServiceManagement(admin || selectedAdminForAction);
+  };
+
+  const handleSelectRateManagement = (_admin) => {
+    setIsAdminActionMenuOpen(false);
+    navigate("/super-admin/set-charges");
+  };
+
+  const handleSelectWalletManagement = (admin) => {
+    setIsAdminActionMenuOpen(false);
+    setSelectedAdminForAction(admin || selectedAdminForAction);
+    setIsWalletModalOpen(true);
+  };
+
+  const handleCloseWalletModal = () => {
+    setIsWalletModalOpen(false);
+  };
+
+  const handleWalletSuccess = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["adminList"] }),
+      queryClient.invalidateQueries({ queryKey: ["adminSearch"] }),
+    ]);
+    if (typeof refetchAllAdmins === "function") {
+      await refetchAllAdmins();
     }
-
-
-    try {
-
-      localStorage.setItem(
-        "selectedUser",
-        JSON.stringify(admin)
-      );
-
-      localStorage.setItem(
-        "selectedAdmin",
-        JSON.stringify(admin)
-      );
-
-    } catch (e) {
-
-      console.warn(
-        "Failed to store admin in localStorage",
-        e
-      );
-    }
-
-
-    navigate(
-      `/super-admin/user/${admin.id}/edit`
-    );
   };
 
 
@@ -1048,19 +1041,16 @@ const AdminList = ({
 
 
   /* =========================================================
-     SERVICE MANAGEMENT
-     
-     THIS IS THE IMPORTANT FIX.
+     ADMIN MANAGEMENT (THREE DOTS MENU)
      
      label contains ONLY ICON.
-     
-     There is NO <button> here.
-     
      Table will create the button itself.
   ========================================================= */
 
   if (
-    canManageUserServiceSettings
+    canManageUserServiceSettings ||
+    isSuperAdminViewer ||
+    isAdmin
   ) {
 
     actions.push({
@@ -1077,11 +1067,12 @@ const AdminList = ({
       onClick: (
         row
       ) =>
-        handleOpenServiceManagement(
+        handleOpenAdminActionMenu(
           row
         ),
     });
   }
+
 
 
   /* =========================================================
@@ -1560,19 +1551,21 @@ const AdminList = ({
                             )}
 
 
-                            {/* MOBILE SERVICE BUTTON */}
+                            {/* MOBILE ADMIN MANAGEMENT BUTTON */}
 
-                            {canManageUserServiceSettings && (
+                            {(canManageUserServiceSettings ||
+                              isSuperAdminViewer ||
+                              isAdmin) && (
 
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleOpenServiceManagement(
+                                  handleOpenAdminActionMenu(
                                     admin
                                   )
                                 }
                                 className="rounded-lg p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-                                title="Service Management"
+                                title="Admin Management"
                               >
 
                                 <MoreHorizontal className="h-5 w-5" />
@@ -1580,6 +1573,7 @@ const AdminList = ({
                               </button>
 
                             )}
+
 
                           </div>
 
@@ -1649,6 +1643,32 @@ const AdminList = ({
 
 
       {/* =====================================================
+          ADMIN ACTION MENU MODAL (SERVICE / RATE / WALLET)
+      ===================================================== */}
+
+      <AdminActionMenuModal
+        isOpen={
+          isAdminActionMenuOpen
+        }
+        onClose={
+          handleCloseAdminActionMenu
+        }
+        admin={
+          selectedAdminForAction
+        }
+        onSelectServiceManagement={
+          handleSelectServiceManagement
+        }
+        onSelectRateManagement={
+          handleSelectRateManagement
+        }
+        onSelectWalletManagement={
+          handleSelectWalletManagement
+        }
+      />
+
+
+      {/* =====================================================
           SERVICE MANAGEMENT MODAL
       ===================================================== */}
 
@@ -1671,6 +1691,27 @@ const AdminList = ({
         }
 
       />
+
+
+      {/* =====================================================
+          ADMIN WALLET MANAGEMENT MODAL
+      ===================================================== */}
+
+      <AdminWalletModal
+        isOpen={
+          isWalletModalOpen
+        }
+        onClose={
+          handleCloseWalletModal
+        }
+        admin={
+          selectedAdminForAction
+        }
+        onSuccess={
+          handleWalletSuccess
+        }
+      />
+
 
     </div>
   );

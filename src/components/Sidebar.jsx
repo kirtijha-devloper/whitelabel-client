@@ -178,27 +178,37 @@ const Sidebar = ({ currentUser }) => {
       path: "/super-admin/set-charges",
       icon: <FaMoneyBillWave />,
     },
+    // {
+    //   name: "Reports",
+    //   icon: <FaChartBar />,
+    //   subMenu: [
+    //     {
+    //       name: "Transaction Reports",
+    //       path: "/super-admin/reports/transactions",
+    //       icon: <FaFileAlt />,
+    //     },
+    //     {
+    //       name: "Commission Report",
+    //       path: "/super-admin/reports/commission",
+    //       icon: <FaPercentage />,
+    //     },
+    //     {
+    //       name: "Service Wise Reports",
+    //       path: "/super-admin/reports/service-wise",
+    //       icon: <FaLayerGroup />,
+    //     },
+    //   ],
+    // },
     {
       name: "Reports",
-      icon: <FaChartBar />,
-      subMenu: [
-        {
-          name: "Transaction Reports",
-          path: "/super-admin/reports/transactions",
-          icon: <FaFileAlt />,
-        },
-        {
-          name: "Commission Report",
-          path: "/super-admin/reports/commission",
-          icon: <FaPercentage />,
-        },
-        {
-          name: "Service Wise Reports",
-          path: "/super-admin/reports/service-wise",
-          icon: <FaLayerGroup />,
-        },
-      ],
+      path: "/super-admin/reports",
+      icon: <FaFileAlt />,
     },
+    // {
+    //   name: "Service Management",
+    //   path: "/super-admin/service-management",
+    //   icon: <FaSlidersH />,
+    // },
     {
       name: "Setting",
       icon: <FaCog />,

@@ -36,13 +36,14 @@ const serviceData = [
 ];
 
 const COLORS = [
-  "#2563eb",
-  "#7c3aed",
-  "#059669",
-  "#f59e0b",
-  "#dc2626",
-  "#0891b2",
+  "#00D3CD", // Brand Primary Teal
+  "#0284c7", // POS T0 Sky Blue
+  "#8b5cf6", // POS T1 Purple
+  "#10b981", // Emerald Green
+  "#f59e0b", // Amber Warning
+  "#6366f1", // Indigo Accent
 ];
+
 
 /* =========================================
    PERCENTAGE OUTSIDE PIE

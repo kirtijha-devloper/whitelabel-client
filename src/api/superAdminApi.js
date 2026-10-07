@@ -231,3 +231,193 @@ export const getSuperAdminPosInventory = async (params = {}) => {
     throw new Error(error?.response?.data?.message || "Failed to fetch POS inventory");
   }
 };
+
+/**
+ * Get Super Admin Transaction Report
+ */
+export const getSuperAdminTransactionReport = async (params = {}) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const { page, limit, domain, company_id, from_date, to_date, status, search, q } = params;
+    let url = "/reports/transactions";
+    const query = [];
+    if (page) query.push(`page=${encodeURIComponent(page)}`);
+    if (limit) query.push(`limit=${encodeURIComponent(limit)}`);
+    if (domain) query.push(`domain=${encodeURIComponent(domain)}`);
+    if (company_id) query.push(`company_id=${encodeURIComponent(company_id)}`);
+    if (from_date) query.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) query.push(`to_date=${encodeURIComponent(to_date)}`);
+    if (status) query.push(`status=${encodeURIComponent(status)}`);
+    const searchTerm = search || q;
+    if (searchTerm) query.push(`search=${encodeURIComponent(searchTerm)}`);
+    if (query.length) url += `?${query.join("&")}`;
+
+    const response = await api.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("[getSuperAdminTransactionReport] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+      details: error?.response?.data ?? null,
+    });
+
+    throw new Error(error?.response?.data?.message || "Failed to fetch transaction report");
+  }
+};
+
+/**
+ * Get Super Admin Commission Report
+ */
+export const getSuperAdminCommissionReport = async (params = {}) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const { page, limit, domain, company_id, from_date, to_date, payment_method, search, q } = params;
+    let url = "/reports/commissions";
+    const query = [];
+    if (page) query.push(`page=${encodeURIComponent(page)}`);
+    if (limit) query.push(`limit=${encodeURIComponent(limit)}`);
+    if (domain) query.push(`domain=${encodeURIComponent(domain)}`);
+    if (company_id) query.push(`company_id=${encodeURIComponent(company_id)}`);
+    if (from_date) query.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) query.push(`to_date=${encodeURIComponent(to_date)}`);
+    if (payment_method) query.push(`payment_method=${encodeURIComponent(payment_method)}`);
+    const searchTerm = search || q;
+    if (searchTerm) query.push(`search=${encodeURIComponent(searchTerm)}`);
+    if (query.length) url += `?${query.join("&")}`;
+
+    const response = await api.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("[getSuperAdminCommissionReport] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+      details: error?.response?.data ?? null,
+    });
+
+    throw new Error(error?.response?.data?.message || "Failed to fetch commission report");
+  }
+};
+
+/**
+ * Get Super Admin Service-Wise Report
+ */
+export const getSuperAdminServiceWiseReport = async (params = {}) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const { category, search, q } = params;
+    let url = "/reports/service-wise";
+    const query = [];
+    if (category) query.push(`category=${encodeURIComponent(category)}`);
+    const searchTerm = search || q;
+    if (searchTerm) query.push(`search=${encodeURIComponent(searchTerm)}`);
+    if (query.length) url += `?${query.join("&")}`;
+
+    const response = await api.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("[getSuperAdminServiceWiseReport] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+      details: error?.response?.data ?? null,
+    });
+
+    throw new Error(error?.response?.data?.message || "Failed to fetch service wise report");
+  }
+};
+
+/**
+ * Get Super Admin Services List from backend DB
+ */
+export const getSuperAdminServices = async () => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const response = await api.get("/services", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data?.data || response.data || [];
+  } catch (error) {
+    console.error("[getSuperAdminServices] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+    });
+    throw new Error(error?.response?.data?.message || "Failed to fetch services");
+  }
+};
+
+/**
+ * Update Super Admin Service Status in backend DB
+ */
+export const updateSuperAdminServiceStatus = async (serviceKey, isEnabled) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const response = await api.put(
+      `/services/${encodeURIComponent(serviceKey)}/status`,
+      { is_enabled: Boolean(isEnabled) },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("[updateSuperAdminServiceStatus] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+    });
+    throw new Error(error?.response?.data?.message || "Failed to update service status");
+  }
+};
+
+/**
+ * Create or Update Custom Service in backend DB
+ */
+export const createSuperAdminService = async (payload) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const response = await api.post("/services/create", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("[createSuperAdminService] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+    });
+    throw new Error(error?.response?.data?.message || "Failed to create service");
+  }
+};

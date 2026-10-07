@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Calendar } from "lucide-react";
 import AdminStatCard from "../../components/SuperAdmin/AdminStatCard";
 import ServiceUsageChart from "../../components/SuperAdmin/ServiceUsageChart";
 import AdminSpendingChart from "../../components/SuperAdmin/AdminSpendingChart";
@@ -17,8 +18,7 @@ const SuperAdminDashboard = () => {
   });
 
   useEffect(() => {
-    // Temporary data
-    // Replace with API later
+    // Temporary data - Replace with API later
     setDashboardData({
       todaysBusiness: 125000,
       totalBusiness: 1850000,
@@ -55,166 +55,154 @@ const SuperAdminDashboard = () => {
     });
   }, []);
 
+  const todayFormatted = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
-    <div className="min-h-screen bg-[#f5f7fb] p-4 sm:p-6 lg:p-7">
-
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 space-y-8">
       {/* ================= HEADER ================= */}
-      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-6">
         <div>
-          <p className="mb-1 text-sm font-medium text-cyan-600">
-            Overview
-          </p>
+          <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20 mb-2">
+            Super Admin Overview
+          </span>
 
-          <h2 className="text-2xl font-bold tracking-tight text-slate-800">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
             Super Admin Dashboard
           </h2>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Monitor your business, transactions and commissions
+          <p className="mt-1 text-sm text-gray-500">
+            Real-time business performance, transactions, and revenue metrics
           </p>
         </div>
 
-        {/* Date */}
-        <div className="flex w-fit items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600">
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"
-              />
-            </svg>
+        {/* Date Display */}
+        <div className="flex w-fit items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00D3CD]/10 text-[#00D3CD]">
+            <Calendar className="h-5 w-5" />
           </div>
 
           <div>
-            <p className="text-xs text-slate-400">
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
               Today
             </p>
-
-            <p className="text-sm font-semibold text-slate-700">
-              October 7, 2026
+            <p className="text-sm font-semibold text-gray-800">
+              {todayFormatted}
             </p>
           </div>
         </div>
       </div>
 
-
       {/* ================= MAIN STAT CARDS ================= */}
-      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div>
+        <div className="mb-4">
+          <h3 className="text-lg font-bold text-gray-900">
+            Business Volume & Earnings
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Overview of total volume and commission generation
+          </p>
+        </div>
 
-        <AdminStatCard
-          title="Today's Business"
-          value={`₹${dashboardData.todaysBusiness.toLocaleString()}`}
-          type="business"
-          subtitle="Business generated today"
-        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <AdminStatCard
+            title="Today's Business"
+            value={`₹${dashboardData.todaysBusiness.toLocaleString("en-IN")}`}
+            type="business"
+            subtitle="Volume generated today"
+          />
 
-        <AdminStatCard
-          title="Total Business"
-          value={`₹${dashboardData.totalBusiness.toLocaleString()}`}
-          type="total"
-          subtitle="Overall business volume"
-        />
+          <AdminStatCard
+            title="Total Business"
+            value={`₹${dashboardData.totalBusiness.toLocaleString("en-IN")}`}
+            type="total"
+            subtitle="Overall platform volume"
+          />
 
-        <AdminStatCard
-          title="Total Transactions"
-          value={dashboardData.totalTransactions.toLocaleString()}
-          type="transactions"
-          subtitle="All transactions"
-        />
+          <AdminStatCard
+            title="Total Transactions"
+            value={dashboardData.totalTransactions.toLocaleString("en-IN")}
+            type="transactions"
+            subtitle="All processed transactions"
+          />
 
-        <AdminStatCard
-          title="Total Commission"
-          value={`₹${dashboardData.totalCommission.toLocaleString()}`}
-          type="commission"
-          subtitle="Total commission earned"
-        />
+          <AdminStatCard
+            title="Total Commission"
+            value={`₹${dashboardData.totalCommission.toLocaleString("en-IN")}`}
+            type="commission"
+            subtitle="Total earnings recorded"
+          />
 
-        <AdminStatCard
-          title="Today's Commission"
-          value={`₹${dashboardData.todaysCommission.toLocaleString()}`}
-          type="todayCommission"
-          subtitle="Commission generated today"
-        />
-
+          <AdminStatCard
+            title="Today's Commission"
+            value={`₹${dashboardData.todaysCommission.toLocaleString("en-IN")}`}
+            type="todayCommission"
+            subtitle="Earnings generated today"
+          />
+        </div>
       </div>
 
-
       {/* ================= TRANSACTION STATUS ================= */}
-      <div className="mb-7">
-
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">
-              Transaction Status
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Current transaction performance
-            </p>
-          </div>
+      <div>
+        <div className="mb-4">
+          <h3 className="text-lg font-bold text-gray-900">
+            Transaction Health & Status
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Operational status breakdown of all processed requests
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <AdminStatCard
-            title="Pending Transactions"
-            value={dashboardData.pendingTransactions.toLocaleString()}
-            type="pending"
-            subtitle="Requires attention"
-          />
-          <AdminStatCard
-            title="Failed Transactions"
-            value={dashboardData.failedTransactions.toLocaleString()}
-            type="failed"
-            subtitle="Failed payments"
-          />
-          <AdminStatCard
             title="Successful Transactions"
-            value={dashboardData.successfulTransactions.toLocaleString()}
+            value={dashboardData.successfulTransactions.toLocaleString("en-IN")}
             type="successful"
-            subtitle="Successfully completed"
+            subtitle="Completed without issues"
           />
 
+          <AdminStatCard
+            title="Pending Transactions"
+            value={dashboardData.pendingTransactions.toLocaleString("en-IN")}
+            type="pending"
+            subtitle="Processing / requires attention"
+          />
+
+          <AdminStatCard
+            title="Failed Transactions"
+            value={dashboardData.failedTransactions.toLocaleString("en-IN")}
+            type="failed"
+            subtitle="Failed or rejected requests"
+          />
         </div>
       </div>
 
-
       {/* ================= ANALYTICS ================= */}
       <div>
-
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-slate-800">
-            Analytics
+          <h3 className="text-lg font-bold text-gray-900">
+            Platform Analytics
           </h3>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Business and service performance overview
+          <p className="text-xs text-gray-500 mt-0.5">
+            Distribution across services and top user spending
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-
-          {/* Service Usage */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+          {/* Service Usage Chart */}
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md">
             <ServiceUsageChart />
           </div>
 
-          {/* Admin Spending */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+          {/* Admin Spending Chart */}
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md">
             <AdminSpendingChart />
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 };

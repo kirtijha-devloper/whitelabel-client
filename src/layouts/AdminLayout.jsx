@@ -122,6 +122,7 @@ const CommissionReport = lazy(
 const ServiceWiseReports = lazy(
   () => import("../Pages/Reports/ServiceWiseReports"),
 );
+const SuperAdminReports = lazy(() => import("../Pages/Superadmin/SuperAdminReports"));
 
 const AdminList = lazy(() => import("../Pages/AdminList"));
 
@@ -513,6 +514,10 @@ export default function AdminLayout() {
               />
 
               <Route
+                path="/super-admin/reports"
+                element={<SuperAdminReports currentUser={currentUser} />}
+              />
+              <Route
                 path="reports/transactions"
                 element={<TransactionReports currentUser={currentUser} />}
               />
@@ -666,10 +671,13 @@ export default function AdminLayout() {
               />
               <Route
                 path="reports"
-                element={guardRoute(
-                  canViewReports,
-                  <Reports currentUser={currentUser} />,
-                )}
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminReports currentUser={currentUser} />
+                  ) : (
+                    guardRoute(canViewReports, <Reports currentUser={currentUser} />)
+                  )
+                }
               />
               <Route
                 path="complaint"

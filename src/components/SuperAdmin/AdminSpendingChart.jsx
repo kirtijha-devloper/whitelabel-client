@@ -65,23 +65,37 @@ const AdminSpendingChart = () => {
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
+              stroke="#f1f5f9"
             />
 
             <XAxis
               dataKey="adminName"
+              axisLine={{ stroke: "#e2e8f0" }}
+              tickLine={false}
               tick={{
                 fontSize: 12,
+                fill: "#64748b",
               }}
             />
 
             <YAxis
               tickFormatter={formatCurrency}
+              axisLine={false}
+              tickLine={false}
               tick={{
                 fontSize: 12,
+                fill: "#64748b",
               }}
             />
 
             <Tooltip
+              contentStyle={{
+                backgroundColor: "#ffffff",
+                borderRadius: "12px",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                fontSize: "12px",
+              }}
               formatter={(value) => [
                 formatCurrency(value),
                 "Amount Spent",
@@ -93,11 +107,12 @@ const AdminSpendingChart = () => {
               name="Amount Spent"
               fill="#00D3CD"
               radius={[6, 6, 0, 0]}
-              barSize={45}
+              barSize={42}
             />
           </BarChart>
         </ResponsiveContainer>
       </div>
+
     </div>
   );
 };
