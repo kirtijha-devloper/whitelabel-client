@@ -92,6 +92,7 @@ const BillAvenueBillerUpload = lazy(
 const SystemActivityLog = lazy(() => import("../Pages/SystemActivityLog"));
 const SetLimit = lazy(() => import("../Pages/SetLimit"));
 const PosSetting = lazy(() => import("../Pages/PosSetting"));
+const MyCharges = lazy(() => import("../Pages/MyCharges"));
 
 const CreateAdmin = lazy(() => import("../Pages/Superadmin/CreateAdmin"));
 const AdminProfile = lazy(() => import("../Pages/Superadmin/AdminProfile"));
@@ -500,6 +501,11 @@ export default function AdminLayout() {
                     <Navigate to="/login" replace />
                   )
                 }
+              />
+
+              <Route
+                path="my-charges"
+                element={guardRoute(isAdminViewer, <MyCharges />)}
               />
 
               <Route
