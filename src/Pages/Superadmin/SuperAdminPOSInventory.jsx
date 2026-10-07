@@ -366,8 +366,8 @@ const SuperAdminPOSInventory = () => {
     }
   };
 
-  const handleAssignFranchise = () => {
-    navigate("/super-admin/inventory/pos/add-to-franchise");
+  const handleAssignAdmin = () => {
+    navigate("/super-admin/inventory/pos/add-to-admin");
   };
 
 
@@ -432,14 +432,14 @@ const SuperAdminPOSInventory = () => {
               Export Excel
             </button>
 
-            {/* ASSIGN TO FRANCHISE */}
+            {/* ASSIGN TO ADMIN */}
             <button
               type="button"
-              onClick={handleAssignFranchise}
+              onClick={handleAssignAdmin}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
             >
               <FaPlus />
-              Assign To Franchise
+              Assign To Admin
             </button>
           </div>
         </div>

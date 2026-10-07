@@ -6,6 +6,7 @@ import Select from "react-select";
 import { assignPosMachineToFranchise, getAllPosMachines } from '../api/posMachine';
 import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FranchiseAllUsers, searchUsers } from '../api/FranchiseApi';
+import { getAdminList } from '../api/superAdminApi';
 
 const FRANCHISE_PAGE_SIZE = 10;
 
@@ -24,8 +25,9 @@ const extractPagination = (payload) => {
     return payload?.pagination || payload?.data?.pagination || {};
 };
 
-const AssignToFranchise = ({ returnPath }) => {
+const AssignToFranchise = ({ returnPath, assignmentType = "franchise" }) => {
     const navigate = useNavigate();
+    const isAdminAssignment = assignmentType === "admin";
     const [selectedMachines, setSelectedMachines] = useState([]);
     const [selectedFranchise, setSelectedFranchise] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
@@ -70,12 +72,10 @@ const AssignToFranchise = ({ returnPath }) => {
         isLoading: franchisesLoading,
         error: franchisesError,
     } = useQuery({
-        queryKey: ["franchises", franchisePage],
-        queryFn: () =>
-            FranchiseAllUsers({
-                page: franchisePage,
-                limit: FRANCHISE_PAGE_SIZE,
-            }),
+        queryKey: [isAdminAssignment ? "superAdminAdminsForPos" : "franchises", franchisePage],
+        queryFn: () => isAdminAssignment
+            ? getAdminList({ page: franchisePage, limit: FRANCHISE_PAGE_SIZE, status: "active" })
+            : FranchiseAllUsers({ page: franchisePage, limit: FRANCHISE_PAGE_SIZE }),
         enabled: !isFranchiseSearchMode,
     });
 
@@ -84,9 +84,10 @@ const AssignToFranchise = ({ returnPath }) => {
         isLoading: searchedFranchisesLoading,
         error: searchedFranchisesError,
     } = useQuery({
-        queryKey: ["franchiseSearch", trimmedFranchiseSearchTerm],
-        queryFn: () =>
-            searchUsers({
+        queryKey: [isAdminAssignment ? "superAdminAdminsForPosSearch" : "franchiseSearch", trimmedFranchiseSearchTerm],
+        queryFn: () => isAdminAssignment
+            ? getAdminList({ search: trimmedFranchiseSearchTerm, status: "active", page: 1, limit: 50 })
+            : searchUsers({
                 q: trimmedFranchiseSearchTerm,
                 status: "active",
                 role: "franchaise",
@@ -122,6 +123,8 @@ const AssignToFranchise = ({ returnPath }) => {
             assignPosMachineToFranchise(posMachineIds, userId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["franchises"] });
+            queryClient.invalidateQueries({ queryKey: ["superAdminAdminsForPos"] });
+            queryClient.invalidateQueries({ queryKey: ["superAdminAdminsForPosSearch"] });
             queryClient.invalidateQueries({ queryKey: ["posMachines"] });
             setSelectedMachines([]);
             setSelectedFranchise(null);
@@ -145,7 +148,7 @@ const AssignToFranchise = ({ returnPath }) => {
             return;
         }
         if (!selectedFranchise) {
-            alert("Please select a franchise");
+            alert(`Please select ${isAdminAssignment ? "an admin" : "a franchise"}`);
             return;
         }
         // Keep backend payload on POS machine id while showing serial number in UI.
@@ -193,7 +196,7 @@ const AssignToFranchise = ({ returnPath }) => {
 
     const franchiseOptions = franchises.map((franchise) => ({
         value: franchise.id,
-        label: franchise.name || `Franchise ${franchise.id}`,
+        label: franchise.name || `${isAdminAssignment ? "Admin" : "Franchise"} ${franchise.id}`,
         mobileNumber: franchise.mobile_number || franchise.mobile || "",
         email: franchise.email || "",
     }));
@@ -231,12 +234,14 @@ const AssignToFranchise = ({ returnPath }) => {
 
     return (
         <div className="p-6 max-w-4xl mx-auto bg-white rounded-xl shadow-md space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Assign POS Machines to Franchise</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">
+                Assign POS Machines to {isAdminAssignment ? "Admin" : "Franchise"}
+            </h2>
 
             {/* Franchise Selection */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Franchise
+                    Select {isAdminAssignment ? "Admin" : "Franchise"}
                 </label>
                 <Select
                     name="franchise_id"
@@ -245,7 +250,7 @@ const AssignToFranchise = ({ returnPath }) => {
                     onChange={handleFranchiseChange}
                     onInputChange={handleFranchiseInputChange}
                     isLoading={franchisesLoading || searchedFranchisesLoading}
-                    placeholder="Search franchise by name, mobile, or email..."
+                    placeholder={`Search ${isAdminAssignment ? "admin" : "franchise"} by name, mobile, or email...`}
                     className="w-full"
                     classNamePrefix="react-select"
                     filterOption={() => true}
@@ -272,12 +277,12 @@ const AssignToFranchise = ({ returnPath }) => {
                             ? "Error loading franchises"
                             : isFranchiseSearchMode
                                 ? "No matching franchises found"
-                                : "No franchises available"
+                                : `No ${isAdminAssignment ? "admins" : "franchises"} available`
                     }
                 />
                 {activeFranchiseError && (
                     <div className="mt-2 p-4 bg-red-50 text-red-600 rounded-lg">
-                        {activeFranchiseError.message || "Failed to load franchises"}
+                                {activeFranchiseError.message || `Failed to load ${isAdminAssignment ? "admins" : "franchises"}`}
                     </div>
                 )}
                 {!isFranchiseSearchMode && !franchisesError && (
@@ -323,7 +328,7 @@ const AssignToFranchise = ({ returnPath }) => {
                         placeholder={
                             selectedFranchise
                                 ? "Search by Device Serial Number or name..."
-                                : "Select a franchise first"
+                                : `Select a ${isAdminAssignment ? "admin" : "franchise"} first`
                         }
                         className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                     />
@@ -336,7 +341,7 @@ const AssignToFranchise = ({ returnPath }) => {
                             </div>
                         ) : !selectedFranchise ? (
                             <div className="p-6 text-center text-sm text-gray-500">
-                                Select a franchise to load POS machines.
+                                Select a {isAdminAssignment ? "admin" : "franchise"} to load POS machines.
                             </div>
                         ) : availableMachines.length === 0 ? (
                             <div className="p-6 text-center text-sm text-gray-500">

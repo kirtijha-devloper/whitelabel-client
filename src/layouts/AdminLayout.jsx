@@ -406,6 +406,20 @@ export default function AdminLayout() {
               />
 
               <Route
+                path="inventory/pos/add-to-admin"
+                element={
+                  isSuperAdminViewer ? (
+                    <AssignToFranchise
+                      returnPath="/super-admin/inventory/pos"
+                      assignmentType="admin"
+                    />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
                 path="inventory/qr"
                 element={
                   isSuperAdminViewer ? (
