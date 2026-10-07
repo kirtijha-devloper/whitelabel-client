@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 const REPORT_TAB_CONFIG = [
   { key: "pos", label: "POS Transactions" },
   { key: "wallet", label: "Wallet Transactions" },
+  { key: "all-transactions", label: "Transaction Reports" },
+  { key: "commission", label: "Commission Report" },
+  { key: "service-wise", label: "Service Wise Reports" },
   { key: "cc-bill", label: "CC Bill Payment" },
   { key: "ba-cc-bill", label: "BA CC Bill Payment" },
   { key: "cc-bill-3", label: "CC Bill 3" },
@@ -11,8 +14,20 @@ const REPORT_TAB_CONFIG = [
 ];
 
 const getTargetPath = (basePath, tabKey) => {
-if (tabKey === "pos" || tabKey === "wallet") {
+  if (tabKey === "pos" || tabKey === "wallet") {
     return `${basePath}?tab=${tabKey}`;
+  }
+
+  if (tabKey === "all-transactions") {
+    return `${basePath}/transactions`;
+  }
+
+  if (tabKey === "commission") {
+    return `${basePath}/commission`;
+  }
+
+  if (tabKey === "service-wise") {
+    return `${basePath}/service-wise`;
   }
 
   if (tabKey === "payout") {

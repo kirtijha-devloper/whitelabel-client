@@ -15,6 +15,8 @@ import {
   FaSignOutAlt,
   FaCube,
   FaSlidersH,
+  FaPercentage,
+  FaLayerGroup,
 } from "react-icons/fa";
 import { IoMenu } from "react-icons/io5";
 import AbheePayLogo from "../assets/FORMAT-PNG.png";
@@ -42,7 +44,7 @@ const Sidebar = ({ currentUser }) => {
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const isActivePath = (path) =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
+    path ? location.pathname === path || location.pathname.startsWith(`${path}/`) : false;
 
   const menuItems = [
     {
@@ -75,7 +77,6 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaBox />,
       permissions: ["stock.pos.read", "stock.pos.manage"],
     },
-    // { name: "POS-Razorpay Report", path: "/admin/pos-razorpay-report", icon: <FaFileAlt /> },
     {
       name: "Razorpay Notifications",
       path: "/admin/razorpay-notifications",
@@ -85,19 +86,36 @@ const Sidebar = ({ currentUser }) => {
         "razorpay.notifications.read",
       ],
     },
-    // {
-    //   name: "Wallet",
-    //   path: "/admin/wallet",
-    //   icon: <FaWallet />,
-    //   permissions: ["wallet.read", "wallet.credit", "wallet.debit"],
-    // },
+    {
+      name: "Set Charges",
+      path: "/admin/set-charges",
+      icon: <FaMoneyBillWave />,
+      adminOnly: true,
+    },
     {
       name: "Reports",
       path: "/admin/reports",
       icon: <FaChartBar />,
       permission: "reports.read",
+      subMenu: [
+        {
+          name: "All Reports Hub",
+          path: "/admin/reports",
+        },
+        {
+          name: "Transaction Reports",
+          path: "/admin/reports/transactions",
+        },
+        {
+          name: "Commission Report",
+          path: "/admin/reports/commission",
+        },
+        {
+          name: "Service Wise Reports",
+          path: "/admin/reports/service-wise",
+        },
+      ],
     },
-    // { name: "Payout Audit Logs", path: "/admin/reports/payout-audit-logs", icon: <FaFileAlt />, adminOnly: true },
     {
       name: "Ledger",
       path: "/admin/ledger",
@@ -116,12 +134,6 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaMoneyBillWave />,
       permissions: ["rate.settings.read", "rate.settings.manage"],
     },
-    // {
-    //   name: "Set Limit",
-    //   path: "/admin/set-limit",
-    //   icon: <FaSlidersH />,
-    //   permissions: ["set_limit.read", "set_limit.manual", "set_limit.excel"],
-    // },
     {
       name: "Settlement",
       path: "/admin/pos-setting",
@@ -160,35 +172,41 @@ const Sidebar = ({ currentUser }) => {
       name: "Inventory",
       path: "/super-admin/inventory",
       icon: <FaBox />,
-      // subMenu: [
-      //   {
-      //     name: "POS Inventory",
-      //     path: "/super-admin/inventory/pos",
-      //   },
-      //   {
-      //     name: "QR Inventory",
-      //     path: "/super-admin/inventory/qr",
-      //   },
-      //   {
-      //     name: "PG Inventory",
-      //     path: "/super-admin/inventory/pg",
-      //   },
-      // ],
     },
-    // {
-    //   name: "Service Management",
-    //   path: "/super-admin/service-management",
-    //   icon: <FaSlidersH />,
-    // },
+    {
+      name: "Set Charges",
+      path: "/super-admin/set-charges",
+      icon: <FaMoneyBillWave />,
+    },
+    {
+      name: "Reports",
+      icon: <FaChartBar />,
+      subMenu: [
+        {
+          name: "Transaction Reports",
+          path: "/super-admin/reports/transactions",
+          icon: <FaFileAlt />,
+        },
+        {
+          name: "Commission Report",
+          path: "/super-admin/reports/commission",
+          icon: <FaPercentage />,
+        },
+        {
+          name: "Service Wise Reports",
+          path: "/super-admin/reports/service-wise",
+          icon: <FaLayerGroup />,
+        },
+      ],
+    },
     {
       name: "Setting",
-      // path: "/super-admin/setting",
       icon: <FaCog />,
       subMenu: [
         {
           name: "Service Management",
           path: "/super-admin/service-management",
-          icon: <FaSlidersH />
+          icon: <FaSlidersH />,
         },
       ],
     },
@@ -272,54 +290,83 @@ const Sidebar = ({ currentUser }) => {
                 </Link>
               </li>
             ))} */}
-            {menuItemsToShow.map((item) => (
-              <li key={item.path}>
-                {item.subMenu ? (
-                  <>
-                    <div className="flex items-center w-full">
-                      <Link
-                        to={item.path}
-                        onClick={() =>
-                          setOpenSubMenu(
-                            openSubMenu === item.name ? null : item.name,
-                          )
-                        }
-                        className={`flex-1 flex items-center px-3 py-2 rounded-lg transition-colors ${
-                          isActivePath(item.path)
-                            ? "bg-[#00D3CD] text-white"
-                            : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                        }`}
-                      >
-                        <span className="flex-shrink-0">{item.icon}</span>
+            {menuItemsToShow.map((item) => {
+              const isSubActive = item.subMenu?.some((sub) => isActivePath(sub.path));
+              const isItemActive = isActivePath(item.path) || isSubActive;
+              const isMenuOpen =
+                openSubMenu === item.name ||
+                (openSubMenu === null && isSubActive);
+
+              return (
+                <li key={item.name || item.path}>
+                  {item.subMenu ? (
+                    <>
+                      <div className="flex items-center w-full">
+                        {item.path ? (
+                          <Link
+                            to={item.path}
+                            onClick={() =>
+                              setOpenSubMenu(
+                                isMenuOpen ? "CLOSED" : item.name,
+                              )
+                            }
+                            className={`flex-1 flex items-center px-3 py-2 rounded-lg transition-colors ${
+                              isItemActive
+                                ? "bg-[#00D3CD] text-white"
+                                : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                            }`}
+                          >
+                            <span className="flex-shrink-0">{item.icon}</span>
+
+                            {!isCollapsed && (
+                              <span className="ml-3 flex-1 text-left">
+                                {item.name}
+                              </span>
+                            )}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenSubMenu(
+                                isMenuOpen ? "CLOSED" : item.name,
+                              )
+                            }
+                            className={`flex-1 flex items-center px-3 py-2 rounded-lg transition-colors ${
+                              isItemActive
+                                ? "bg-gray-800 text-[#00D3CD] font-medium"
+                                : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                            }`}
+                          >
+                            <span className="flex-shrink-0">{item.icon}</span>
+
+                            {!isCollapsed && (
+                              <span className="ml-3 flex-1 text-left">
+                                {item.name}
+                              </span>
+                            )}
+                          </button>
+                        )}
 
                         {!isCollapsed && (
-                          <span className="ml-3 flex-1 text-left">
-                            {item.name}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenSubMenu(
+                                isMenuOpen ? "CLOSED" : item.name,
+                              );
+                            }}
+                            className="px-3 py-2 text-gray-400 hover:text-white"
+                          >
+                            {isMenuOpen ? "−" : "+"}
+                          </button>
                         )}
-                      </Link>
+                      </div>
 
-                      {!isCollapsed && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setOpenSubMenu(
-                              openSubMenu === item.name ? null : item.name,
-                            );
-                          }}
-                          className="px-3 py-2 text-gray-400 hover:text-white"
-                        >
-                          {openSubMenu === item.name ? "−" : "+"}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Submenu */}
-                    {!isCollapsed &&
-                      openSubMenu === item.name &&
-                      item.subMenu && (
+                      {/* Submenu */}
+                      {!isCollapsed && isMenuOpen && item.subMenu && (
                         <ul className="ml-8 mt-1 space-y-1">
                           {item.subMenu.map((subItem) => (
                             <li key={subItem.path}>
@@ -327,7 +374,7 @@ const Sidebar = ({ currentUser }) => {
                                 to={subItem.path}
                                 className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                                   isActivePath(subItem.path)
-                                    ? "bg-[#00D3CD] text-white"
+                                    ? "bg-[#00D3CD] text-white font-medium"
                                     : "text-gray-400 hover:bg-gray-800 hover:text-white"
                                 }`}
                               >
@@ -337,24 +384,25 @@ const Sidebar = ({ currentUser }) => {
                           ))}
                         </ul>
                       )}
-                  </>
-                ) : (
-                  /* Normal menu item */
-                  <Link
-                    to={item.path}
-                    className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
-                      isActivePath(item.path)
-                        ? "bg-[#00D3CD] text-white"
-                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                    }`}
-                  >
-                    <span className="flex-shrink-0">{item.icon}</span>
+                    </>
+                  ) : (
+                    /* Normal menu item */
+                    <Link
+                      to={item.path}
+                      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                        isActivePath(item.path)
+                          ? "bg-[#00D3CD] text-white"
+                          : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                      }`}
+                    >
+                      <span className="flex-shrink-0">{item.icon}</span>
 
-                    {!isCollapsed && <span className="ml-3">{item.name}</span>}
-                  </Link>
-                )}
-              </li>
-            ))}
+                      {!isCollapsed && <span className="ml-3">{item.name}</span>}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

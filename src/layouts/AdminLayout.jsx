@@ -110,6 +110,18 @@ const SuperAdminPGInventory = lazy(
 const SuperAdminServiceManagement = lazy(
   () => import("../Pages/Superadmin/SuperAdminServiceManagement"),
 );
+const SuperAdminSetCharges = lazy(
+  () => import("../Pages/Superadmin/SuperAdminSetCharges"),
+);
+const TransactionReports = lazy(
+  () => import("../Pages/Reports/TransactionReports"),
+);
+const CommissionReport = lazy(
+  () => import("../Pages/Reports/CommissionReport"),
+);
+const ServiceWiseReports = lazy(
+  () => import("../Pages/Reports/ServiceWiseReports"),
+);
 
 const AdminList = lazy(() => import("../Pages/AdminList"));
 
@@ -440,6 +452,55 @@ export default function AdminLayout() {
                     <Navigate to="/login" replace />
                   )
                 }
+              />
+
+              <Route
+                path="set-charges"
+                element={
+                  isSuperAdminViewer || isAdminViewer ? (
+                    <SuperAdminSetCharges currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/super-admin/set-charges"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminSetCharges currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="reports/transactions"
+                element={<TransactionReports currentUser={currentUser} />}
+              />
+              <Route
+                path="/super-admin/reports/transactions"
+                element={<TransactionReports currentUser={currentUser} />}
+              />
+
+              <Route
+                path="reports/commission"
+                element={<CommissionReport currentUser={currentUser} />}
+              />
+              <Route
+                path="/super-admin/reports/commission"
+                element={<CommissionReport currentUser={currentUser} />}
+              />
+
+              <Route
+                path="reports/service-wise"
+                element={<ServiceWiseReports currentUser={currentUser} />}
+              />
+              <Route
+                path="/super-admin/reports/service-wise"
+                element={<ServiceWiseReports currentUser={currentUser} />}
               />
 
               {/* <Route path="create-user" element={<CreateUser currentUser={currentUser}/>} /> */}
