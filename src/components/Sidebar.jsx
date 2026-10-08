@@ -211,6 +211,11 @@ const Sidebar = ({ currentUser }) => {
       path: "/super-admin/reports",
       icon: <FaFileAlt />,
     },
+    {
+      name: "Settlement",
+      path: "/super-admin/Settlement",
+      icon: <FaSlidersH/>,
+    },
     // {
     //   name: "Service Management",
     //   path: "/super-admin/service-management",

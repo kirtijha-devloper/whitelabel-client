@@ -99,6 +99,8 @@ export const getAdminDetails = async (id) => {
       },
     });
 
+   
+
     return response.data;
   } catch (error) {
     console.error("[getAdminDetails] request failed", {

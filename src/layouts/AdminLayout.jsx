@@ -126,6 +126,7 @@ const ServiceWiseReports = lazy(
 const SuperAdminReports = lazy(() => import("../Pages/Superadmin/SuperAdminReports"));
 
 const AdminList = lazy(() => import("../Pages/AdminList"));
+const SuperAdminsettlement= lazy(()=> import("../Pages/Superadmin/SuperAdminsettlement"))
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -459,6 +460,27 @@ export default function AdminLayout() {
                 element={
                   isSuperAdminViewer ? (
                     <SuperAdminServiceManagement />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="Settlement"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminsettlement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="settlement"
+                element={
+                  isSuperAdminViewer ? (
+                    <SuperAdminsettlement currentUser={currentUser} />
                   ) : (
                     <Navigate to="/login" replace />
                   )
