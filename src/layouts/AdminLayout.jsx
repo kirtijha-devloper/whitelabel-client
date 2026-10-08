@@ -495,12 +495,12 @@ export default function AdminLayout() {
               <Route
                 path="set-charges"
                 element={
-                  isSuperAdminViewer || isAdminViewer ? (
+                  isSuperAdminViewer ? (
                     <SuperAdminSetCharges currentUser={currentUser} />
                   ) : (
                     <Navigate to="/login" replace />
                   )
-                }
+                  }
               />
 
               <Route
