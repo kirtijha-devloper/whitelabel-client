@@ -88,18 +88,6 @@ const Sidebar = ({ currentUser }) => {
       ],
     },
     {
-      name: "Set Charges",
-      path: "/admin/set-charges",
-      icon: <FaMoneyBillWave />,
-      adminOnly: true,
-    },
-    {
-      name: "My Charges",
-      path: "/admin/my-charges",
-      icon: <FaCoins />,
-      adminOnly: true,
-    },
-    {
       name: "Reports",
       path: "/admin/reports",
       icon: <FaChartBar />,
@@ -140,6 +128,12 @@ const Sidebar = ({ currentUser }) => {
       path: "/admin/rate-setting",
       icon: <FaMoneyBillWave />,
       permissions: ["rate.settings.read", "rate.settings.manage"],
+    },
+      {
+      name: "My Charges",
+      path: "/admin/my-charges",
+      icon: <FaCoins />,
+      adminOnly: true,
     },
     {
       name: "Settlement",

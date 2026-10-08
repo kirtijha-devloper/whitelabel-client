@@ -610,7 +610,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Director Name
+                    Director Name <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -632,7 +632,7 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Mail size={15} />
-                    Email Address
+                    Email Address <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -654,7 +654,7 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Phone size={15} />
-                    Mobile Number
+                    Mobile Number <span className="text-red-500">*</span>
                   </label>
 
                   <div className="flex">
@@ -747,7 +747,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gender
+                    Gender<span className="ml-2 text-red-500">*</span>
                   </label>
 
                   <div className="flex gap-5 py-2">
@@ -758,6 +758,7 @@ function CreateAdmin() {
                         type="radio"
                         name="gender"
                         value="male"
+                        required
                         checked={state.formData.gender === 'male'}
                         onChange={handleChange}
                       />
@@ -807,15 +808,15 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Calendar size={15} />
-                    Date of Birth
+                    Date of Birth <span className="text-red-500">*</span>
                   </label>
 
                   <input
                     type="date"
                     name="dob"
+                    required
                     value={state.formData.dob || ''}
                     onChange={handleChange}
-                    required
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
 
@@ -845,7 +846,7 @@ function CreateAdmin() {
                 <div className="md:col-span-2">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address Line 1
+                    Address Line 1 <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -886,7 +887,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City
+                    City <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -907,7 +908,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    District
+                    District <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -928,7 +929,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pincode
+                    Pincode <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -953,7 +954,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    State
+                    State <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -974,7 +975,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Country
+                    Country <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1018,7 +1019,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aadhaar Number
+                    Aadhaar Number <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1049,7 +1050,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PAN Number
+                    PAN Number <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1082,7 +1083,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    GST Number
+                    GST Number <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1125,7 +1126,7 @@ function CreateAdmin() {
                       className="min-w-0"
                     >
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {field.label}
+                        {field.label} {field.name === 'shop_photo' ? "" : <span className="text-red-500">*</span>}
                       </label>
 
                       <div className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3">
@@ -1148,6 +1149,7 @@ function CreateAdmin() {
 
                         <input
                           id={inputId}
+                          required={field.name !== 'shop_photo'}
                           type="file"
                           name={field.name}
                           onChange={(e) => handleFileChange(e, field.name)}
