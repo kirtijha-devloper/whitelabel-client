@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
+import ConfirmationModal from "../components/Common/ConfirmationModal";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { AllUsers, searchUsers } from "../api/FranchiseApi";
 import { getAssignedPosMachines } from "../api/posMachine";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Ban, ChevronDown, Eye, Loader2, LogIn, MoreVertical, SquarePen, Wallet } from "lucide-react";
+import { AlertTriangle, Ban, ChevronDown, Eye, Loader2, Lock, LogIn, MoreVertical, SquarePen, Wallet } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   impersonateUser,
@@ -18,10 +19,9 @@ import {
 } from "../api/authApi";
 import { seedSessionAuthInWindow } from "../utils/auth";
 import { adminWalletCredit, adminWalletDebit } from "../api/WalletApi";
-import { extractUsersArray, normalizeUserRole, maskEmail, maskEmailForUser } from "../utils/userAccess";
+import { extractUsersArray, normalizeUserRole, maskEmailForUser } from "../utils/userAccess";
 import {
   formatPermissionList,
-  getAdminLandingPathForUser,
   hasAnyPermission,
   hasPermission,
   isAdminUser,
@@ -430,6 +430,17 @@ const UserList = ({
     nextRoleName: "",
   });
 
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    variant: "primary",
+    isLoading: false,
+    onConfirm: () => {},
+  });
+
   const [posModalState, setPosModalState] = useState({
     open: false,
     user: null,
@@ -621,7 +632,7 @@ const UserList = ({
     }
   };
 
-  const handleMasterBulkToggle = async (serviceKey, targetState) => {
+  const handleMasterBulkToggle = (serviceKey, targetState) => {
     if (!isAdmin) {
       toast.error("Only admin can perform bulk service updates across all users.");
       return;
@@ -631,25 +642,36 @@ const UserList = ({
     const serviceLabel = serviceItem ? serviceItem.label : serviceKey;
     const actionText = targetState ? "ENABLE" : "DISABLE";
 
-    if (!window.confirm(`Are you sure you want to ${actionText} ${serviceLabel} for ALL merchant and franchise users in the system?`)) {
-      return;
-    }
-
-    try {
-      setBulkServiceUpdatingKey(serviceKey);
-      const response = await updateBulkUserServiceSettings(serviceKey, targetState);
-      toast.success(response?.message || `Successfully ${targetState ? 'enabled' : 'disabled'} ${serviceLabel} for all users!`);
-      await Promise.all([
-        refetchMasterServiceSettings(),
-        queryClient.invalidateQueries({ queryKey: ["allUsers"] }),
-        queryClient.invalidateQueries({ queryKey: ["userSearch"] }),
-      ]);
-    } catch (error) {
-      toast.error(error?.message || `Failed to bulk update ${serviceLabel} for all users.`);
-    } finally {
-      setBulkServiceUpdatingKey("");
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: `${targetState ? "Enable" : "Disable"} ${serviceLabel} Globally?`,
+      message: `Are you sure you want to ${actionText.toLowerCase()} "${serviceLabel}" for ALL merchant and franchise users in the system?`,
+      confirmText: `${actionText} for All`,
+      cancelText: "Cancel",
+      variant: targetState ? "success" : "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: true }));
+          setBulkServiceUpdatingKey(serviceKey);
+          const response = await updateBulkUserServiceSettings(serviceKey, targetState);
+          toast.success(response?.message || `Successfully ${targetState ? 'enabled' : 'disabled'} ${serviceLabel} for all users!`);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          await Promise.all([
+            refetchMasterServiceSettings(),
+            queryClient.invalidateQueries({ queryKey: ["allUsers"] }),
+            queryClient.invalidateQueries({ queryKey: ["userSearch"] }),
+          ]);
+        } catch (error) {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: false }));
+          toast.error(error?.message || `Failed to bulk update ${serviceLabel} for all users.`);
+        } finally {
+          setBulkServiceUpdatingKey("");
+        }
+      },
+    });
   };
+
 
   const {
     data: assignedPosResponse,
@@ -858,14 +880,49 @@ const UserList = ({
   const getServiceToggleState = (row, serviceKey) => {
     const userServiceSettings = getUserServiceSettings(row);
     const effectiveServiceFlags = getEffectiveServiceFlags(row);
+    const masterConfig = masterServiceSettingsData?.[serviceKey];
+    const isSuperAdminDisabled = Boolean(masterConfig?.is_super_admin_disabled);
+    const isAdminGlobalDisabled = !isSuperAdminDisabled && masterConfig?.is_enabled === false;
+    const isGloballyBlocked = isSuperAdminDisabled || isAdminGlobalDisabled;
 
     return {
       rawEnabled: Boolean(userServiceSettings?.[serviceKey]),
-      effectiveEnabled: Boolean(effectiveServiceFlags?.[serviceKey]),
+      effectiveEnabled: !isGloballyBlocked && Boolean(effectiveServiceFlags?.[serviceKey]),
+      isSuperAdminDisabled,
+      isAdminGlobalDisabled,
+      isGloballyBlocked,
     };
   };
 
   const getServiceSettingUpdateKey = (userId, serviceKey) => `${userId}:${serviceKey}`;
+
+  const confirmToggleUserService = (row, service, targetState) => {
+    const serviceLabel = USER_SERVICE_INLINE_LABELS[service.key] || service.label || service.key;
+    const userName = row?.name || row?.username || `User #${row?.id}`;
+    const userRole = row?.role || "user";
+    const actionText = targetState ? "Enable" : "Disable";
+
+    setConfirmConfig({
+      isOpen: true,
+      title: `${actionText} ${serviceLabel} for ${userName}?`,
+      message: targetState
+        ? `Are you sure you want to enable "${serviceLabel}" for ${userName} (${userRole})? They will immediately receive access to this service.`
+        : `Are you sure you want to disable "${serviceLabel}" for ${userName} (${userRole})? They will immediately lose access to this service.`,
+      confirmText: `${actionText} Service`,
+      cancelText: "Cancel",
+      variant: targetState ? "primary" : "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: true }));
+          await handleToggleUserService(row, service.key, targetState);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        } catch {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
+  };
 
   const renderServiceSettingsInline = (row, className = "") => {
     if (!isServiceToggleRole(row)) {
@@ -877,27 +934,46 @@ const UserList = ({
         className={`inline-grid grid-cols-2 items-start gap-x-5 gap-y-1.5 whitespace-normal ${className}`.trim()}
       >
         {SERVICE_FLAG_CONFIG.filter((service) => service.key !== "user_daily_limit" && service.key !== "pos_t0_settlement").map((service) => {
-          const { rawEnabled, effectiveEnabled } = getServiceToggleState(row, service.key);
+          const { rawEnabled, isSuperAdminDisabled, isAdminGlobalDisabled, isGloballyBlocked } = getServiceToggleState(row, service.key);
           const isUpdating =
             serviceSettingUpdatingKey === getServiceSettingUpdateKey(row?.id, service.key);
-          const showGlobalHint = rawEnabled && !effectiveEnabled;
+
+          const tooltip = isSuperAdminDisabled
+            ? "Locked by Super Admin"
+            : isAdminGlobalDisabled
+            ? "Disabled in Organization Settings by Admin"
+            : undefined;
 
           return (
-            <div key={service.key}>
+            <div key={service.key} className="flex items-center">
               <label
-                title={showGlobalHint ? "Globally blocked" : undefined}
-                className="inline-flex items-center gap-3 whitespace-nowrap rounded px-0.5 py-0.5 text-[13px] text-gray-700"
+                title={tooltip}
+                className={`inline-flex items-center gap-2 whitespace-nowrap rounded px-0.5 py-0.5 text-[13px] ${
+                  isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700"
+                }`}
               >
-                <span className="font-medium leading-none text-gray-800">
+                <span className={`font-medium leading-none ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}>
                   {USER_SERVICE_INLINE_LABELS[service.key] || service.label}
                 </span>
+
+                {isSuperAdminDisabled ? (
+                  <span title="Locked globally by Super Admin" className="inline-flex items-center text-rose-500">
+                    <Lock className="h-3 w-3" />
+                  </span>
+                ) : isAdminGlobalDisabled ? (
+                  <span title="Disabled in Organization Settings by Admin" className="inline-flex items-center text-amber-500">
+                    <AlertTriangle className="h-3 w-3" />
+                  </span>
+                ) : null}
+
                 <input
                   type="checkbox"
-                  checked={rawEnabled}
-                  disabled={!canManageUserServiceSettings || isUpdating}
+                  checked={!isGloballyBlocked && rawEnabled}
+                  disabled={!canManageUserServiceSettings || isUpdating || isGloballyBlocked}
                   onChange={(event) => {
                     event.stopPropagation();
-                    handleToggleUserService(row, service.key, event.target.checked);
+                    if (isGloballyBlocked) return;
+                    confirmToggleUserService(row, service, event.target.checked);
                   }}
                   className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-primary focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed"
                 />
@@ -1057,20 +1133,40 @@ const UserList = ({
     navigate(`${redirectUrl}/${row.id}/edit`);
   };
 
-  const handleToggleUserStatus = async (row, nextStatus) => {
-    try {
-      await updateUserStatus({
-        id: row?.id,
-        status: nextStatus,
-      });
-      toast.success(`${row?.name || "User"} ${nextStatus === "active" ? "enabled" : "disabled"} successfully.`);
-      if (typeof refetchAllUsers === "function") {
-        await refetchAllUsers();
-      }
-    } catch (error) {
-      toast.error(error?.message || "Failed to update user status.");
-    }
+  const handleToggleUserStatus = (row, nextStatus) => {
+    const isActivating = nextStatus === "active";
+    setConfirmConfig({
+      isOpen: true,
+      title: `${isActivating ? "Activate" : "Deactivate"} User?`,
+      message: `Are you sure you want to change the status of "${row?.name || row?.mobile_number || "this user"}" to ${nextStatus}? ${
+        !isActivating
+          ? "This will temporarily prevent portal login and transaction actions for this user."
+          : "This will restore full portal access for this user."
+      }`,
+      confirmText: isActivating ? "Activate User" : "Deactivate User",
+      cancelText: "Cancel",
+      variant: isActivating ? "success" : "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: true }));
+          await updateUserStatus({
+            id: row?.id,
+            status: nextStatus,
+          });
+          toast.success(`${row?.name || "User"} ${isActivating ? "enabled" : "disabled"} successfully.`);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          if (typeof refetchAllUsers === "function") {
+            await refetchAllUsers();
+          }
+        } catch (error) {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: false }));
+          toast.error(error?.message || "Failed to update user status.");
+        }
+      },
+    });
   };
+
 
   const getEmployeeAccessRoleId = (user) => {
     const direct = user?.employee_access_role_id ?? user?.employeeAccessRoleId ?? null;
@@ -1180,7 +1276,9 @@ const UserList = ({
           action: enabled ? "SERVICE_ENABLED" : "SERVICE_DISABLED",
           serviceKey: serviceKey,
         });
-      } catch (logErr) {}
+      } catch {
+        // ignore audit log error
+      }
 
       toast.success(
         `${service?.label || "Service"} has been ${enabled ? "enabled" : "disabled"
@@ -1203,71 +1301,8 @@ const UserList = ({
     }
   };
 
-  const handleBulkToggleService = async (serviceKey, enabled) => {
-    if (!canManageUserServiceSettings) {
-      toast.error("Only admins can update service settings.");
-      return;
-    }
-
-    const service = SERVICE_FLAG_CONFIG.find((item) => item.key === serviceKey);
-    const serviceLabel = USER_SERVICE_INLINE_LABELS[serviceKey] || service?.label || serviceKey;
-    const actionText = enabled ? "ENABLE" : "DISABLE";
-
-    const confirmMsg = `Are you sure you want to ${actionText} ${serviceLabel} for ALL merchant & franchise users on this list?`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setBulkServiceUpdatingKey(serviceKey);
-
-    try {
-      const targetUsers = currentData.filter((u) => isServiceToggleRole(u));
-      if (targetUsers.length === 0) {
-        toast.info("No merchant or franchise users found on current view.");
-        return;
-      }
-
-      toast.info(`Bulk updating ${serviceLabel} for ${targetUsers.length} user(s)...`);
-
-      let updatedCount = 0;
-      for (const u of targetUsers) {
-        try {
-          await updateUserServiceSettings(u.id, { [serviceKey]: enabled });
-          
-          // Record System Activity Audit Log per user
-          try {
-            recordLimitAuditLog({
-              performingUser: currentUser,
-              affectedUser: u,
-              previousState: enabled ? "Disabled" : "Enabled",
-              newState: enabled ? "Enabled" : "Disabled",
-              action: enabled ? "BULK_SERVICE_ENABLED" : "BULK_SERVICE_DISABLED",
-              serviceKey: serviceKey,
-            });
-          } catch (lErr) {}
-
-          updatedCount += 1;
-        } catch (err) {
-          console.error(`Failed to update ${serviceLabel} for user ${u.id}`, err);
-        }
-      }
-
-      toast.success(
-        `Successfully ${enabled ? "enabled" : "disabled"} ${serviceLabel} for ${updatedCount} user(s)!`
-      );
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["allUsers"] }),
-        queryClient.invalidateQueries({ queryKey: ["userSearch"] }),
-        queryClient.invalidateQueries({ queryKey: ["user"] }),
-      ]);
-    } catch (error) {
-      console.error("[bulk-toggle-service] failed", error);
-      toast.error(`Could not bulk update ${serviceLabel}.`);
-    } finally {
-      setBulkServiceUpdatingKey("");
-    }
-  };
-
   const getIpayOutletId = (row) => {
+
     const value = row?.ipay_outlet_id ?? row?.ipayOutletId ?? null;
     return value !== undefined ? value : null;
   };
@@ -1332,26 +1367,37 @@ const UserList = ({
     }
   };
 
-  const handleResetIpayOutlet = async (user) => {
-    if (!window.confirm(`Are you sure you want to reset KYC for ${user.name || user.mobile_number}?`)) {
-      return;
-    }
-
-    try {
-      setIsIpayOutletSubmitting(true);
-      await updateUserIpayOutlet({ id: user.id, ipay_outlet_id: null });
-      toast.success('InstantPay outlet ID reset successfully');
-      if (typeof refetchAllUsers === 'function') {
-        await refetchAllUsers();
-      }
-      queryClient.invalidateQueries(['allUsers']);
-      queryClient.invalidateQueries(['userSearch']);
-    } catch (error) {
-      toast.error(error?.message || 'Failed to reset InstantPay outlet ID');
-    } finally {
-      setIsIpayOutletSubmitting(false);
-    }
+  const handleResetIpayOutlet = (user) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Reset KYC for User?",
+      message: `Are you sure you want to reset KYC for "${user.name || user.mobile_number || "this user"}"? This will clear their InstantPay outlet ID.`,
+      confirmText: "Reset KYC",
+      cancelText: "Cancel",
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        try {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: true }));
+          setIsIpayOutletSubmitting(true);
+          await updateUserIpayOutlet({ id: user.id, ipay_outlet_id: null });
+          toast.success('InstantPay outlet ID reset successfully');
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          if (typeof refetchAllUsers === 'function') {
+            await refetchAllUsers();
+          }
+          queryClient.invalidateQueries(['allUsers']);
+          queryClient.invalidateQueries(['userSearch']);
+        } catch (error) {
+          setConfirmConfig((prev) => ({ ...prev, isLoading: false }));
+          toast.error(error?.message || 'Failed to reset InstantPay outlet ID');
+        } finally {
+          setIsIpayOutletSubmitting(false);
+        }
+      },
+    });
   };
+
 
   const openWalletModal = (user, role) => {
     if (!canAdjustWallet) {
@@ -2064,41 +2110,75 @@ const UserList = ({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
               {MASTER_SERVICE_CONTROLS.map((service) => {
                 const isPending = bulkServiceUpdatingKey === service.key;
-                const isCurrentlyActive = masterServiceSettingsData?.[service.key]?.is_enabled !== false;
+                const masterConfig = masterServiceSettingsData?.[service.key];
+                const isSuperAdminDisabled = Boolean(masterConfig?.is_super_admin_disabled);
+                const isCurrentlyActive = !isSuperAdminDisabled && masterConfig?.is_enabled !== false;
 
                 return (
                   <div
                     key={service.key}
                     className={`flex items-center justify-between rounded-xl border p-2.5 transition-all duration-200 shadow-sm ${
-                      isCurrentlyActive
+                      isSuperAdminDisabled
+                        ? "border-rose-200 bg-rose-50/40 opacity-75"
+                        : isCurrentlyActive
                         ? "border-emerald-200 bg-emerald-50/40 hover:border-emerald-300"
                         : "border-gray-200 bg-gray-50/60 hover:border-gray-300"
                     }`}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
-                      <span className="font-bold text-gray-800 text-xs truncate" title={service.label}>
-                        {service.label}
-                      </span>
-                      <span className={`text-[10px] font-medium ${isCurrentlyActive ? "text-emerald-600 font-semibold" : "text-gray-400"}`}>
-                        {isCurrentlyActive ? "Enabled for All" : "Disabled for All"}
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-bold text-gray-800 text-xs truncate" title={service.label}>
+                          {service.label}
+                        </span>
+                        {isSuperAdminDisabled && (
+                          <Lock className="h-3 w-3 text-rose-500 shrink-0" />
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-medium ${
+                        isSuperAdminDisabled
+                          ? "text-rose-600 font-semibold"
+                          : isCurrentlyActive
+                          ? "text-emerald-600 font-semibold"
+                          : "text-gray-400"
+                      }`}>
+                        {isSuperAdminDisabled
+                          ? "Locked by Super Admin"
+                          : isCurrentlyActive
+                          ? "Enabled for All"
+                          : "Disabled for All"}
                       </span>
                     </div>
 
                     <button
                       type="button"
-                      onClick={() => handleMasterBulkToggle(service.key, !isCurrentlyActive)}
-                      disabled={isPending}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 ${
-                        isCurrentlyActive ? "bg-emerald-600" : "bg-gray-300"
-                      }`}
-                      title={`Click to toggle ${service.label} for ALL users`}
+                      onClick={() => {
+                        if (isSuperAdminDisabled) return;
+                        handleMasterBulkToggle(service.key, !isCurrentlyActive);
+                      }}
+                      disabled={isPending || isSuperAdminDisabled}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${
+                        isSuperAdminDisabled
+                          ? "bg-rose-300 cursor-not-allowed opacity-60"
+                          : isCurrentlyActive
+                          ? "bg-emerald-600 cursor-pointer"
+                          : "bg-gray-300 cursor-pointer"
+                      } disabled:opacity-50`}
+                      title={
+                        isSuperAdminDisabled
+                          ? "This service is locked globally by Super Admin"
+                          : `Click to toggle ${service.label} for ALL users`
+                      }
                     >
                       <span
                         className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-300 ease-in-out flex items-center justify-center text-[9px] font-extrabold ${
-                          isCurrentlyActive ? "translate-x-5 text-emerald-600" : "translate-x-0 text-gray-400"
+                          isSuperAdminDisabled
+                            ? "translate-x-0 text-rose-600"
+                            : isCurrentlyActive
+                            ? "translate-x-5 text-emerald-600"
+                            : "translate-x-0 text-gray-400"
                         }`}
                       >
-                        {isPending ? "..." : (isCurrentlyActive ? "ON" : "OFF")}
+                        {isPending ? "..." : (isSuperAdminDisabled ? <Lock size={10} /> : (isCurrentlyActive ? "ON" : "OFF"))}
                       </span>
                     </button>
                   </div>
@@ -2244,7 +2324,7 @@ const UserList = ({
                   No users found.
                 </div>
               ) : (
-                currentData.map((user, idx) => {
+                currentData.map((user) => {
                   const normalizedRole = normalizeUserRole(user?.role);
                   const roleLabel = normalizedRole
                     ? `${normalizedRole.charAt(0).toUpperCase()}${normalizedRole.slice(1)}`
@@ -3035,8 +3115,22 @@ const UserList = ({
           </div>
         </Modal>
       )}
+
+      {/* Confirmation Modal synced with AbheePay UI tokens */}
+      <ConfirmationModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+        isLoading={confirmConfig.isLoading}
+      />
     </div>
   );
 };
+
 
 export default UserList;

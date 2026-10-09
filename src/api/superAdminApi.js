@@ -415,3 +415,27 @@ export const createSuperAdminService = async (payload) => {
     throw new Error(error?.response?.data?.message || "Failed to create service");
   }
 };
+
+/**
+ * Get Admin Services Map (with Super Admin lock states)
+ */
+export const getAdminServices = async (adminId) => {
+  try {
+    const token = getAuthToken();
+    if (!token) throw new Error("Unauthorized User");
+
+    const response = await api.get(`/admin/${encodeURIComponent(adminId)}/services`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data?.data || response.data || {};
+  } catch (error) {
+    console.error("[getAdminServices] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+    });
+    throw new Error(error?.response?.data?.message || "Failed to fetch admin services");
+  }
+};

@@ -5,12 +5,9 @@ import {
   FaSearch,
   FaCheckCircle,
   FaTimesCircle,
-  FaTrash,
   FaEdit,
-  FaLayerGroup,
-  FaUsers,
-  FaInfoCircle,
   FaSyncAlt,
+  FaLayerGroup,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +16,7 @@ import {
   updateSuperAdminServiceStatus,
   createSuperAdminService,
 } from "../../api/superAdminApi";
+import ConfirmationModal from "../../components/Common/ConfirmationModal";
 
 const CATEGORY_OPTIONS = [
   "Payout & Banking",
@@ -40,6 +38,17 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingService, setEditingService] = useState(null);
 
+  // Confirmation Modal State
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    variant: "primary",
+    onConfirm: () => {},
+  });
+
   // Form State
   const [formData, setFormData] = useState({
     key: "",
@@ -50,15 +59,16 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
     target_roles: ["admin", "franchise", "merchant", "super_franchise"],
   });
 
-  // Load real services from backend DB
+  // Query Services directly from PostgreSQL
   const {
     data: services = [],
     isLoading,
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ["superAdminServicesList"],
+    queryKey: ["superAdminServices"],
     queryFn: getSuperAdminServices,
+    staleTime: 30 * 1000,
   });
 
   // Toggle Mutation
@@ -66,12 +76,18 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
     mutationFn: ({ key, newStatus }) =>
       updateSuperAdminServiceStatus(key, newStatus),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries(["superAdminServicesList"]);
-      queryClient.invalidateQueries(["superAdminServiceWiseReport"]);
-      if (variables.newStatus) {
-        toast.success(`Service "${variables.key}" is now ENABLED.`);
-      } else {
-        toast.info(`Service "${variables.key}" is now DISABLED.`);
+      toast.success(
+        `Service '${variables.key}' is now ${variables.newStatus ? "enabled" : "disabled"}`
+      );
+      queryClient.invalidateQueries({ queryKey: ["superAdminServices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("service_flags_updated", {
+            detail: { serviceKey: variables.key, enabled: variables.newStatus },
+          })
+        );
       }
     },
     onError: (err) => {
@@ -79,15 +95,16 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
     },
   });
 
-  // Create / Update Mutation
+  // Save Mutation
   const saveMutation = useMutation({
     mutationFn: (payload) => createSuperAdminService(payload),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["superAdminServicesList"]);
-      queryClient.invalidateQueries(["superAdminServiceWiseReport"]);
-      toast.success(data?.message || "Service saved successfully!");
+    onSuccess: (res) => {
+      toast.success(res.message || "Service saved successfully");
       setIsAddModalOpen(false);
       setEditingService(null);
+      queryClient.invalidateQueries({ queryKey: ["superAdminServices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       setFormData({
         key: "",
         label: "",
@@ -103,7 +120,24 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
   });
 
   const handleToggle = (key, currentStatus) => {
-    toggleMutation.mutate({ key, newStatus: !currentStatus });
+    const nextStatus = !currentStatus;
+    const serviceObj = services.find((s) => (s.key || s.service_key) === key);
+    const serviceName = serviceObj?.label || key;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: `${nextStatus ? "Enable" : "Disable"} Service Globally?`,
+      message: nextStatus
+        ? `Enabling "${serviceName}" will make it available platform-wide for Admins to enable for their tenants.`
+        : `Disabling "${serviceName}" will immediately lock and deactivate this service platform-wide for all Admins, Franchises, and Merchants. Admins cannot override this lock.`,
+      confirmText: nextStatus ? "Enable Service" : "Disable Service",
+      cancelText: "Cancel",
+      variant: nextStatus ? "success" : "danger",
+      onConfirm: () => {
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        toggleMutation.mutate({ key, newStatus: nextStatus });
+      },
+    });
   };
 
   const handleAddSubmit = (e) => {
@@ -143,9 +177,10 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
     setIsAddModalOpen(true);
   };
 
+  // Filter Services
   const filteredServices = services.filter((s) => {
-    const isEnabled = s.is_enabled !== false;
     const key = s.key || s.service_key || "";
+    const isEnabled = s.is_enabled !== false;
     const label = s.label || "";
     const category = s.category || "";
 
@@ -170,36 +205,42 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
   const disabledCount = totalServices - enabledCount;
 
   return (
-    <div className={embedded ? "space-y-6" : "min-h-screen bg-gray-50 p-4 md:p-6 space-y-6"}>
-      {/* ── Header Section ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-200">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-[#00D3CD]/10 text-[#00D3CD] rounded-xl">
-              <FaSlidersH className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-                Service Management
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Enable or disable platform services globally across Admin, Franchise, and Merchant roles.
-              </p>
-            </div>
+    <div className={embedded ? "space-y-4" : "min-h-screen bg-gray-50 p-4 md:p-6 space-y-4"}>
+      {/* ── Compact Header & Quick Stats ─────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-[#00D3CD]/10 text-[#00D3CD] rounded-xl">
+            <FaSlidersH className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">
+              Global Service Settings
+            </h1>
+            <p className="text-xs text-gray-400">
+              Platform Master Switch • Controls global service availability
+            </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons & Counters */}
         <div className="flex items-center gap-2">
+          {/* Quick Counter Pills */}
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+            <span className="font-semibold text-gray-500">Total: {totalServices}</span>
+            <span className="text-gray-300">•</span>
+            <span className="font-bold text-emerald-600">{enabledCount} Active</span>
+            <span className="text-gray-300">•</span>
+            <span className="font-bold text-rose-500">{disabledCount} Disabled</span>
+          </div>
+
           <button
             type="button"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-xs transition disabled:opacity-50"
             title="Refresh Services"
           >
             <FaSyncAlt className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-[#00D3CD]" : ""}`} />
-            <span>Refresh</span>
           </button>
 
           <button
@@ -216,96 +257,50 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
               });
               setIsAddModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#00D3CD] hover:bg-[#00bdb7] text-white text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#00D3CD] hover:bg-[#00bdb7] text-white text-xs font-semibold shadow-sm transition-all"
           >
-            <FaPlus className="w-3.5 h-3.5" />
-            <span>Add New Service</span>
+            <FaPlus className="w-3 h-3" />
+            <span>Add Service</span>
           </button>
         </div>
       </div>
 
-      {/* ── Overview KPI Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Total Services
-            </p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{totalServices}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-[#00D3CD]/10 flex items-center justify-center text-[#00D3CD]">
-            <FaLayerGroup className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Enabled Services
-            </p>
-            <p className="text-xl font-bold text-green-700 mt-1">{enabledCount}</p>
-            <span className="text-[11px] text-green-700 font-medium bg-green-50 px-2 py-0.5 rounded-md mt-1 inline-block border border-green-200">
-              Visible to users
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
-            <FaCheckCircle className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Disabled Services
-            </p>
-            <p className="text-xl font-bold text-red-700 mt-1">{disabledCount}</p>
-            <span className="text-[11px] text-red-700 font-medium bg-red-50 px-2 py-0.5 rounded-md mt-1 inline-block border border-red-200">
-              Hidden from users
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
-            <FaTimesCircle className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Target Audiences
-            </p>
-            <p className="text-xl font-bold text-gray-900 mt-1">4 Roles</p>
-            <span className="text-[11px] text-gray-600 font-medium bg-gray-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-              Admin / SF / Franchise / Merchant
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600">
-            <FaUsers className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Search & Filter Toolbar ─────────────────────────────────────────── */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative w-full md:w-80">
-          <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+      {/* ── Search & Filter Bar ─────────────────────────────────────────── */}
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="relative w-full md:w-72">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
           <input
             type="text"
-            placeholder="Search service name, key..."
+            placeholder="Search service or key..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00D3CD] focus:border-[#00D3CD]"
+            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Category Filter */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 font-medium focus:ring-1 focus:ring-[#00D3CD]"
+          >
+            <option value="all">All Categories</option>
+            {CATEGORY_OPTIONS.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
           {/* Status Tabs */}
-          <div className="inline-flex p-1 bg-gray-100 rounded-xl text-xs font-semibold">
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg text-xs font-semibold">
             {["all", "enabled", "disabled"].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setStatusFilter(tab)}
-                className={`px-3 py-1.5 rounded-lg capitalize transition-all ${
+                className={`px-2.5 py-1 rounded-md capitalize transition-all ${
                   statusFilter === tab
                     ? "bg-[#00D3CD] text-white shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
@@ -318,12 +313,12 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
         </div>
       </div>
 
-      {/* ── Services Grid ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* ── Services Grid (Clean, Compact, Minimal Text) ─────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {isLoading ? (
-          <div className="col-span-full bg-white p-12 rounded-xl border border-gray-200 text-center text-gray-400">
-            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#00D3CD] border-t-transparent mb-2" />
-            <p className="text-xs">Loading services from database...</p>
+          <div className="col-span-full bg-white p-10 rounded-xl border border-gray-200 text-center text-gray-400">
+            <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#00D3CD] border-t-transparent mb-2" />
+            <p className="text-xs">Loading services...</p>
           </div>
         ) : filteredServices.length > 0 ? (
           filteredServices.map((service) => {
@@ -333,38 +328,38 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
             return (
               <div
                 key={key}
-                className={`bg-white rounded-xl p-5 border transition-all duration-200 flex flex-col justify-between shadow-sm hover:shadow-md ${
-                  isEnabled ? "border-gray-200" : "border-red-200 bg-red-50/20"
+                className={`bg-white rounded-xl p-4 border transition-all duration-150 shadow-sm hover:border-[#00D3CD]/50 flex flex-col justify-between ${
+                  isEnabled ? "border-gray-200" : "border-rose-100 bg-rose-50/20"
                 }`}
               >
                 <div>
-                  {/* Top Bar with Category & Toggle */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-gray-100 text-gray-700">
+                  {/* Top Header: Category Tag & Switch */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
                       {service.category || "General"}
                     </span>
 
                     {/* Enable / Disable Switch */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span
-                        className={`text-xs font-bold ${
-                          isEnabled ? "text-green-700" : "text-red-700"
+                        className={`text-[11px] font-bold ${
+                          isEnabled ? "text-emerald-600" : "text-rose-500"
                         }`}
                       >
-                        {isEnabled ? "ACTIVE" : "DISABLED"}
+                        {isEnabled ? "Active" : "Disabled"}
                       </span>
 
                       <button
                         type="button"
                         onClick={() => handleToggle(key, isEnabled)}
                         disabled={toggleMutation.isPending}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                           isEnabled ? "bg-[#00D3CD]" : "bg-gray-300"
                         }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                            isEnabled ? "translate-x-5" : "translate-x-0"
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            isEnabled ? "translate-x-4" : "translate-x-0"
                           }`}
                         />
                       </button>
@@ -372,66 +367,45 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
                   </div>
 
                   {/* Title & Key */}
-                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900 leading-snug">
                     {service.label}
                   </h3>
-                  <code className="text-xs text-gray-400 font-mono block mt-0.5">
-                    key: {key}
+                  <code className="text-[11px] text-gray-400 font-mono mt-0.5 block">
+                    {key}
                   </code>
-
-                  <p className="text-xs text-gray-600 mt-2 line-clamp-2 leading-relaxed">
-                    {service.description}
-                  </p>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                  {/* Target Roles */}
-                  <div className="flex flex-wrap gap-1">
-                    {(service.target_roles || ["admin", "franchise", "merchant"]).map((role) => (
-                      <span
-                        key={role}
-                        className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600"
-                      >
-                        {role}
-                      </span>
-                    ))}
-                  </div>
+                {/* Bottom Bar: Action */}
+                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                  <span className="text-gray-400">
+                    {isEnabled ? "Platform-wide: Open" : "Platform-wide: Locked"}
+                  </span>
 
-                  {/* Actions */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400 font-medium">
-                      Status: {isEnabled ? "Visible to All" : "Hidden from All"}
-                    </span>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleEditClick(service)}
-                        className="p-1.5 text-gray-400 hover:text-[#00D3CD] rounded-lg hover:bg-gray-100 transition-colors"
-                        title="Edit Service"
-                      >
-                        <FaEdit className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleEditClick(service)}
+                    className="p-1 text-gray-400 hover:text-[#00D3CD] rounded hover:bg-gray-100 transition-colors"
+                    title="Edit Service"
+                  >
+                    <FaEdit className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="col-span-full bg-white p-12 rounded-xl border border-gray-200 text-center text-gray-400">
-            <FaInfoCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-            No services found matching search / filters.
+          <div className="col-span-full bg-white p-8 rounded-xl border border-gray-200 text-center text-xs text-gray-400">
+            No services matching filter criteria.
           </div>
         )}
       </div>
 
       {/* ── Add / Edit Modal ─────────────────────────────────────────────────── */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6 space-y-4 border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 flex items-center justify-between">
-              <span>{editingService ? "Edit Service" : "Add New Platform Service"}</span>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5 space-y-4 border border-gray-100">
+            <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3 flex items-center justify-between">
+              <span>{editingService ? "Edit Service" : "Add Platform Service"}</span>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
@@ -441,10 +415,10 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
               </button>
             </h3>
 
-            <form onSubmit={handleAddSubmit} className="space-y-4">
+            <form onSubmit={handleAddSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Service Display Name *
+                  Service Name *
                 </label>
                 <input
                   type="text"
@@ -452,33 +426,33 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
                   placeholder="e.g. UPI Dynamic QR"
                   value={formData.label}
                   onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-[#00D3CD]"
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-[#00D3CD]"
                 />
               </div>
 
               {!editingService && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Service Key (Unique Identifier)
+                    Service Key
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. upi_qr_collection (auto-generated if empty)"
+                    placeholder="e.g. upi_qr_collection (optional)"
                     value={formData.key}
                     onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[#00D3CD]"
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2 font-mono focus:ring-1 focus:ring-[#00D3CD]"
                   />
                 </div>
               )}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Service Category
+                  Category
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-[#00D3CD]"
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-1 focus:ring-[#00D3CD]"
                 >
                   {CATEGORY_OPTIONS.map((cat) => (
                     <option key={cat} value={cat}>
@@ -490,41 +464,28 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Description
+                  Status
                 </label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief description of this platform service..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-[#00D3CD]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Initial Status
-                </label>
-                <div className="flex items-center gap-4">
-                  <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                <div className="flex items-center gap-4 text-xs">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
                       name="service_status"
                       checked={formData.enabled}
                       onChange={() => setFormData({ ...formData, enabled: true })}
-                      className="text-[#00D3CD] focus:ring-[#00D3CD]"
+                      className="text-[#00D3CD]"
                     />
-                    <span>Enabled (Active)</span>
+                    <span>Enabled</span>
                   </label>
-                  <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
                       name="service_status"
                       checked={!formData.enabled}
                       onChange={() => setFormData({ ...formData, enabled: false })}
-                      className="text-[#00D3CD] focus:ring-[#00D3CD]"
+                      className="text-[#00D3CD]"
                     />
-                    <span>Disabled (Hidden)</span>
+                    <span>Disabled</span>
                   </label>
                 </div>
               </div>
@@ -533,22 +494,34 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saveMutation.isPending}
-                  className="px-4 py-2 rounded-lg bg-[#00D3CD] hover:bg-[#00bdb7] text-white text-xs font-semibold shadow-sm disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-[#00D3CD] hover:bg-[#00bdb7] text-white text-xs font-semibold shadow-sm disabled:opacity-50"
                 >
-                  {saveMutation.isPending ? "Saving..." : editingService ? "Update Service" : "Save Service"}
+                  {saveMutation.isPending ? "Saving..." : editingService ? "Update" : "Save"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* ── Confirmation Modal ── */}
+      <ConfirmationModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 };

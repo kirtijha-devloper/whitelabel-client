@@ -4,16 +4,39 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Eye, Loader2, SquarePen, Users, Download, Search, ShieldCheck } from "lucide-react";
+import { Eye, Loader2, SquarePen, Users, Download, Search, ShieldCheck, MoreHorizontal } from "lucide-react";
 import { toast } from "react-toastify";
 import { extractUsersArray, normalizeUserRole } from "../../utils/userAccess";
-import { getAdminList, updateAdminStatus } from "../../api/superAdminApi";
+import { getAdminList, updateAdminStatus, updateAdmin } from "../../api/superAdminApi";
+import AdminActionMenuModal from "../../components/SuperAdmin/AdminActionMenuModal";
+import ServiceManagementModal from "../../components/SuperAdmin/ServiceManagementModal";
+import AdminWalletModal from "../../components/SuperAdmin/AdminWalletModal";
+import AdminRateModal from "../../components/SuperAdmin/AdminRateModal";
+import ConfirmationModal from "../../components/Common/ConfirmationModal";
 
 const SuperAdminAdminList = ({ currentUser }) => {
   const [searchInputValue, setSearchInputValue] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+
+  // Management Modals
+  const [isAdminActionMenuOpen, setIsAdminActionMenuOpen] = useState(false);
+  const [selectedAdminForAction, setSelectedAdminForAction] = useState(null);
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    variant: "primary",
+    onConfirm: () => {},
+  });
 
   const [adminParams, setAdminParams] = useState({
     page: 1,
@@ -27,6 +50,84 @@ const SuperAdminAdminList = ({ currentUser }) => {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // ── Action Handlers ───────────────────────────────────────────────────────
+  const handleOpenAdminActionMenu = (row) => {
+    setSelectedAdminForAction(row);
+    setIsAdminActionMenuOpen(true);
+  };
+
+  const handleSelectServiceManagement = (admin) => {
+    setIsAdminActionMenuOpen(false);
+    const target = admin || selectedAdminForAction;
+    if (!target) return;
+
+    const companyData = {
+      id: target.id, // Admin user's own User table PK — required by findAdminUser() on backend
+      company_id: target.company?.company_id || target.company_id || "",
+      company_name: target.company?.company_name || target.company_or_shop_name || target.name || "Company",
+      services: target.company?.services || target.services || {
+        pos: true,
+        pg: true,
+        qr: true,
+        soundbox: true,
+        dmt: true,
+        billpayments: true,
+      },
+    };
+    setSelectedCompany(companyData);
+    setIsServiceModalOpen(true);
+  };
+
+  const handleSelectRateManagement = (admin) => {
+    setIsAdminActionMenuOpen(false);
+    setSelectedAdminForAction(admin || selectedAdminForAction);
+    setIsRateModalOpen(true);
+  };
+
+  const handleCloseRateModal = () => {
+    setIsRateModalOpen(false);
+  };
+
+  const handleSelectWalletManagement = (admin) => {
+    setIsAdminActionMenuOpen(false);
+    setSelectedAdminForAction(admin || selectedAdminForAction);
+    setIsWalletModalOpen(true);
+  };
+
+  const handleSaveServices = async ({ companyId, company_id, services }) => {
+    try {
+      await updateAdmin(companyId, {
+        services,
+        company_id,
+      });
+      toast.success("Admin services updated successfully.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["superAdminAdminsList"] }),
+        queryClient.invalidateQueries({ queryKey: ["superAdminAdminsSearch"] }),
+        queryClient.invalidateQueries({ queryKey: ["adminServices"] }),
+        queryClient.invalidateQueries({ queryKey: ["superAdminServices"] }),
+      ]);
+      if (typeof refetchAllAdmins === "function") {
+        await refetchAllAdmins();
+      }
+      setIsServiceModalOpen(false);
+      setSelectedCompany(null);
+    } catch (error) {
+      console.error("Save services error:", error);
+      toast.error(error?.message || "Failed to update admin services");
+    }
+  };
+
+  const handleWalletSuccess = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["superAdminAdminsList"] }),
+      queryClient.invalidateQueries({ queryKey: ["superAdminAdminsSearch"] }),
+    ]);
+    if (typeof refetchAllAdmins === "function") {
+      await refetchAllAdmins();
+    }
+  };
 
   // ── Access Check ─────────────────────────────────────────────────────────
   const normalizedCurrentUserRole = normalizeUserRole(currentUser?.role);
@@ -93,11 +194,7 @@ const SuperAdminAdminList = ({ currentUser }) => {
   };
 
   // ── Status Toggle ─────────────────────────────────────────────────────────
-  const handleToggleAdminStatus = async (admin) => {
-    const nextStatus = admin.status === "active" ? "inactive" : "active";
-    const confirmMsg = `Are you sure you want to mark admin ${admin.name || admin.username} as ${nextStatus}?`;
-    if (!window.confirm(confirmMsg)) return;
-
+  const executeToggleAdminStatus = async (admin, nextStatus) => {
     setStatusUpdatingId(admin.id);
     try {
       await updateAdminStatus(admin.id, nextStatus);
@@ -110,6 +207,26 @@ const SuperAdminAdminList = ({ currentUser }) => {
     } finally {
       setStatusUpdatingId(null);
     }
+  };
+
+  const handleToggleAdminStatus = (admin) => {
+    const nextStatus = admin.status === "active" ? "inactive" : "active";
+    setConfirmConfig({
+      isOpen: true,
+      title: `${nextStatus === "active" ? "Activate" : "Deactivate"} Administrator?`,
+      message: `Are you sure you want to mark admin "${admin.name || admin.username}" as ${nextStatus}? ${
+        nextStatus === "inactive"
+          ? "This will prevent access to their white-label platform and associated services."
+          : "This will restore full access to their white-label platform."
+      }`,
+      confirmText: nextStatus === "active" ? "Activate Admin" : "Deactivate Admin",
+      cancelText: "Cancel",
+      variant: nextStatus === "active" ? "success" : "danger",
+      onConfirm: async () => {
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        await executeToggleAdminStatus(admin, nextStatus);
+      },
+    });
   };
 
   // ── Excel Export ──────────────────────────────────────────────────────────
@@ -267,6 +384,16 @@ const SuperAdminAdminList = ({ currentUser }) => {
             className="p-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-primary hover:text-white hover:border-primary transition-colors"
           >
             <SquarePen size={16} />
+          </button>
+
+          {/* Action Menu (3 Dots) */}
+          <button
+            type="button"
+            title="Admin Management Menu"
+            onClick={() => handleOpenAdminActionMenu(row)}
+            className="p-1.5 rounded-md border border-gray-200 text-gray-700 hover:bg-primary hover:text-white hover:border-primary transition-colors"
+          >
+            <MoreHorizontal size={16} />
           </button>
         </div>
       ),
@@ -431,6 +558,64 @@ const SuperAdminAdminList = ({ currentUser }) => {
           </div>
         )}
       </div>
+
+      {/* ── Admin Action Menu Modal (Three Dots) ── */}
+      <AdminActionMenuModal
+        isOpen={isAdminActionMenuOpen}
+        onClose={() => {
+          setIsAdminActionMenuOpen(false);
+          setSelectedAdminForAction(null);
+        }}
+        admin={selectedAdminForAction}
+        onSelectServiceManagement={handleSelectServiceManagement}
+        onSelectRateManagement={handleSelectRateManagement}
+        onSelectWalletManagement={handleSelectWalletManagement}
+      />
+
+      {/* ── Admin-based Service Management Modal ── */}
+      <ServiceManagementModal
+        isOpen={isServiceModalOpen}
+        onClose={() => {
+          setIsServiceModalOpen(false);
+          setSelectedCompany(null);
+        }}
+        company={selectedCompany}
+        onSave={handleSaveServices}
+      />
+
+      {/* ── Admin Wallet Adjustment Modal ── */}
+      <AdminWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+          setSelectedAdminForAction(null);
+        }}
+        admin={selectedAdminForAction}
+        onSuccess={handleWalletSuccess}
+      />
+
+      {/* ── Admin Rate Management Modal (In-Place Modal) ── */}
+      <AdminRateModal
+        isOpen={isRateModalOpen}
+        onClose={handleCloseRateModal}
+        admin={selectedAdminForAction}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["superAdminAdminsList"] });
+          queryClient.invalidateQueries({ queryKey: ["superAdminAdminsSearch"] });
+        }}
+      />
+
+      {/* ── Confirmation Modal ── */}
+      <ConfirmationModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 };

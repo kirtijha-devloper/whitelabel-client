@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, ArrowLeft, Loader2, Edit, X, Eye, EyeOff, LockKeyhole, Trash2 } from 'lucide-react';
-import { fetchUserDetails, approveUser, userDetail, generateTpin, verifyTPin, updatePassword, updateUserProfile } from '../api/authApi';
+import { userDetail, generateTpin, verifyTPin, updatePassword, updateUserProfile } from '../api/authApi';
 import { updateChargeSlab } from '../api/chargeSet';
 import { fetchServiceSettings, updateServiceSettings } from '../api/serviceSettingsApi';
 import { useServiceSettingsPolling } from '../hooks/useServiceSettingsPolling';
@@ -69,7 +69,6 @@ function Settings({ currentUser }) {
   const queryClient = useQueryClient();
 
   const sessRoot = (location.pathname || '').split('/')[1] || 'admin';
-  const billerUploadRoute = `/${sessRoot}/billavenue-billers-upload`;
   const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin';
   const [activeModal, setActiveModal] = useState(null);
   const [formData, setFormData] = useState({});
@@ -666,6 +665,12 @@ function Settings({ currentUser }) {
   };
 
   const handleServiceSettingToggle = (serviceKey) => {
+    const isSuperAdminDisabled = Boolean(serviceSettingsData?.[serviceKey]?.is_super_admin_disabled);
+    if (isSuperAdminDisabled) {
+      toast.warning(`Service '${serviceKey}' is disabled by Super Admin and cannot be enabled.`);
+      return;
+    }
+
     setServiceSettingsForm((prev) => ({
       ...prev,
       [serviceKey]: !prev[serviceKey],
@@ -674,9 +679,16 @@ function Settings({ currentUser }) {
 
   const handleServiceSettingsSubmit = (event) => {
     event.preventDefault();
-    if (typeof serviceSettingsForm.pos_t0_settlement === 'boolean') {
+    const payload = { ...serviceSettingsForm };
+    SERVICE_FLAG_CONFIG.forEach((service) => {
+      if (serviceSettingsData?.[service.key]?.is_super_admin_disabled) {
+        payload[service.key] = false;
+      }
+    });
+
+    if (typeof payload.pos_t0_settlement === 'boolean') {
       const prevVal = Boolean(serviceSettingsData?.pos_t0_settlement?.is_enabled ?? serviceSettingsData?.pos_t0_settlement ?? true);
-      const newVal = Boolean(serviceSettingsForm.pos_t0_settlement);
+      const newVal = Boolean(payload.pos_t0_settlement);
       if (prevVal !== newVal) {
         recordLimitAuditLog({
           performingUser: currentUser,
@@ -688,7 +700,7 @@ function Settings({ currentUser }) {
         });
       }
     }
-    updateServiceSettingsMutation.mutate({ ...serviceSettingsForm });
+    updateServiceSettingsMutation.mutate(payload);
   };
 
   const openRoleModal = (mode, role = null) => {
@@ -703,7 +715,9 @@ function Settings({ currentUser }) {
             rolePerms = normalizePermissions([...rolePerms, ...list]);
           }
         }
-      } catch (e) {}
+      } catch {
+        void 0;
+      }
     }
 
     setRoleForm({
@@ -775,7 +789,9 @@ function Settings({ currentUser }) {
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('employeeAccessRoleUpdated'));
           }
-        } catch (e) {}
+        } catch {
+          void 0;
+        }
       }
     };
 
@@ -1324,7 +1340,8 @@ function Settings({ currentUser }) {
                 <div className="space-y-3">
                   {SERVICE_FLAG_CONFIG.filter((service) => service.key !== "user_daily_limit").map((service) => {
                     const currentConfig = serviceSettingsData?.[service.key];
-                    const isEnabled = Boolean(serviceSettingsForm?.[service.key]);
+                    const isSuperAdminDisabled = Boolean(currentConfig?.is_super_admin_disabled);
+                    const isEnabled = isSuperAdminDisabled ? false : Boolean(serviceSettingsForm?.[service.key]);
                     const updatedAt = currentConfig?.updated_at
                       ? new Date(currentConfig.updated_at).toLocaleString()
                       : 'Not updated yet';
@@ -1339,13 +1356,22 @@ function Settings({ currentUser }) {
                     return (
                       <label
                         key={service.key}
-                        className="flex cursor-pointer items-start gap-4 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm transition hover:border-[#00D3CD]/50"
+                        className={`flex items-start gap-4 rounded-xl border px-4 py-4 shadow-sm transition ${
+                          isSuperAdminDisabled
+                            ? "border-amber-200 bg-amber-50/30 cursor-not-allowed opacity-80"
+                            : "border-gray-200 bg-white cursor-pointer hover:border-[#00D3CD]/50"
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={isEnabled}
+                          disabled={isSuperAdminDisabled}
                           onChange={() => handleServiceSettingToggle(service.key)}
-                          className="mt-1 h-4 w-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
+                          className={`mt-1 h-4 w-4 rounded border-gray-300 ${
+                            isSuperAdminDisabled
+                              ? "cursor-not-allowed bg-gray-200 text-gray-400"
+                              : "text-[#00D3CD] focus:ring-[#00D3CD]"
+                          }`}
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1353,19 +1379,33 @@ function Settings({ currentUser }) {
                               <p className="text-sm font-semibold text-gray-900">{service.label}</p>
                               <p className="mt-1 text-sm text-gray-600">{service.description}</p>
                             </div>
-                            <span
-                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                                isEnabled
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-700'
-                              }`}
-                            >
-                              {isEnabled ? 'Enabled' : 'Disabled'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {isSuperAdminDisabled ? (
+                                <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300">
+                                  🔒 Locked by Super Admin
+                                </span>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                    isEnabled
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-red-100 text-red-700'
+                                  }`}
+                                >
+                                  {isEnabled ? 'Enabled' : 'Disabled'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <p className="mt-2 text-xs text-gray-500">
-                            Last update: {updatedAt} | Updated by: {updatedBy}
-                          </p>
+                          {isSuperAdminDisabled ? (
+                            <p className="mt-2 text-xs text-amber-700 font-medium">
+                              This service has been disabled platform-wide by Super Admin and cannot be enabled.
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-xs text-gray-500">
+                              Last update: {updatedAt} | Updated by: {updatedBy}
+                            </p>
+                          )}
                         </div>
                       </label>
                     );

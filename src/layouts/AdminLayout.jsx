@@ -111,6 +111,9 @@ const SuperAdminPGInventory = lazy(
 const SuperAdminServiceManagement = lazy(
   () => import("../Pages/Superadmin/SuperAdminServiceManagement"),
 );
+const AdminServiceManagement = lazy(
+  () => import("../Pages/Admin/AdminServiceManagement"),
+);
 const SuperAdminSetCharges = lazy(
   () => import("../Pages/Superadmin/SuperAdminSetCharges"),
 );
@@ -461,7 +464,10 @@ export default function AdminLayout() {
                   isSuperAdminViewer ? (
                     <SuperAdminServiceManagement />
                   ) : (
-                    <Navigate to="/login" replace />
+                    guardRoute(
+                      isAdminViewer,
+                      <AdminServiceManagement currentUser={currentUser} />,
+                    )
                   )
                 }
               />

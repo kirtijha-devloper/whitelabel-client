@@ -46,6 +46,8 @@ import {
 import ServiceManagementModal from "../components/SuperAdmin/ServiceManagementModal";
 import AdminActionMenuModal from "../components/SuperAdmin/AdminActionMenuModal";
 import AdminWalletModal from "../components/SuperAdmin/AdminWalletModal";
+import AdminRateModal from "../components/SuperAdmin/AdminRateModal";
+import ConfirmationModal from "../components/Common/ConfirmationModal";
 
 
 /* =========================================================
@@ -94,6 +96,18 @@ const AdminList = ({
   const [selectedAdminForAction, setSelectedAdminForAction] = useState(null);
 
   const [selectedCompany, setSelectedCompany] = useState(null);
+
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    variant: "primary",
+    onConfirm: () => {},
+  });
 
 
   /* =========================================================
@@ -359,70 +373,52 @@ const AdminList = ({
      STATUS UPDATE
   ========================================================= */
 
-  const handleToggleStatus = async (
-    row,
-    nextStatus
-  ) => {
-
-    if (
-      !canUpdateUserStatus ||
-      !row?.id
-    ) {
-      return;
-    }
-
+  const executeToggleStatus = async (row, nextStatus) => {
+    if (!canUpdateUserStatus || !row?.id) return;
 
     try {
-
-      setStatusUpdatingId(
-        String(row.id)
-      );
-
-
-      await updateAdminStatus(
-        row.id,
-        nextStatus
-      );
-
-
+      setStatusUpdatingId(String(row.id));
+      await updateAdminStatus(row.id, nextStatus);
       toast.success(
         `${row?.name || "Admin"} status changed to ${
-          nextStatus === "active"
-            ? "active"
-            : "inactive"
+          nextStatus === "active" ? "active" : "inactive"
         }.`
       );
 
-
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["adminList"],
-        }),
-
-        queryClient.invalidateQueries({
-          queryKey: ["adminSearch"],
-        }),
+        queryClient.invalidateQueries({ queryKey: ["adminList"] }),
+        queryClient.invalidateQueries({ queryKey: ["adminSearch"] }),
       ]);
 
-
-      if (
-        typeof refetchAllAdmins ===
-        "function"
-      ) {
+      if (typeof refetchAllAdmins === "function") {
         await refetchAllAdmins();
       }
-
     } catch (error) {
-
-      toast.error(
-        error?.message ||
-          "Failed to update admin status."
-      );
-
+      toast.error(error?.message || "Failed to update admin status.");
     } finally {
-
       setStatusUpdatingId(null);
     }
+  };
+
+  const handleToggleStatus = (row, nextStatus) => {
+    if (!canUpdateUserStatus || !row?.id) return;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: `${nextStatus === "active" ? "Activate" : "Deactivate"} Administrator?`,
+      message: `Are you sure you want to change the status of "${row?.name || "this admin"}" to ${nextStatus}? ${
+        nextStatus === "inactive"
+          ? "This will temporarily prevent portal login and transaction actions for this admin."
+          : "This will restore full portal access for this admin."
+      }`,
+      confirmText: nextStatus === "active" ? "Activate Admin" : "Deactivate Admin",
+      cancelText: "Cancel",
+      variant: nextStatus === "active" ? "success" : "danger",
+      onConfirm: async () => {
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        await executeToggleStatus(row, nextStatus);
+      },
+    });
   };
 
 
@@ -465,9 +461,14 @@ const AdminList = ({
     handleOpenServiceManagement(admin || selectedAdminForAction);
   };
 
-  const handleSelectRateManagement = (_admin) => {
+  const handleSelectRateManagement = (admin) => {
     setIsAdminActionMenuOpen(false);
-    navigate("/super-admin/set-charges");
+    setSelectedAdminForAction(admin || selectedAdminForAction);
+    setIsRateModalOpen(true);
+  };
+
+  const handleCloseRateModal = () => {
+    setIsRateModalOpen(false);
   };
 
   const handleSelectWalletManagement = (admin) => {
@@ -615,6 +616,14 @@ const AdminList = ({
 
         queryClient.invalidateQueries({
           queryKey: ["adminSearch"],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: ["adminServices"],
+        }),
+
+        queryClient.invalidateQueries({
+          queryKey: ["superAdminServices"],
         }),
       ]);
 
@@ -1755,6 +1764,32 @@ const AdminList = ({
         }
       />
 
+      {/* =====================================================
+          ADMIN RATE MANAGEMENT MODAL (IN-PLACE MODAL)
+      ===================================================== */}
+      <AdminRateModal
+        isOpen={isRateModalOpen}
+        onClose={handleCloseRateModal}
+        admin={selectedAdminForAction}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["adminList"] });
+          queryClient.invalidateQueries({ queryKey: ["adminSearch"] });
+        }}
+      />
+
+      {/* =====================================================
+          CONFIRMATION MODAL
+      ===================================================== */}
+      <ConfirmationModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+      />
 
     </div>
   );

@@ -144,6 +144,12 @@ const Sidebar = ({ currentUser }) => {
         "settlement.manage",
       ],
     },
+    {
+      name: "Service Management",
+      path: "/admin/service-management",
+      icon: <FaSlidersH />,
+      permissions: ["rate.settings.read", "rate.settings.manage"],
+    },
     { name: "Setting", path: "/admin/setting", icon: <FaCog /> },
     {
       name: "System Log",
