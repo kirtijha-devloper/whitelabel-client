@@ -290,33 +290,50 @@ function CreateAdmin() {
     e.preventDefault();
     const form = state.formData;
 
-    if (!form.name?.trim()) {
-      toast.error('Director name is required');
-      return;
-    }
-    if (!form.email?.trim()) {
-      toast.error('Email address is required');
-      return;
-    }
-    if (!form.mobile_number?.trim() || form.mobile_number.length !== 10) {
-      toast.error('Valid 10-digit Indian mobile number is required');
-      return;
-    }
-    if (!isEditMode && (!form.password || form.password.length < 8)) {
-      toast.error('Password must be at least 8 characters long');
-      return;
-    }
-    if (isEditMode && form.password && form.password.length < 8) {
-      toast.error('New password must be at least 8 characters long');
-      return;
-    }
-    if (!form.company_or_shop_name?.trim()) {
-      toast.error('Company / Shop Name is required');
-      return;
-    }
-    if (!form.domain_name?.trim()) {
-      toast.error('Domain Name is required');
-      return;
+    // In CREATE mode, fields are strictly required:
+    if (!isEditMode) {
+      if (!form.name?.trim()) {
+        toast.error('Director name is required');
+        return;
+      }
+      if (!form.email?.trim()) {
+        toast.error('Email address is required');
+        return;
+      }
+      if (!form.mobile_number?.trim() || form.mobile_number.length !== 10) {
+        toast.error('Valid 10-digit Indian mobile number is required');
+        return;
+      }
+      if (!form.password || form.password.length < 8) {
+        toast.error('Password must be at least 8 characters long');
+        return;
+      }
+      if (!form.company_or_shop_name?.trim()) {
+        toast.error('Company / Shop Name is required');
+        return;
+      }
+      if (!form.domain_name?.trim()) {
+        toast.error('Domain Name is required');
+        return;
+      }
+    } else {
+      // In EDIT mode: NO fields are mandatory!
+      // Only validate format IF a field is provided:
+      if (form.password && form.password.trim() && form.password.trim().length < 8) {
+        toast.error('New password must be at least 8 characters long');
+        return;
+      }
+      if (form.mobile_number && form.mobile_number.trim() && form.mobile_number.trim().length !== 10) {
+        toast.error('Mobile number must be exactly 10 digits');
+        return;
+      }
+      if (form.email && form.email.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(form.email.trim())) {
+          toast.error('Invalid email address format');
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -324,6 +341,7 @@ function CreateAdmin() {
     try {
       if (isEditMode) {
         // EDIT MODE: PUT /api/super-admin/admin/:id
+        // Frontend first identifies modified data. Only modified data is sent!
         const initial = initialDataRef.current || {};
         const changedData = {};
 
@@ -394,13 +412,22 @@ function CreateAdmin() {
           changedData.settlement_type = form.settlement_type;
         }
 
-        const hasFiles = Boolean(
-          form.company_logo instanceof File ||
-          FILE_FIELD_CONFIG.some((f) => form[f.name] instanceof File)
-        );
+        // For images and logo: ONLY updated file fields are included!
+        const updatedFiles = {};
+        if (form.company_logo instanceof File) {
+          updatedFiles.company_logo = form.company_logo;
+        }
+        FILE_FIELD_CONFIG.forEach((field) => {
+          if (form[field.name] instanceof File) {
+            updatedFiles[field.name] = form[field.name];
+          }
+        });
+
+        const hasFiles = Object.keys(updatedFiles).length > 0;
+        const hasTextChanges = Object.keys(changedData).length > 0;
 
         // If nothing at all changed, avoid useless API call
-        if (Object.keys(changedData).length === 0 && !hasFiles) {
+        if (!hasTextChanges && !hasFiles) {
           toast.info('No changes detected.');
           setLoading(false);
           return;
@@ -413,18 +440,14 @@ function CreateAdmin() {
             formData.append(key, value);
           });
 
-          if (form.company_logo instanceof File) {
-            formData.append('company_logo', form.company_logo);
-          }
-
-          FILE_FIELD_CONFIG.forEach((field) => {
-            if (form[field.name] instanceof File) {
-              formData.append(field.name, form[field.name]);
-            }
+          // ONLY append updated files (never untouched ones)
+          Object.entries(updatedFiles).forEach(([fieldKey, fileObj]) => {
+            formData.append(fieldKey, fileObj);
           });
 
           dataToSend = formData;
         } else {
+          // If no files were updated, send clean JSON with ONLY modified fields
           dataToSend = changedData;
         }
 
@@ -610,7 +633,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Director Name <span className="text-red-500">*</span>
+                    Director Name {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -618,7 +641,7 @@ function CreateAdmin() {
                     name="name"
                     value={state.formData.name || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter full name"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -632,7 +655,7 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Mail size={15} />
-                    Email Address <span className="text-red-500">*</span>
+                    Email Address {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -640,7 +663,7 @@ function CreateAdmin() {
                     name="email"
                     value={state.formData.email || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter email address"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -654,7 +677,7 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Phone size={15} />
-                    Mobile Number <span className="text-red-500">*</span>
+                    Mobile Number {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <div className="flex">
@@ -673,7 +696,7 @@ function CreateAdmin() {
                       name="mobile_number"
                       value={state.formData.mobile_number || ''}
                       onChange={handleChange}
-                      required
+                      required={!isEditMode}
                       maxLength={10}
                       inputMode="numeric"
                       pattern="[0-9]{10}"
@@ -747,7 +770,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gender<span className="ml-2 text-red-500">*</span>
+                    Gender{!isEditMode && <span className="ml-2 text-red-500">*</span>}
                   </label>
 
                   <div className="flex gap-5 py-2">
@@ -758,7 +781,7 @@ function CreateAdmin() {
                         type="radio"
                         name="gender"
                         value="male"
-                        required
+                        required={!isEditMode}
                         checked={state.formData.gender === 'male'}
                         onChange={handleChange}
                       />
@@ -808,13 +831,13 @@ function CreateAdmin() {
 
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Calendar size={15} />
-                    Date of Birth <span className="text-red-500">*</span>
+                    Date of Birth {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
                     type="date"
                     name="dob"
-                    required
+                    required={!isEditMode}
                     value={state.formData.dob || ''}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -846,7 +869,7 @@ function CreateAdmin() {
                 <div className="md:col-span-2">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address Line 1 <span className="text-red-500">*</span>
+                    Address Line 1 {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -854,7 +877,7 @@ function CreateAdmin() {
                     name="address1"
                     value={state.formData.address1 || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter address line 1"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -887,7 +910,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City <span className="text-red-500">*</span>
+                    City {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -895,7 +918,7 @@ function CreateAdmin() {
                     name="city"
                     value={state.formData.city || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter city"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -908,7 +931,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    District <span className="text-red-500">*</span>
+                    District {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -916,7 +939,7 @@ function CreateAdmin() {
                     name="district"
                     value={state.formData.district || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter district"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -929,7 +952,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pincode <span className="text-red-500">*</span>
+                    Pincode {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -937,7 +960,7 @@ function CreateAdmin() {
                     name="pincode"
                     value={state.formData.pincode || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     maxLength={6}
                     inputMode="numeric"
                     pattern="[0-9]{6}"
@@ -954,7 +977,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    State <span className="text-red-500">*</span>
+                    State {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -962,7 +985,7 @@ function CreateAdmin() {
                     name="state"
                     value={state.formData.state || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter state"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -975,7 +998,7 @@ function CreateAdmin() {
                 <div>
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Country <span className="text-red-500">*</span>
+                    Country {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -983,7 +1006,7 @@ function CreateAdmin() {
                     name="country"
                     value={state.formData.country || 'India'}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter country"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -1019,7 +1042,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aadhaar Number <span className="text-red-500">*</span>
+                    Aadhaar Number {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -1027,10 +1050,10 @@ function CreateAdmin() {
                     name="aadhar_number"
                     value={state.formData.aadhar_number || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     maxLength={12}
                     inputMode="numeric"
-                    pattern="[0-9]{12}"
+                    pattern={!isEditMode ? "[0-9]{12}" : undefined}
                     placeholder="Enter 12-digit Aadhaar number"
                     title="Aadhaar number must contain exactly 12 digits"
                     className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -1050,7 +1073,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PAN Number <span className="text-red-500">*</span>
+                    PAN Number {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -1058,10 +1081,10 @@ function CreateAdmin() {
                     name="pan_number"
                     value={state.formData.pan_number || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     maxLength={10}
                     inputMode="text"
-                    pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+                    pattern={!isEditMode ? "[A-Z]{5}[0-9]{4}[A-Z]{1}" : undefined}
                     placeholder="Enter 10-character PAN"
                     title="PAN must be 5 letters, 4 digits, and 1 letter"
                     autoCapitalize="characters"
@@ -1083,7 +1106,7 @@ function CreateAdmin() {
                 <div className="min-w-0">
 
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    GST Number <span className="text-red-500">*</span>
+                    GST Number {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -1091,10 +1114,10 @@ function CreateAdmin() {
                     name="gst_number"
                     value={state.formData.gst_number || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     maxLength={15}
                     inputMode="text"
-                    pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}"
+                    pattern={!isEditMode ? "[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}" : undefined}
                     placeholder="Enter 15-character GST"
                     title="GST number must be 15 characters in the correct format"
                     autoCapitalize="characters"
@@ -1126,7 +1149,7 @@ function CreateAdmin() {
                       className="min-w-0"
                     >
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {field.label} {field.name === 'shop_photo' ? "" : <span className="text-red-500">*</span>}
+                        {field.label} {!isEditMode && field.name !== 'shop_photo' && <span className="text-red-500">*</span>}
                       </label>
 
                       <div className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3">
@@ -1136,12 +1159,14 @@ function CreateAdmin() {
                             htmlFor={inputId}
                             className="cursor-pointer inline-flex items-center rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
-                            {hasSelectedFile ? 'Replace File' : 'Select File'}
+                            {hasSelectedFile ? 'Replace File' : (isEditMode && typeof selectedFile === 'string' && selectedFile ? 'Replace File' : 'Select File')}
                           </label>
 
                           <span className="min-w-0 break-all text-xs text-gray-600">
                             {hasSelectedFile
                               ? selectedFile.name
+                              : typeof selectedFile === 'string' && selectedFile
+                              ? 'Current file attached'
                               : 'No file selected'}
                           </span>
 
@@ -1149,7 +1174,6 @@ function CreateAdmin() {
 
                         <input
                           id={inputId}
-                          required={field.name !== 'shop_photo'}
                           type="file"
                           name={field.name}
                           onChange={(e) => handleFileChange(e, field.name)}
@@ -1181,7 +1205,7 @@ function CreateAdmin() {
                 {/* COMPANY NAME */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Name <span className="text-red-500">*</span>
+                    Company Name {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -1189,7 +1213,7 @@ function CreateAdmin() {
                     name="company_or_shop_name"
                     value={state.formData.company_or_shop_name || ''}
                     onChange={handleChange}
-                    required
+                    required={!isEditMode}
                     placeholder="Enter company or shop name"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
@@ -1241,7 +1265,7 @@ function CreateAdmin() {
                 {/* DOMAIN NAME */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Domain Name <span className="text-red-500">*</span>
+                    Domain Name {!isEditMode && <span className="text-red-500">*</span>}
                   </label>
 
                   <input
@@ -1259,7 +1283,7 @@ function CreateAdmin() {
                         });
                       }
                     }}
-                    required
+                    required={!isEditMode}
                     placeholder="e.g. google.com"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
