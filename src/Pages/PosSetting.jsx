@@ -22,6 +22,8 @@ import {
   ChevronRight,
   UserCheck,
   Trash2,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 import Loader from "../components/Loader";
 import {
@@ -232,14 +234,14 @@ export default function PosSetting({ currentUser }) {
       channel.onmessage = () => {
         refetchPos();
         refetchUsers();
-        queryClient.invalidateQueries(["admin-service-settings"]);
+        queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
       };
     }
 
     const handleStorage = () => {
       refetchPos();
       refetchUsers();
-      queryClient.invalidateQueries(["admin-service-settings"]);
+      queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
     };
 
     window.addEventListener("storage", handleStorage);
@@ -255,22 +257,155 @@ export default function PosSetting({ currentUser }) {
   }, [refetchPos, refetchUsers]);
 
   // Update Customer T0 Limit Mutation
+  // Update Customer T0 Limit Mutation
   const updateLimitMutation = useMutation({
     mutationFn: ({ id, t0_daily_limit }) => updateCustomerT0Limit(id, t0_daily_limit),
+    onMutate: async (variables) => {
+      const targetId = variables?.id;
+      const newLimitNum =
+        variables?.t0_daily_limit !== "" && variables?.t0_daily_limit !== null && variables?.t0_daily_limit !== undefined
+          ? Number(variables.t0_daily_limit)
+          : null;
+      const newLimitStr = newLimitNum !== null ? String(newLimitNum) : null;
+
+      // 1. Immediately remove from editingLimitMap so UI switches out of edit mode instantly
+      if (targetId) {
+        setEditingLimitMap((prev) => {
+          const next = { ...prev };
+          delete next[targetId];
+          return next;
+        });
+      }
+
+      // 2. Snapshot previous values for rollback on error
+      const previousPosData = queryClient.getQueryData(["posSettings"]);
+      const previousUsersData = queryClient.getQueryData(["allUsersListForPosSetting"]);
+
+      // 3. Instant optimistic cache update for posSettings
+      queryClient.setQueryData(["posSettings"], (old) => {
+        if (!old) return old;
+        const updateList = (list) =>
+          Array.isArray(list)
+            ? list.map((item) =>
+                Number(item.id) === Number(targetId)
+                  ? { ...item, t0_daily_limit: newLimitStr }
+                  : item
+              )
+            : list;
+
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            customers: updateList(old.data?.customers),
+            merchants: updateList(old.data?.merchants),
+          },
+          customers: updateList(old.customers),
+        };
+      });
+
+      // 4. Instant optimistic cache update for allUsersListForPosSetting
+      queryClient.setQueryData(["allUsersListForPosSetting"], (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((u) =>
+            Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+          );
+        }
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((u) =>
+              Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+            ),
+          };
+        }
+        if (old.users && Array.isArray(old.users)) {
+          return {
+            ...old,
+            users: old.users.map((u) =>
+              Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+            ),
+          };
+        }
+        return old;
+      });
+
+      return { previousPosData, previousUsersData, targetId };
+    },
     onSuccess: (data, variables) => {
       toast.success(data?.message || "T0 daily limit updated successfully!");
-      queryClient.invalidateQueries(["posSettings"]);
-      queryClient.invalidateQueries(["allUsersListForPosSetting"]);
-      queryClient.invalidateQueries(["allUsers"]);
-      queryClient.invalidateQueries(["userSearch"]);
-      queryClient.invalidateQueries(["currentUser"]);
-      queryClient.invalidateQueries(["dashboard"]);
-      refetchPos();
-      refetchUsers();
-      dispatchLimitChangeEvent();
-      dispatchSettlementChangeEvent();
+
+      const targetId = variables?.id;
+      const newLimitNum =
+        variables?.t0_daily_limit !== "" && variables?.t0_daily_limit !== null && variables?.t0_daily_limit !== undefined
+          ? Number(variables.t0_daily_limit)
+          : null;
+      const newLimitStr = newLimitNum !== null ? String(newLimitNum) : null;
+
+      // Keep confirmed value in cache
+      queryClient.setQueryData(["posSettings"], (old) => {
+        if (!old) return old;
+        const updateList = (list) =>
+          Array.isArray(list)
+            ? list.map((item) =>
+                Number(item.id) === Number(targetId)
+                  ? { ...item, t0_daily_limit: newLimitStr }
+                  : item
+              )
+            : list;
+
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            customers: updateList(old.data?.customers),
+            merchants: updateList(old.data?.merchants),
+          },
+          customers: updateList(old.customers),
+        };
+      });
+
+      queryClient.setQueryData(["allUsersListForPosSetting"], (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((u) =>
+            Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+          );
+        }
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((u) =>
+              Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+            ),
+          };
+        }
+        if (old.users && Array.isArray(old.users)) {
+          return {
+            ...old,
+            users: old.users.map((u) =>
+              Number(u.id) === Number(targetId) ? { ...u, t0_daily_limit: newLimitStr } : u
+            ),
+          };
+        }
+        return old;
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["posSettings"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userSearch"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousPosData) {
+        queryClient.setQueryData(["posSettings"], context.previousPosData);
+      }
+      if (context?.previousUsersData) {
+        queryClient.setQueryData(["allUsersListForPosSetting"], context.previousUsersData);
+      }
       toast.error(error?.message || "Failed to update T0 limit");
     },
   });
@@ -280,12 +415,12 @@ export default function PosSetting({ currentUser }) {
     mutationFn: ({ id, settlement_type }) => updateUserSettlementType(id, settlement_type),
     onSuccess: (data, variables) => {
       toast.success(data?.message || `Settlement mode updated to ${variables.settlement_type}!`);
-      queryClient.invalidateQueries(["posSettings"]);
-      queryClient.invalidateQueries(["allUsersListForPosSetting"]);
-      queryClient.invalidateQueries(["allUsers"]);
-      queryClient.invalidateQueries(["userSearch"]);
-      queryClient.invalidateQueries(["currentUser"]);
-      queryClient.invalidateQueries(["dashboard"]);
+      queryClient.invalidateQueries({ queryKey: ["posSettings"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userSearch"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       refetchPos();
       refetchUsers();
       dispatchLimitChangeEvent();
@@ -301,12 +436,12 @@ export default function PosSetting({ currentUser }) {
     mutationFn: (settlementType) => bulkSetSettlementType(settlementType),
     onSuccess: (data, variables) => {
       toast.success(data?.message || `All users updated to ${variables} settlement mode`);
-      queryClient.invalidateQueries(["posSettings"]);
-      queryClient.invalidateQueries(["allUsersListForPosSetting"]);
-      queryClient.invalidateQueries(["allUsers"]);
-      queryClient.invalidateQueries(["userSearch"]);
-      queryClient.invalidateQueries(["currentUser"]);
-      queryClient.invalidateQueries(["dashboard"]);
+      queryClient.invalidateQueries({ queryKey: ["posSettings"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userSearch"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       refetchPos();
       refetchUsers();
       dispatchLimitChangeEvent();
@@ -345,8 +480,11 @@ export default function PosSetting({ currentUser }) {
 
       return {
         ...u,
-        settlement_type: u.settlement_type ?? posItem.settlement_type ?? "T0",
-        t0_daily_limit: u.t0_daily_limit ?? posItem.t0_daily_limit ?? null,
+        settlement_type: posItem.settlement_type ?? u.settlement_type ?? "T0",
+        t0_daily_limit:
+          posItem.t0_daily_limit !== undefined
+            ? posItem.t0_daily_limit
+            : (u.t0_daily_limit ?? null),
       };
     });
   }, [posData?.data?.customers, posData?.customers, allUsersData, isEmployee]);
@@ -560,9 +698,62 @@ export default function PosSetting({ currentUser }) {
     return calculateFranchisePoolStats(parentUser, scopedUsersList, pUsed);
   }, [isFranchise, isSuperFranchise, rawUsersList, currentUser, scopedUsersList, posTodayTxns]);
 
-  const executeSaveCustomerLimit = (customer, valToSave, finalLimitVal, previousState, newState) => {
-    setUserDailyLimit(customer.id, finalLimitVal, customer);
+  const adminLimitsStats = useMemo(() => {
+    if (!isAdmin && !isEmployee) return null;
 
+    const backendAdminLimits = posData?.data?.admin_limits;
+
+    const rawPayinLimit =
+      backendAdminLimits?.payin_limit !== undefined && backendAdminLimits?.payin_limit !== null
+        ? backendAdminLimits.payin_limit
+        : (currentUser?.t0_daily_limit !== undefined && currentUser?.t0_daily_limit !== null
+            ? currentUser.t0_daily_limit
+            : backendAdminLimits?.payin_limit);
+
+    const isPayinNotSet =
+      rawPayinLimit === null || rawPayinLimit === undefined || rawPayinLimit === "";
+    const isPayinUnlimited =
+      !isPayinNotSet && String(rawPayinLimit).toLowerCase() === "unlimited";
+    const payinLimitNum =
+      !isPayinNotSet && !isPayinUnlimited ? Number(rawPayinLimit) || 0 : null;
+
+    const payoutLimitNum =
+      backendAdminLimits?.payout_limit !== undefined
+        ? Number(backendAdminLimits.payout_limit) || 0
+        : Number(currentUser?.payout_limit ?? currentUser?.company?.payout_limit) || 0;
+
+    const ccBillLimitNum =
+      backendAdminLimits?.cc_bill_limit !== undefined
+        ? Number(backendAdminLimits.cc_bill_limit) || 0
+        : Number(currentUser?.bill_payment_limit ?? currentUser?.company?.bill_payment_limit) || 0;
+
+    // Calculate total allocated to top-level scoped users under Admin (Super Franchise, Standalone Franchise, Direct Merchant)
+    let allocatedToUsers = 0;
+    scopedUsersList.forEach((u) => {
+      const l = Number(u.t0_daily_limit);
+      if (Number.isFinite(l) && l > 0) {
+        allocatedToUsers += l;
+      }
+    });
+
+    const remainingPayin = isPayinNotSet
+      ? null
+      : isPayinUnlimited
+      ? "unlimited"
+      : Math.max(0, (payinLimitNum || 0) - allocatedToUsers);
+
+    return {
+      isPayinNotSet,
+      isPayinUnlimited,
+      payinLimit: isPayinNotSet ? null : isPayinUnlimited ? "unlimited" : payinLimitNum,
+      payoutLimit: payoutLimitNum,
+      ccBillLimit: ccBillLimitNum,
+      allocatedToUsers,
+      remainingPayin,
+    };
+  }, [isAdmin, isEmployee, posData?.data?.admin_limits, currentUser, scopedUsersList]);
+
+  const executeSaveCustomerLimit = (customer, valToSave, finalLimitVal, previousState, newState) => {
     recordLimitAuditLog({
       performingUser: currentUser,
       affectedUser: customer,
@@ -572,20 +763,9 @@ export default function PosSetting({ currentUser }) {
       serviceKey: "user_daily_limit",
     });
 
-    dispatchLimitChangeEvent({ type: "limit_override", customerId: customer.id });
-
     updateLimitMutation.mutate({
       id: customer.id,
       t0_daily_limit: valToSave,
-    });
-
-    const nameStr = customer.name || customer.full_name || customer.business_name || `User #${customer.id}`;
-    setSuccessModal({
-      isOpen: true,
-      title: "Limit Saved Successfully!",
-      message: `T0 Daily Limit has been updated and saved for ${nameStr}.`,
-      userName: nameStr,
-      changeSummary: `${previousState} → ${newState}`,
     });
   };
 
@@ -649,6 +829,57 @@ export default function PosSetting({ currentUser }) {
       });
       return children;
     };
+
+    // 0. Validate against Admin Payin Limit pool (for top-level accounts: Super Franchise, Standalone Franchise, Direct Merchant)
+    if (isAdmin || isEmployee) {
+      const isTopLevelAccount =
+        isSuperFranchiseRole ||
+        (isFranchiseRole && !customer?.super_franchise_id && !customer?.superFranchiseId) ||
+        (!isSuperFranchiseRole && !isFranchiseRole && !getParentFranchiseId(customer) && !customer?.super_franchise_id);
+
+      if (isTopLevelAccount) {
+        const rawAdminPayin = adminLimitsStats?.payinLimit;
+        const isPayinNotSet = adminLimitsStats?.isPayinNotSet;
+        const isPayinUnlimited = adminLimitsStats?.isPayinUnlimited;
+        const proposedVal = finalLimitVal !== null ? Number(finalLimitVal) : 0;
+
+        if (isPayinNotSet && proposedVal > 0) {
+          toast.error(
+            "Cannot assign T0 limit! Admin has no Payin (T0) limit pool assigned by Super Admin (Not Set / ₹0). Super Admin must assign a Payin limit first."
+          );
+          return;
+        }
+
+        if (!isPayinNotSet && !isPayinUnlimited) {
+          const adminPool = Number(rawAdminPayin) || 0;
+          if (adminPool <= 0 && proposedVal > 0) {
+            toast.error(
+              "Cannot assign T0 limit! Admin Payin limit is ₹0. Super Admin must increase Admin's Payin limit first."
+            );
+            return;
+          }
+
+          let otherTopLevelAllocated = 0;
+          scopedUsersList.forEach((u) => {
+            if (String(u.id) !== String(customer.id)) {
+              const l = Number(u.t0_daily_limit);
+              if (Number.isFinite(l) && l > 0) {
+                otherTopLevelAllocated += l;
+              }
+            }
+          });
+
+          const maxAvailableFromAdmin = Math.max(0, adminPool - otherTopLevelAllocated);
+
+          if (proposedVal > maxAvailableFromAdmin) {
+            toast.error(
+              `Admin Payin limit pool (₹${adminPool.toLocaleString("en-IN")}) exceeded! Total allocated limit (₹${(otherTopLevelAllocated + proposedVal).toLocaleString("en-IN")}) cannot exceed Admin Payin limit. Maximum available limit to assign is ₹${maxAvailableFromAdmin.toLocaleString("en-IN")}.`
+            );
+            return;
+          }
+        }
+      }
+    }
 
     // 1. Validate if updated user IS a Super Franchise:
     // Admin cannot reduce Super Franchise limit below (total allocated to child franchises + employees combined + self-utilized)
@@ -981,16 +1212,8 @@ export default function PosSetting({ currentUser }) {
     const previousState = prevLimitVal !== null && prevLimitVal !== undefined && prevLimitVal !== "" ? `₹${prevLimitVal}` : "Unassigned (T1)";
     const newState = finalLimitVal !== null ? `₹${finalLimitVal}` : "Unassigned (T1)";
 
-    setConfirmModal({
-      isOpen: true,
-      title: "Confirm T0 Daily Limit Save",
-      message: `Are you sure you want to update the T0 Daily Limit for ${customer.name || customer.full_name || 'User'}?`,
-      user: customer,
-      previousState,
-      newState,
-      actionType: "LIMIT",
-      onConfirm: () => executeSaveCustomerLimit(customer, valToSave, finalLimitVal, previousState, newState),
-    });
+    // Directly save limit without any confirmation modal
+    executeSaveCustomerLimit(customer, valToSave, finalLimitVal, previousState, newState);
   };
 
   const executeToggleSettlement = (user, currentEffectiveSettlement, nextSettlementMode) => {
@@ -1300,6 +1523,32 @@ export default function PosSetting({ currentUser }) {
       return;
     }
 
+    if (isAdmin || isEmployee) {
+      if (adminLimitsStats?.payinLimit !== null && !adminLimitsStats?.isPayinUnlimited) {
+        const adminPool = Number(adminLimitsStats?.payinLimit) || 0;
+        const newLimitsMap = new Map();
+        matchedRows.forEach((r) => {
+          if (r.matchedUser && r.limitVal !== null) {
+            newLimitsMap.set(String(r.matchedUser.id), Number(r.limitVal) || 0);
+          }
+        });
+
+        let projectedTopLevelTotal = 0;
+        scopedUsersList.forEach((u) => {
+          const uId = String(u.id);
+          const limit = newLimitsMap.has(uId) ? newLimitsMap.get(uId) : (Number(u.t0_daily_limit) || 0);
+          projectedTopLevelTotal += limit;
+        });
+
+        if (projectedTopLevelTotal > adminPool) {
+          toast.error(
+            `Cannot apply Excel limits! Total top-level allocation would be ₹${projectedTopLevelTotal.toLocaleString("en-IN")}, exceeding Admin Payin limit pool of ₹${adminPool.toLocaleString("en-IN")}.`
+          );
+          return;
+        }
+      }
+    }
+
     setIsProcessingExcel(true);
     let updatedCount = 0;
     const updatePromises = [];
@@ -1333,8 +1582,8 @@ export default function PosSetting({ currentUser }) {
 
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    await queryClient.invalidateQueries(["posSettings"]);
-    await queryClient.invalidateQueries(["allUsersListForPosSetting"]);
+    await queryClient.invalidateQueries({ queryKey: ["posSettings"] });
+    await queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
     await refetchAll();
     dispatchLimitChangeEvent({ type: "excel_upload", count: updatedCount });
 
@@ -1464,7 +1713,7 @@ export default function PosSetting({ currentUser }) {
 
 
           {/* Applied Rate Indicator */}
-          <td className="p-3.5">
+          {/* <td className="p-3.5">
             {effectiveSettlement === "T0" ? (
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
@@ -1481,11 +1730,11 @@ export default function PosSetting({ currentUser }) {
                 T1 Rate Applied
               </span>
             )}
-          </td>
+          </td> */}
 
           {/* T0 Daily Limit */}
           <td className="p-3.5">
-            {canManageSettlement ? (
+            {
               <div className="flex items-center gap-1.5 max-w-[180px]">
                 <span className="text-slate-400 font-semibold text-xs">₹</span>
                 <input
@@ -1506,14 +1755,12 @@ export default function PosSetting({ currentUser }) {
                   title={!isPosServiceActive ? "Service is currently disabled by Admin" : ""}
                 />
               </div>
-            ) : (
-              <span>{isLimitSet ? `₹${rawLimit}` : "Unassigned (T1)"}</span>
-            )}
+            }
           </td>
 
           {/* Action */}
           <td className="p-3.5 text-right">
-            {canManageSettlement && (
+            { 
               <button
                 onClick={() => handleSaveCustomerLimit(user)}
                 disabled={updateLimitMutation.isPending || !isPosServiceActive}
@@ -1522,7 +1769,7 @@ export default function PosSetting({ currentUser }) {
               >
                 Save Limit
               </button>
-            )}
+            }
           </td>
         </tr>
 
@@ -1609,7 +1856,7 @@ export default function PosSetting({ currentUser }) {
                           <th className="p-2.5">#</th>
                           <th className="p-2.5">User ID</th>
                           <th className="p-2.5">{childSingularLabel} Name</th>
-                          <th className="p-2.5">Applied Rate</th>
+                          {/* <th className="p-2.5">Applied Rate</th> */}
                           <th className="p-2.5">T0 Daily Limit (₹)</th>
                           <th className="p-2.5 text-right">Action</th>
                         </tr>
@@ -1713,6 +1960,121 @@ export default function PosSetting({ currentUser }) {
           )}
         </div>
       </div>
+
+      {/* Admin Settlement Limits Overview Card (Admin / Employee) */}
+      {(isAdmin || isEmployee) && adminLimitsStats && (
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-[#00D3CD] text-white rounded-xl shadow-sm">
+                <Building2 className="w-5 h-5 font-bold" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  Admin Settlement & Master Limits
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200">
+                    Assigned by Super Admin
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Daily master limits configured by Super Admin: Payin (T0 Pool), Payout Limit, and Credit Card Bill Payment Limit.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            {/* 1. PAYIN / T0 SETTLEMENT POOL */}
+            <div className="bg-gradient-to-br from-cyan-50/70 via-teal-50/30 to-white p-4 rounded-xl border border-cyan-200 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <ArrowDownLeft className="w-3.5 h-3.5 text-[#00D3CD]" />
+                    Payin Total Limit (T0 Pool)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
+                    Master Cap
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-slate-900 mt-2 block">
+                  {adminLimitsStats.isPayinUnlimited
+                    ? "Unlimited"
+                    : adminLimitsStats.isPayinNotSet || adminLimitsStats.payinLimit === null
+                    ? "Not Set (T1)"
+                    : `₹${adminLimitsStats.payinLimit?.toLocaleString("en-IN")}`}
+                </span>
+              </div>
+
+              <div className="mt-3 pt-2.5 border-t border-cyan-100 text-xs space-y-1.5">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="text-slate-500 font-medium">Allocated to Users:</span>
+                  <strong className="text-slate-900 font-bold">
+                    ₹{adminLimitsStats.allocatedToUsers?.toLocaleString("en-IN")}
+                  </strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="text-slate-500 font-medium">Remaining Available:</span>
+                  <strong
+                    className={`font-bold ${
+                      adminLimitsStats.remainingPayin === 0 || adminLimitsStats.remainingPayin === null
+                        ? "text-rose-600"
+                        : "text-emerald-600"
+                    }`}
+                  >
+                    {adminLimitsStats.isPayinUnlimited
+                      ? "Unlimited"
+                      : adminLimitsStats.isPayinNotSet || adminLimitsStats.remainingPayin === null
+                      ? "₹0"
+                      : `₹${adminLimitsStats.remainingPayin?.toLocaleString("en-IN")}`}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. PAYOUT LIMIT */}
+            <div className="bg-gradient-to-br from-blue-50/60 via-slate-50/30 to-white p-4 rounded-xl border border-blue-200/80 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <ArrowUpRight className="w-3.5 h-3.5 text-blue-600" />
+                    Payout Limit
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                    Company
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-slate-900 mt-2 block">
+                  ₹{adminLimitsStats.payoutLimit?.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <p className="mt-3 pt-2.5 border-t border-blue-100/70 text-[11px] text-slate-500">
+                Maximum daily payout transaction volume permitted for your company.
+              </p>
+            </div>
+
+            {/* 3. CC BILL PAYMENT LIMIT */}
+            <div className="bg-gradient-to-br from-amber-50/60 via-orange-50/20 to-white p-4 rounded-xl border border-amber-200/80 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                    CC Bill Limit
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                    Company
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-slate-900 mt-2 block">
+                  ₹{adminLimitsStats.ccBillLimit?.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <p className="mt-3 pt-2.5 border-t border-amber-100/70 text-[11px] text-slate-500">
+                Maximum daily credit card bill payment volume permitted for your company.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Self-Limit Pool Breakdown Card (Franchise or Super Franchise) */}
       {(isFranchise || isSuperFranchise) && franchiseSelfPoolStats && (
@@ -1923,7 +2285,7 @@ export default function PosSetting({ currentUser }) {
                 <th className="p-3.5">#</th>
                 <th className="p-3.5">User ID</th>
                 <th className="p-3.5">User Name & Role</th>
-                <th className="p-3.5">Applied Rate Mode</th>
+                {/* <th className="p-3.5">Applied Rate Mode</th> */}
                 <th className="p-3.5">T0 Daily Limit (₹)</th>
                 <th className="p-3.5 text-right">Action</th>
               </tr>
