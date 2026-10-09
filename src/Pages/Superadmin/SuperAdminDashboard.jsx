@@ -3,8 +3,10 @@ import { Calendar } from "lucide-react";
 import AdminStatCard from "../../components/SuperAdmin/AdminStatCard";
 import ServiceUsageChart from "../../components/SuperAdmin/ServiceUsageChart";
 import AdminSpendingChart from "../../components/SuperAdmin/AdminSpendingChart";
+import { getSuperAdminDashboardData } from "../../api/superAdminApi";
 
 const SuperAdminDashboard = () => {
+  const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     todaysBusiness: 0,
     totalBusiness: 0,
@@ -18,41 +20,31 @@ const SuperAdminDashboard = () => {
   });
 
   useEffect(() => {
-    // Temporary data - Replace with API later
-    setDashboardData({
-      todaysBusiness: 125000,
-      totalBusiness: 1850000,
-      totalTransactions: 2450,
-      totalCommission: 92500,
-      todaysCommission: 6200,
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const res = await getSuperAdminDashboardData();
+        if (res) {
+          setDashboardData({
+            todaysBusiness: res.todaysBusiness || 0,
+            totalBusiness: res.totalBusiness || 0,
+            totalTransactions: res.totalTransactions || 0,
+            totalCommission: res.totalCommission || 0,
+            todaysCommission: res.todaysCommission || 0,
+            pendingTransactions: res.pendingTransactions || 0,
+            failedTransactions: res.failedTransactions || 0,
+            successfulTransactions: res.successfulTransactions || 0,
+            spending: res.spending || [],
+          });
+        }
 
-      pendingTransactions: 35,
-      failedTransactions: 18,
-      successfulTransactions: 2397,
-
-      spending: [
-        {
-          adminName: "Admin 1",
-          amount: 25000,
-        },
-        {
-          adminName: "Admin 2",
-          amount: 18000,
-        },
-        {
-          adminName: "Admin 3",
-          amount: 42000,
-        },
-        {
-          adminName: "Admin 4",
-          amount: 12000,
-        },
-        {
-          adminName: "Admin 5",
-          amount: 30000,
-        },
-      ],
-    });
+      } catch (err) {
+        console.error("Dashboard fetch error : ", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard(); // calling dashboard
   }, []);
 
   const todayFormatted = new Date().toLocaleDateString("en-US", {
@@ -60,6 +52,14 @@ const SuperAdminDashboard = () => {
     day: "numeric",
     year: "numeric",
   });
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00D3CD] border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 space-y-8">

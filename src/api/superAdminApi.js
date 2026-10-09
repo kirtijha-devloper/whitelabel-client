@@ -6,11 +6,39 @@ const api = axios.create({
   baseURL: BASE_URL + "/super-admin",
 });
 
+
+export const getSuperAdminDashboardData = async () => {
+  try {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Unauthorized User");
+    }
+
+    const response = await api.get("/dashboard", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data?.data || response.data;
+
+  } catch (error) {
+    console.log("[getSuperAdminDashboardData] request failed", {
+      status: error?.response?.status ?? null,
+      message: error?.response?.data?.message || error?.message || null,
+      details: error?.response?.data ?? null,
+    });
+    throw new Error(error?.response?.data?.message || "Failed to Get Super Admin Dashboard Data");
+  }
+}
+
+
 /**
  * Create Admin + Company
  * Super Admin creates Company and Admin User.
  * Accepts either FormData (multipart) or plain JSON object.
  */
+
 export const createAdmin = async (data) => {
   try {
     const token = getAuthToken();
