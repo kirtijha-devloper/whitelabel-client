@@ -181,8 +181,8 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaBox />,
     },
     {
-      name: "Set Charges",
-      path: "/super-admin/set-charges",
+      name: "Rate Setting",
+      path: "/super-admin/rate-setting",
       icon: <FaMoneyBillWave />,
     },
     // {

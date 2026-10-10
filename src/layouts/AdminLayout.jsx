@@ -231,7 +231,7 @@ export default function AdminLayout() {
     "complaints.read",
     "complaints.manage",
   ]);
-  const canViewRateSettings = hasAnyPermission(currentUser, [
+  const canViewRateSettings = isSuperAdminViewer || hasAnyPermission(currentUser, [
     "rate.settings.read",
     "rate.settings.manage",
   ]);
