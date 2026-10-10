@@ -20,6 +20,7 @@ import {
   getServiceDisabledMessage,
   getServiceFlagValue,
 } from "../utils/serviceFlags";
+import { getSharedCcBillLimit } from "../api/sharedCcBillLimitApi";
 
 const getUserIdValue = (u) => String(u?.id ?? u?.user_id ?? "").trim();
 const getUserNameValue = (u) => String(u?.name ?? u?.full_name ?? u?.user_name ?? "Unknown");
@@ -240,6 +241,15 @@ export default function CCBillPay({ currentUser }) {
       ? parseFloat(currentUser.available_balance)
       : walletNum;
   const settlementHoldNum = Math.max(0, walletNum - availableBalanceNum);
+
+  const { data: sharedCcBillLimitResp } = useQuery({
+    queryKey: ["sharedCcBillLimit"],
+    queryFn: () => getSharedCcBillLimit(),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
+  });
+  const sharedLimit = sharedCcBillLimitResp?.data || null;
 
   // CC Bill Pay is self-pay only for franchise/merchant; user selection is intentionally hidden.
   const isSelfPayRole =
@@ -516,17 +526,24 @@ navigate(billBasePath, { replace: true });
       };
       setPaymentResult(response.payment);
       try {
-        // Refresh the header wallet from the backend-backed current user endpoint
-        // so the result screen reflects the deducted balance without a full reload.
-        await queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+        // Refresh the header wallet and shared CC bill limit from the backend
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ["currentUser"] }),
+          queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] }),
+        ]);
       } catch (refreshError) {
         console.error("[cc-bill] failed to refresh current user balance", refreshError);
       }
       toast.success(response.payment?.message || "Payment request submitted");
       navigate(`${billBasePath}/result`, { state: nextState, replace: true });
     },
-    onError: (error) => {
-      toast.error(getServiceDisabledMessage(error, "Payment request failed"));
+    onError: async (error) => {
+      await queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] }).catch(() => {});
+      const errMsg =
+        error?.code === "CC_BILL_DAILY_LIMIT_EXCEEDED" || error?.response?.data?.code === "CC_BILL_DAILY_LIMIT_EXCEEDED"
+          ? (error?.response?.data?.message || error?.message || "Daily CC bill payment limit exceeded.")
+          : getServiceDisabledMessage(error, "Payment request failed");
+      toast.error(errMsg);
     },
   });
 
@@ -583,6 +600,14 @@ navigate(billBasePath, { replace: true });
   const hasInsufficientAvailable =
     estimatedPayAmount > 0 && availableBalanceNum < minRequiredBalance;
 
+  // Shared daily CC bill limit pre-check
+  const isDailyLimitExceeded = Boolean(
+    sharedLimit &&
+    Number(sharedLimit.daily_limit) > 0 &&
+    Number.isFinite(payableAmount) &&
+    payableAmount > Number(sharedLimit.remaining_amount ?? 0)
+  );
+
   const panRequired = Number.isFinite(payableAmount) && payableAmount > 50000;
   const normalizedCustomerPan = sanitizePanNumber(customerPan);
   const panValid = !panRequired || isValidPanNumber(normalizedCustomerPan);
@@ -596,6 +621,7 @@ navigate(billBasePath, { replace: true });
     geoStatus === "requesting" ||
     !geoCode ||
     hasInsufficientAvailable ||
+    isDailyLimitExceeded ||
     !panValid;
   const currentStep = isResultRoute ? 3 : isReviewRoute ? 2 : 1;
   const flowSteps = [
@@ -1104,9 +1130,19 @@ navigate(billBasePath, { replace: true });
 
           <div className="flex flex-col gap-3 border-t border-gray-200 px-4 pb-4 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2">
-              <div className="rounded-lg border border-[#00B9B2]/30 bg-[#EFFFFE] px-3 py-2 text-sm">
-                <span className="text-gray-600">Payable Amount:</span>{" "}
-                <span className="font-semibold text-gray-900">{formatAmount(payableAmount)}</span>
+              <div className="rounded-lg border border-[#00B9B2]/30 bg-[#EFFFFE] px-3 py-2 text-sm flex items-center justify-between">
+                <div>
+                  <span className="text-gray-600">Payable Amount:</span>{" "}
+                  <span className="font-semibold text-gray-900">{formatAmount(payableAmount)}</span>
+                </div>
+                {sharedLimit && Number(sharedLimit.daily_limit) > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Daily Limit Remaining:{" "}
+                    <strong className={isDailyLimitExceeded ? "text-red-600" : "text-emerald-700"}>
+                      ₹{Number(sharedLimit.remaining_amount ?? 0).toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+                )}
               </div>
               {settlementHoldNum > 0 && (
                 <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -1125,6 +1161,15 @@ navigate(billBasePath, { replace: true });
                     {settlementHoldNum > 0
                       ? ` ₹${settlementHoldNum.toFixed(2)} is on hold and will be available tomorrow at 10:30 AM. Available now: ₹${availableBalanceNum.toFixed(2)}.`
                       : " Please add funds to continue."}
+                  </span>
+                </div>
+              )}
+              {isDailyLimitExceeded && (
+                <div className="flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <span className="shrink-0">✕</span>
+                  <span>
+                    Daily CC bill payment limit exceeded for your company. Available limit remaining today:{" "}
+                    <strong>₹{Number(sharedLimit?.remaining_amount ?? 0).toLocaleString("en-IN")}</strong>.
                   </span>
                 </div>
               )}

@@ -354,6 +354,8 @@ export const submitBillAvenueCcBill3Payment = async ({
   } catch (error) {
     const enrichedError = new Error(parseBillAvenueError(error, "CC Bill 3 payment request failed"));
     enrichedError.status = error?.response?.status;
+    enrichedError.code = error?.response?.data?.code;
+    enrichedError.response = error?.response;
     enrichedError.responseData = error?.response?.data;
     throw enrichedError;
   }
