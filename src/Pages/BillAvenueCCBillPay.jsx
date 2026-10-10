@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FaCheckCircle,
   FaCopy,
@@ -22,6 +22,7 @@ import {
   registerBillAvenueComplaint,
   submitBillAvenuePayment,
 } from "../api/billAvenueApi";
+import { getSharedCcBillLimit } from "../api/sharedCcBillLimitApi";
 import {
   getServiceDisabledMessage,
   getServiceFlagValue,
@@ -194,12 +195,22 @@ export default function BillAvenueCCBillPay({ currentUser }) {
   ]);
 
   // Wallet / balance info
+  const queryClient = useQueryClient();
   const walletNum = parseFloat(currentUser?.wallet ?? 0);
   const availableBalanceNum =
     currentUser?.available_balance !== undefined
       ? parseFloat(currentUser.available_balance)
       : walletNum;
   const settlementHoldNum = Math.max(0, walletNum - availableBalanceNum);
+
+  const { data: sharedCcBillLimitResp } = useQuery({
+    queryKey: ["sharedCcBillLimit"],
+    queryFn: () => getSharedCcBillLimit(),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
+  });
+  const sharedLimit = sharedCcBillLimitResp?.data || null;
 
   // ── form state (persisted across steps via route state) ──────────────────
   const [selectedBillerId, setSelectedBillerId] = useState(
@@ -438,13 +449,19 @@ export default function BillAvenueCCBillPay({ currentUser }) {
 
   const isPanRequired = Number.isFinite(payableAmount) && payableAmount >= 50000;
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-  const isPanValid = !isPanRequired || panRegex.test(String(customerPan).trim().toUpperCase());
+  const isDailyLimitExceeded = Boolean(
+    sharedLimit &&
+    Number(sharedLimit.daily_limit) > 0 &&
+    Number.isFinite(payableAmount) &&
+    payableAmount > Number(sharedLimit.remaining_amount ?? 0)
+  );
 
   const payDisabled =
     !billData ||
     !Number.isFinite(payableAmount) ||
     payableAmount <= 0 ||
     hasInsufficientAvailable ||
+    isDailyLimitExceeded ||
     !selectedPaymentMode ||
     !isPanValid;
 
@@ -535,11 +552,18 @@ export default function BillAvenueCCBillPay({ currentUser }) {
       };
       setPaymentResult(result);
       setStatusResult(null);
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] }).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] }).catch(() => {});
       toast[result.status === "SUCCESS" ? "success" : "error"](result.message || "Payment submitted");
       navigate(`${billBasePath}/result`, { state: nextState, replace: true });
     },
-    onError: (error) => {
-      toast.error(getServiceDisabledMessage(error, "Payment request failed"));
+    onError: async (error) => {
+      await queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] }).catch(() => {});
+      const errMsg =
+        error?.code === "CC_BILL_DAILY_LIMIT_EXCEEDED" || error?.response?.data?.code === "CC_BILL_DAILY_LIMIT_EXCEEDED"
+          ? (error?.response?.data?.message || error?.message || "Daily CC bill payment limit exceeded.")
+          : getServiceDisabledMessage(error, "Payment request failed");
+      toast.error(errMsg);
     },
   });
 
@@ -1148,9 +1172,19 @@ export default function BillAvenueCCBillPay({ currentUser }) {
                 </div>
               )}
 
-              <div className="rounded-lg border border-[#00B9B2]/30 bg-[#EFFFFE] px-3 py-2 text-sm">
-                <span className="text-gray-600">Payable Amount: </span>
-                <span className="font-semibold text-gray-900">{formatAmount(payableAmount)}</span>
+              <div className="rounded-lg border border-[#00B9B2]/30 bg-[#EFFFFE] px-3 py-2 text-sm flex items-center justify-between">
+                <div>
+                  <span className="text-gray-600">Payable Amount: </span>
+                  <span className="font-semibold text-gray-900">{formatAmount(payableAmount)}</span>
+                </div>
+                {sharedLimit && Number(sharedLimit.daily_limit) > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Daily Limit Remaining:{" "}
+                    <strong className={isDailyLimitExceeded ? "text-red-600" : "text-emerald-700"}>
+                      ₹{Number(sharedLimit.remaining_amount ?? 0).toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+                )}
               </div>
 
               {hasInsufficientAvailable && (
@@ -1161,6 +1195,16 @@ export default function BillAvenueCCBillPay({ currentUser }) {
                     {settlementHoldNum > 0
                       ? `₹${settlementHoldNum.toFixed(2)} is on hold and will be available tomorrow at 10:30 AM. Available now: ₹${availableBalanceNum.toFixed(2)}.`
                       : "Please add funds to continue."}
+                  </span>
+                </div>
+              )}
+
+              {isDailyLimitExceeded && (
+                <div className="flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <span className="shrink-0">✕</span>
+                  <span>
+                    Daily CC bill payment limit exceeded for your company. Available limit remaining today:{" "}
+                    <strong>₹{Number(sharedLimit?.remaining_amount ?? 0).toLocaleString("en-IN")}</strong>.
                   </span>
                 </div>
               )}

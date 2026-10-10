@@ -39,6 +39,7 @@ import { getServiceFlagValue } from "../utils/serviceFlags";
 import { recordLimitAuditLog, calculateFranchisePoolStats, dispatchLimitChangeEvent, getUserTodayUtilized, setUserDailyLimit } from "../utils/userLimit";
 import { clearAllTestTransactionData, getTodayDateKey, dispatchSettlementChangeEvent } from "../utils/userSettlement";
 import { fetchServiceSettings } from "../api/serviceSettingsApi";
+import { getSharedCcBillLimit } from "../api/sharedCcBillLimitApi";
 import { useServiceSettingsPolling } from "../hooks/useServiceSettingsPolling";
 import { hasAnyPermission, hasPermission } from "../utils/accessControl";
 
@@ -66,6 +67,15 @@ export default function PosSetting({ currentUser }) {
   });
 
   useServiceSettingsPolling(canReadServiceSettings);
+
+  const { data: sharedCcBillLimitResp } = useQuery({
+    queryKey: ["sharedCcBillLimit", currentUser?.id],
+    queryFn: () => getSharedCcBillLimit(),
+    enabled: Boolean(isAdmin || isEmployee),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
+  });
 
   const { data: posTodayTxns } = useQuery({
     queryKey: ["posSettingTodayTxns", currentUser?.id],
@@ -723,7 +733,9 @@ export default function PosSetting({ currentUser }) {
         : Number(currentUser?.payout_limit ?? currentUser?.company?.payout_limit) || 0;
 
     const ccBillLimitNum =
-      backendAdminLimits?.cc_bill_limit !== undefined
+      sharedCcBillLimitResp?.data?.daily_limit !== undefined && sharedCcBillLimitResp?.data?.daily_limit !== null
+        ? Number(sharedCcBillLimitResp.data.daily_limit) || 0
+        : backendAdminLimits?.cc_bill_limit !== undefined
         ? Number(backendAdminLimits.cc_bill_limit) || 0
         : Number(currentUser?.bill_payment_limit ?? currentUser?.company?.bill_payment_limit) || 0;
 
@@ -758,7 +770,7 @@ export default function PosSetting({ currentUser }) {
       allocatedToUsers,
       remainingPayin,
     };
-  }, [isAdmin, isEmployee, posData?.data?.admin_limits, currentUser, scopedUsersList]);
+  }, [isAdmin, isEmployee, posData?.data?.admin_limits, currentUser, scopedUsersList, sharedCcBillLimitResp]);
 
   const executeSaveCustomerLimit = (customer, valToSave, finalLimitVal, previousState, newState) => {
     recordLimitAuditLog({

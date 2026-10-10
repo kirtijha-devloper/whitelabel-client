@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Table from "../../components/Table";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   SlidersHorizontal,
   Building,
@@ -15,6 +15,10 @@ import { toast } from "react-toastify";
 import { BASE_SITE_URL } from "../../constants";
 import { extractUsersArray, normalizeUserRole } from "../../utils/userAccess";
 import { getAdminList, updateAdmin } from "../../api/superAdminApi";
+import {
+  getSharedCcBillLimit,
+  updateSharedCcBillLimit,
+} from "../../api/sharedCcBillLimitApi";
 
 
 /**
@@ -46,6 +50,7 @@ const SuperAdminsettlement = ({ currentUser }) => {
   // Limits State per admin: { [adminId]: { payout: "", ccBill: "", payin: "" } }
   const [limitsState, setLimitsState] = useState({});
   const [savingKey, setSavingKey] = useState(null); // e.g. "adminId_payout"
+  const dirtyInputsRef = useRef({});
 
   // Access check
   const normalizedCurrentUserRole = normalizeUserRole(currentUser?.role);
@@ -105,7 +110,40 @@ const SuperAdminsettlement = ({ currentUser }) => {
   const effectiveLimit = isSearchMode ? searchPageSize : adminParams.limit;
   const totalPages = Math.max(1, Math.ceil(totalResults / effectiveLimit));
 
-  // Initialize limits inputs directly from backend database response
+  // Admin IDs in the current view
+  const currentAdminIds = useMemo(
+    () => currentData.map((admin) => admin.id).filter(Boolean),
+    [currentData],
+  );
+
+  // Load configured CC Bill limit and current usage from backend for each visible Admin
+  const { data: sharedLimitsMap = {} } = useQuery({
+    queryKey: ["sharedCcBillLimitsMap", currentAdminIds],
+    queryFn: async () => {
+      if (!currentAdminIds.length) return {};
+      const results = await Promise.all(
+        currentAdminIds.map(async (adminId) => {
+          try {
+            const resp = await getSharedCcBillLimit({ admin_id: adminId });
+            return { adminId, data: resp?.data || null };
+          } catch (e) {
+            console.error(`Failed to load shared CC bill limit for admin ${adminId}:`, e);
+            return { adminId, data: null };
+          }
+        }),
+      );
+      return results.reduce((acc, curr) => {
+        if (curr.data) {
+          acc[curr.adminId] = curr.data;
+        }
+        return acc;
+      }, {});
+    },
+    enabled: isSuperAdminViewer && currentAdminIds.length > 0,
+    staleTime: 10 * 1000,
+  });
+
+  // Initialize limits inputs directly from backend database response & shared limit API
   useEffect(() => {
     if (!currentData || currentData.length === 0) return;
 
@@ -114,13 +152,16 @@ const SuperAdminsettlement = ({ currentUser }) => {
       currentData.forEach((admin) => {
         const id = admin.id;
         const comp = admin.company || {};
+        const sharedData = sharedLimitsMap[id];
 
         const serverPayout =
           comp.payout_limit !== undefined && comp.payout_limit !== null
             ? String(Number(comp.payout_limit))
             : "";
         const serverCcBill =
-          comp.bill_payment_limit !== undefined && comp.bill_payment_limit !== null
+          sharedData?.daily_limit !== undefined && sharedData?.daily_limit !== null
+            ? String(Number(sharedData.daily_limit))
+            : comp.bill_payment_limit !== undefined && comp.bill_payment_limit !== null
             ? String(Number(comp.bill_payment_limit))
             : "";
         const serverPayin =
@@ -128,15 +169,29 @@ const SuperAdminsettlement = ({ currentUser }) => {
             ? String(Number(admin.t0_daily_limit))
             : "";
 
+        const isPayoutDirty = dirtyInputsRef.current[`${id}_payout`];
+        const isCcBillDirty = dirtyInputsRef.current[`${id}_ccBill`];
+        const isPayinDirty = dirtyInputsRef.current[`${id}_payin`];
+
         nextState[id] = {
-          payout: prev[id]?.payout !== undefined ? prev[id].payout : serverPayout,
-          ccBill: prev[id]?.ccBill !== undefined ? prev[id].ccBill : serverCcBill,
-          payin: prev[id]?.payin !== undefined ? prev[id].payin : serverPayin,
+          payout: isPayoutDirty
+            ? prev[id]?.payout ?? ""
+            : prev[id]?.payout !== undefined && prev[id]?.payout !== ""
+            ? prev[id].payout
+            : serverPayout,
+          ccBill: isCcBillDirty
+            ? prev[id]?.ccBill ?? ""
+            : serverCcBill || prev[id]?.ccBill || "",
+          payin: isPayinDirty
+            ? prev[id]?.payin ?? ""
+            : prev[id]?.payin !== undefined && prev[id]?.payin !== ""
+            ? prev[id].payin
+            : serverPayin,
         };
       });
       return nextState;
     });
-  }, [currentData]);
+  }, [currentData, sharedLimitsMap]);
 
   // Clean numbers only
   const sanitizeDigits = (val) => {
@@ -146,6 +201,7 @@ const SuperAdminsettlement = ({ currentUser }) => {
 
   const handleLimitInputChange = (adminId, limitType, value) => {
     const cleanVal = sanitizeDigits(value);
+    dirtyInputsRef.current[`${adminId}_${limitType}`] = true;
     setLimitsState((prev) => ({
       ...prev,
       [adminId]: {
@@ -165,18 +221,26 @@ const SuperAdminsettlement = ({ currentUser }) => {
     setSavingKey(saveKey);
 
     try {
-      // Prepare payload to sync with backend database
-      const payload = {};
-      if (limitType === "payout") {
-        payload.payout_limit = numValue;
-      } else if (limitType === "ccBill") {
-        payload.bill_payment_limit = numValue;
-      } else if (limitType === "payin") {
-        payload.t0_daily_limit = numValue;
+      if (limitType === "ccBill") {
+        // Connect existing CC Bill Set button to PUT /api/shared-cc-bill-limit
+        await updateSharedCcBillLimit({
+          admin_id: Number(adminId),
+          daily_limit: numValue,
+        });
+      } else {
+        // Prepare payload to sync with backend database
+        const payload = {};
+        if (limitType === "payout") {
+          payload.payout_limit = numValue;
+        } else if (limitType === "payin") {
+          payload.t0_daily_limit = numValue;
+        }
+
+        // Call Super Admin Update API
+        await updateAdmin(adminId, payload);
       }
 
-      // Call Super Admin Update API
-      await updateAdmin(adminId, payload);
+      delete dirtyInputsRef.current[saveKey];
 
       const labelMap = {
         payout: "Payout",
@@ -191,6 +255,8 @@ const SuperAdminsettlement = ({ currentUser }) => {
       // Invalidate queries so fresh DB data is loaded
       await queryClient.invalidateQueries({ queryKey: ["superAdminSettlementAdmins"] });
       await queryClient.invalidateQueries({ queryKey: ["superAdminSettlementSearch"] });
+      await queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimitsMap"] });
+      await queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] });
     } catch (err) {
       console.error("Database limit save error:", err);
       toast.error(err?.message || "Failed to update limit in database");
@@ -239,6 +305,7 @@ const SuperAdminsettlement = ({ currentUser }) => {
     const adminId = row.id;
     const currentVal = limitsState[adminId]?.[limitType] ?? "";
     const isSaving = savingKey === `${adminId}_${limitType}`;
+    const sharedLimit = limitType === "ccBill" ? sharedLimitsMap[adminId] : null;
 
     return (
       <div className="space-y-1.5 min-w-[200px] max-w-[240px]">
@@ -289,7 +356,20 @@ const SuperAdminsettlement = ({ currentUser }) => {
             {icon}
             {badgeLabel}
           </span>
-          {currentVal !== "" && Number(currentVal) > 0 ? (
+          {limitType === "ccBill" && sharedLimit ? (
+            <div className="text-right leading-tight">
+              {sharedLimit.daily_limit !== undefined && sharedLimit.daily_limit !== null && Number(sharedLimit.daily_limit) > 0 ? (
+                <span className="text-emerald-700 font-semibold">
+                  ₹{Number(sharedLimit.daily_limit).toLocaleString("en-IN")}
+                </span>
+              ) : (
+                <span className="text-gray-400">No Limit</span>
+              )}
+              <span className="block text-[10px] text-gray-500 font-normal">
+                Used: ₹{Number(sharedLimit.consumed_amount || 0).toLocaleString("en-IN")}
+              </span>
+            </div>
+          ) : currentVal !== "" && Number(currentVal) > 0 ? (
             <span className="text-emerald-700 font-semibold">
               ₹{Number(currentVal).toLocaleString("en-IN")}
             </span>
