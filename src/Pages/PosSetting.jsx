@@ -742,11 +742,18 @@ export default function PosSetting({ currentUser }) {
       ? "unlimited"
       : Math.max(0, (payinLimitNum || 0) - allocatedToUsers);
 
+    const todayPayoutUsed = Number(backendAdminLimits?.today_payout_used) || 0;
+    const remainingPayoutLimit = backendAdminLimits?.remaining_payout_limit !== undefined
+      ? Number(backendAdminLimits.remaining_payout_limit)
+      : Math.max(0, payoutLimitNum - todayPayoutUsed);
+
     return {
       isPayinNotSet,
       isPayinUnlimited,
       payinLimit: isPayinNotSet ? null : isPayinUnlimited ? "unlimited" : payinLimitNum,
       payoutLimit: payoutLimitNum,
+      todayPayoutUsed,
+      remainingPayoutLimit,
       ccBillLimit: ccBillLimitNum,
       allocatedToUsers,
       remainingPayin,
@@ -2047,9 +2054,16 @@ export default function PosSetting({ currentUser }) {
                   ₹{adminLimitsStats.payoutLimit?.toLocaleString("en-IN")}
                 </span>
               </div>
-              <p className="mt-3 pt-2.5 border-t border-blue-100/70 text-[11px] text-slate-500">
-                Maximum daily payout transaction volume permitted for your company.
-              </p>
+              <div className="mt-3 pt-2.5 border-t border-blue-100/70 text-[11px] text-slate-500 space-y-1">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-500">Used Today:</span>
+                  <span className="font-semibold text-slate-700">₹{adminLimitsStats.todayPayoutUsed?.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-blue-700 font-medium">Remaining:</span>
+                  <span className="font-bold text-blue-800">₹{adminLimitsStats.remainingPayoutLimit?.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
             </div>
 
             {/* 3. CC BILL PAYMENT LIMIT */}
