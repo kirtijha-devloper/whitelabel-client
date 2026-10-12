@@ -14,6 +14,8 @@ const getAuthHeaders = () => {
 
 const POS_CHARGE_RULES_BASE = `${BASE_URL}/pos-charge-rules`;
 const RULE_SCOPES = {
+  SUPER_ADMIN_DEFAULT: 'super_admin_default',
+  SUPER_ADMIN_ADMIN: 'super_admin_admin',
   ADMIN_DEFAULT: 'admin_default',
   ADMIN_FRANCHISE: 'admin_franchise',
   ADMIN_MERCHANT: 'admin_merchant',
@@ -50,9 +52,9 @@ const normalizeClassificationToken = (value) =>
     .trim()
     .toUpperCase()
     .replace(/\s+/g, ' ')
-    .replace(/[\/_-]/g, ' ');
+    .replace(/[/_\\-]/g, ' ');
 
-const normalizeKeyToken = (value) => normalizeToken(value).replace(/[\/_-]/g, '');
+const normalizeKeyToken = (value) => normalizeToken(value).replace(/[/_\\-]/g, '');
 
 const logRateInfo = (event, payload = {}) => {
   if (!RATE_LOG_ALLOWLIST.has(event)) {
@@ -91,7 +93,7 @@ const parseRequestData = (value) => {
 
   try {
     return JSON.parse(value);
-  } catch (error) {
+  } catch {
     return value;
   }
 };
@@ -283,7 +285,7 @@ const hasMerchantScope = (rule) => getRuleUserId(rule) !== null;
 const hasFranchiseScope = (rule) => getRuleFranchiseId(rule) !== null;
 const isAdminDefaultRule = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT;
+  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT;
   return !hasMerchantScope(rule) && !hasFranchiseScope(rule);
 };
 const isAdminFranchiseRule = (rule) => {
@@ -311,7 +313,7 @@ const isFranchiseRule = (rule) => isFranchiseDefaultRule(rule);
 const isMerchantRule = (rule) => isAdminMerchantRule(rule) || isFranchiseMerchantRule(rule);
 const getRuleScope = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope === RULE_SCOPES.ADMIN_DEFAULT) return 'admin';
+  if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT) return 'admin';
   if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT) return 'franchise';
   if (scope === RULE_SCOPES.ADMIN_MERCHANT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'merchant';
   if (isMerchantRule(rule)) return 'merchant';
@@ -494,7 +496,7 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   sub_type: rule.sub_type || 'Consumer',
   card_classification: fromApiCardClassification(rule.card_classification),
   gst_required: Boolean(rule.gst_required),
-  gst_rate: Boolean(rule.gst_required) ? toFiniteNumber(rule.gst_percent, 0) : null,
+  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
   base_rate: toFiniteNumber(rule.charge_percent, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
@@ -527,7 +529,7 @@ const mapRuleToMerchantFormat = (rule, options = {}) => ({
   sub_type: rule.sub_type || 'Consumer',
   card_classification: fromApiCardClassification(rule.card_classification),
   gst_required: Boolean(rule.gst_required),
-  gst_rate: Boolean(rule.gst_required) ? toFiniteNumber(rule.gst_percent, 0) : null,
+  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
   merchant_rate: toFiniteNumber(rule.charge_percent, 0),
   base_rate: options.baseRule
     ? toFiniteNumber(options.baseRule.charge_percent, 0)
@@ -576,12 +578,16 @@ const enrichManagedFranchiseDefaultRate = (mappedRate, { adminRule = null, franc
 };
 
 const fetchChargeRules = async (params = {}, { includePagination = false } = {}) => {
+  const normalizedParams = { ...params };
+  if (Array.isArray(normalizedParams.scope)) {
+    normalizedParams.scope = normalizedParams.scope.join(',');
+  }
   const requestConfig = {
     ...getAuthHeaders(),
     params: Object.fromEntries(
       Object.entries({
         limit: 2000,
-        ...params
+        ...normalizedParams
       }).filter(([, value]) => value !== undefined && value !== null && value !== '')
     )
   };
@@ -779,7 +785,7 @@ const buildAuthenticatedMerchantRules = (rules = []) => {
       network: fromApiCardBrand(rule.card_brand),
       card_type: fromApiCardType(rule.card_type),
       card_classification: fromApiCardClassification(rule.card_classification),
-      gst_rate: Boolean(rule.gst_required) ? toFiniteNumber(rule.gst_percent, 0) : null,
+      gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
       rate_percentage: toFiniteNumber(rule.charge_percent, 0),
       min_amount: toFiniteNumber(rule.min_amount, 0),
       max_amount: toNullableNumber(rule.max_amount),
@@ -1130,13 +1136,16 @@ export const getFranchiseRates = async (franchiseId, options = {}) => {
   try {
     logRateInfo('franchise-rates:load:start', { franchiseId });
     const includeInherited = options?.includeInherited !== false;
-    const defaultRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT]);
+    const defaultRules = await fetchRulesByScopes([
+      RULE_SCOPES.ADMIN_DEFAULT,
+      RULE_SCOPES.SUPER_ADMIN_DEFAULT
+    ]);
 
     if (!franchiseId || franchiseId === 'default') {
       if (options.paginate) {
         const { rules, pagination } = await fetchChargeRules(
           {
-            scope: RULE_SCOPES.ADMIN_DEFAULT,
+            scope: options.scope || [RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT],
             page: options.page ?? 1,
             limit: options.limit ?? 100
           },
@@ -1437,7 +1446,7 @@ export const getAllFranchiseRates = async (franchises) => {
   try {
     const allRates = {};
     const [defaultRules, adminFranchiseRules] = await Promise.all([
-      fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT]),
+      fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]),
       fetchRulesByScopes([RULE_SCOPES.ADMIN_FRANCHISE])
     ]);
 
@@ -1469,7 +1478,7 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
 
     if (!merchantId || merchantId === 'default') {
       if (franchiseId === null) {
-        const defaultRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT]);
+        const defaultRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]);
         const defaults = defaultRules
           .map((rule) =>
             mapRuleToMerchantFormat(rule, {
@@ -1492,7 +1501,7 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
       }
 
       const [adminRules, franchiseRules] = await Promise.all([
-        fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE], { franchaise_id: franchiseId }),
+        fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE], { franchaise_id: franchiseId }),
         fetchRulesByScopes([RULE_SCOPES.FRANCHISE_DEFAULT], { franchaise_id: franchiseId })
       ]);
       const defaults = buildMerchantEffectiveRules(adminRules, franchiseRules, [], 'default', franchiseId);
@@ -1508,9 +1517,9 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
     }
 
     const adminRules = franchiseId === null
-      ? await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT])
+      ? await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT])
       : await fetchRulesByScopes(
-        [RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE],
+        [RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE],
         { franchaise_id: franchiseId }
       );
     const franchiseRules = franchiseId === null

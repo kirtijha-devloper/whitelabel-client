@@ -23,6 +23,9 @@ import {
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { toast } from "react-toastify";
+import CombinedReportDownloadButton from "../../components/Reports/CombinedReportDownloadButton";
+import ReportTabs from "../../components/Reports/ReportTabs";
+import { normalizeUserRole } from "../../utils/userAccess";
 
 // Comprehensive Mock fallback data for rich presentation
 const SAMPLE_COMMISSIONS = [
@@ -151,7 +154,7 @@ const SERVICE_OPTIONS = [
   "PG MID Routing",
 ];
 
-const CommissionReport = () => {
+const CommissionReport = ({ currentUser }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("ALL");
   const [selectedService, setSelectedService] = useState("All Services");
@@ -182,6 +185,12 @@ const CommissionReport = () => {
   const totalCommissionDistributed = filteredCommissions.reduce((acc, c) => acc + c.commission_earned, 0);
   const totalPlatformMargin = filteredCommissions.reduce((acc, c) => acc + c.platform_margin, 0);
   const totalQualifyingVolume = filteredCommissions.reduce((acc, c) => acc + c.volume, 0);
+  const roleBase = normalizeUserRole(currentUser?.role).replace('_', '-');
+  const reportsBasePath = `/${roleBase}/reports`;
+  const reportType = useMemo(() => {
+      const tab = new URLSearchParams(location.search).get('tab');
+      return tab;
+    }, [location.search]);
 
   // Chart Data by Service
   const chartData = useMemo(() => {
@@ -233,6 +242,13 @@ const CommissionReport = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 space-y-6">
+      <h1 className="mb-5 text-2xl font-bold text-gray-800">Reports</h1>
+      <ReportTabs 
+        basePath={reportsBasePath}
+        activeTab={reportType}
+        trailingAction={<CombinedReportDownloadButton />}
+        currentUser={currentUser}
+      />
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>

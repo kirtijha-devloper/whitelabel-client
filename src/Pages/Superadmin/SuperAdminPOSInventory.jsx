@@ -66,6 +66,8 @@ const SuperAdminPOSInventory = () => {
   const [companyName, setCompanyName] = useState("");
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showCompanyConfirmation, setShowCompanyConfirmation] = useState(false);
+  const [showCompanyListModal, setShowCompanyListModal] = useState(false);
+  const [companySearchTerm, setCompanySearchTerm] = useState("");
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [bulkUploadFile, setBulkUploadFile] = useState(null);
   const [bulkUploadResult, setBulkUploadResult] = useState(null);
@@ -77,6 +79,12 @@ const SuperAdminPOSInventory = () => {
     () => Array.from(new Set(companyRecords.map((company) => String(company?.name || "").trim()).filter(Boolean))),
     [companyRecords]
   );
+
+  const filteredCompanyOptions = useMemo(() => {
+    const term = companySearchTerm.trim().toLowerCase();
+    if (!term) return companyOptions;
+    return companyOptions.filter((name) => name.toLowerCase().includes(term));
+  }, [companyOptions, companySearchTerm]);
 
   const getSerialNumber = (machine) => machine?.device_serial_number || machine?.serial_number || "-";
   const getMachineModel = (machine) => machine?.model || machine?.device_model || "-";
@@ -465,7 +473,10 @@ const SuperAdminPOSInventory = () => {
 
               <button
                 type="button"
-                onClick={handleAddCompany}
+                onClick={() => {
+                  setCompanySearchTerm("");
+                  setShowCompanyListModal(true);
+                }}
                 className="px-4 py-1.5 rounded-full border border-white/50 text-sm font-semibold hover:bg-white/10"
               >
                 View
@@ -733,6 +744,86 @@ const SuperAdminPOSInventory = () => {
           </table>
         </div>
       </div>
+
+      {/* COMPANY LIST MODAL */}
+      <Modal
+        isOpen={showCompanyListModal}
+        onClose={() => {
+          setShowCompanyListModal(false);
+          setCompanySearchTerm("");
+        }}
+        title="Master Company List"
+        className="max-w-xl"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700">
+            <span>
+              Total Companies:{" "}
+              <span className="font-semibold text-gray-900">
+                {companyOptions.length}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCompanyListModal(false);
+                handleAddCompany();
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-600 hover:text-cyan-700"
+            >
+              <FaPlus className="text-[10px]" /> Add New Company
+            </button>
+          </div>
+
+          {companyOptions.length > 5 && (
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+              <input
+                type="text"
+                placeholder="Search company name..."
+                value={companySearchTerm}
+                onChange={(event) => setCompanySearchTerm(event.target.value)}
+                className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-4 text-sm focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              />
+            </div>
+          )}
+
+          <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-gray-200">
+            {filteredCompanyOptions.length ? (
+              <ul className="divide-y divide-gray-100">
+                {filteredCompanyOptions.map((name, index) => (
+                  <li
+                    key={name}
+                    className="flex items-center justify-between px-4 py-3 text-sm text-gray-800 hover:bg-gray-50"
+                  >
+                    <span className="font-medium">{name}</span>
+                    <span className="text-xs text-gray-400">#{index + 1}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-6 text-center text-sm text-gray-500">
+                {companySearchTerm
+                  ? "No matching companies found."
+                  : "No company names available."}
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCompanyListModal(false);
+                setCompanySearchTerm("");
+              }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={showCompanyModal}

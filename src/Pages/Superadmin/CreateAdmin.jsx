@@ -23,6 +23,7 @@ import { toast } from 'react-toastify';
 import { useUserCreation } from '../../context/UserCreationContext';
 import { createAdmin, getAdminDetails, updateAdmin } from '../../api/superAdminApi';
 import { useRef } from 'react';
+import ConfirmationModal from '../../components/Common/ConfirmationModal';
 
 
 // ==========================================
@@ -151,6 +152,12 @@ function CreateAdmin() {
         });
       } catch (err) {
         console.error('Failed to fetch admin details:', err);
+        ConfirmationModal({
+          title: 'Error',
+          variant: 'danger',
+          message: err?.message || 'Failed to load Admin details.',
+          onConfirm: () => navigate('/super-admin/admin-list'),
+        });
         toast.error(err?.message || 'Failed to load Admin details.');
       } finally {
         if (isMounted) setFetching(false);

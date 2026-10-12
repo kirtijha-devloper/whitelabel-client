@@ -49,13 +49,21 @@ const getTargetPath = (basePath, tabKey) => {
   return basePath;
 };
 
-const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_TAB_CONFIG }) => {
+const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_TAB_CONFIG, currentUser }) => {
   const navigate = useNavigate();
 
   return (
     <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="flex flex-wrap gap-3 md:flex-nowrap md:gap-4">
         {tabs.map((tab) => {
+          {console.log("current User:", currentUser, "tab:", tab, "activeTab:", activeTab);}
+          if((tab.key === "cc-bill-3" || tab.key === "ba-cc-bill" || tab.key === "cc-bill" || tab.key === "payout" || tab.key === "pos" || tab.key === "wallet") && currentUser?.role === "super_admin") {
+            return null; 
+          }
+          if((tab.key === "service-wise" || tab.key === "all-transactions" || tab.key === "commission") && currentUser?.role !== "super_admin") {
+            return null; 
+          }
+          console.log("current User:", currentUser, "tab:", tab, "activeTab:", activeTab);
           const isActive = activeTab === tab.key;
 
           return (

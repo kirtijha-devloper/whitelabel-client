@@ -23,6 +23,7 @@ import { IoMenu } from "react-icons/io5";
 import AbheePayLogo from "../assets/FORMAT-PNG.png";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { logoutCurrentSession } from "../utils/auth";
+import { BASE_SITE_URL } from "../constants";
 import {
   getAdminLandingPathForUser,
   hasAnyPermission,
@@ -30,6 +31,19 @@ import {
   isAdminUser,
   isSuperAdminUser,
 } from "../utils/accessControl";
+
+/**
+ * Resolves uploaded image path to full URL (supporting absolute URLs and /uploads/ paths)
+ */
+const resolveLogoUrl = (logoPath) => {
+  if (!logoPath || typeof logoPath !== "string") return null;
+  const trimmed = logoPath.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const clean = trimmed.replace(/\\/g, "/");
+  const slashPrefixed = clean.startsWith("/") ? clean : `/${clean}`;
+  return `${BASE_SITE_URL}${slashPrefixed}`;
+};
 
 const Sidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -42,6 +56,9 @@ const Sidebar = ({ currentUser }) => {
 
   const isSuperAdmin = isSuperAdminUser(currentUser);
   const landingPath = getAdminLandingPathForUser(currentUser);
+
+  const rawLogo = currentUser?.company?.logo || currentUser?.shop_with_photo_url || null;
+  const companyLogoUrl = resolveLogoUrl(rawLogo);
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const isActivePath = (path) => {
@@ -280,8 +297,16 @@ const Sidebar = ({ currentUser }) => {
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           {!isCollapsed && (
-            <Link to={landingPath} className="text-xl font-bold text-pink-500">
-              <img src={AbheePayLogo} width={150} />
+            <Link to={landingPath} className="flex items-center">
+              <img
+                src={companyLogoUrl || AbheePayLogo}
+                alt={currentUser?.company?.company_name || "Company Logo"}
+                width={150}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = AbheePayLogo;
+                }}
+              />
             </Link>
           )}
           <button

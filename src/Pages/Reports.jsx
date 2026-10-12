@@ -97,6 +97,7 @@ const mobilePosSearchOptions = [
 ];
 
 const normalizeRole = (role) => {
+  if(role === "super_admin") return "super-admin";
   const value = String(role || '').trim().toLowerCase();
   if (value === 'franchaise') return 'franchise';
   if(value === 'super_franchise') return 'super-franchise'
@@ -695,10 +696,11 @@ const Reports = ({ currentUser }) => {
   return (
     <div className="min-h-screen bg-transparent px-0 py-1 sm:bg-gray-100 sm:p-6">
       <h1 className="mb-5 text-2xl font-bold text-gray-800">Reports</h1>
-      <ReportTabs
+      <ReportTabs 
         basePath={reportsBasePath}
         activeTab={reportType}
         trailingAction={<CombinedReportDownloadButton />}
+        currentUser={currentUser}
       />
 
 
