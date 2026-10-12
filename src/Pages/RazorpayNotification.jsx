@@ -19,7 +19,7 @@ import {
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as XLSX from "xlsx";
-import { hasPermission } from "../utils/accessControl";
+import { hasPermission, isSuperAdminUser } from "../utils/accessControl";
 import {
   getRowBank,
   getRowCardClassification,
@@ -342,6 +342,7 @@ const RazorpayNotification = ({ currentUser }) => {
   const [selectedRow, setSelectedRow] = useState(null);
   const canViewNotifications = hasPermission(currentUser, "razorpay.notifications.list");
   const canReadNotifications = hasPermission(currentUser, "razorpay.notifications.read");
+  const isSuperAdmin = isSuperAdminUser(currentUser);
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [processMode, setProcessMode] = useState("rule");
   const [processingRow, setProcessingRow] = useState(null);
@@ -582,6 +583,10 @@ const RazorpayNotification = ({ currentUser }) => {
   };
 
   const openPreviewModal = (provider = "pinelab") => {
+    if (!isSuperAdmin) {
+      toast.error("Upload feature is only accessible by Super Admin.");
+      return;
+    }
     setUploadProvider(provider);
     setPreviewFile(null);
     setPreviewResult(null);
@@ -1126,34 +1131,38 @@ const RazorpayNotification = ({ currentUser }) => {
             <label htmlFor="include_unlinked" className="text-sm text-gray-700">Include Unlinked</label>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => openPreviewModal("pinelab")}
-              className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 whitespace-nowrap text-sm font-medium"
-            >
-              Pinelab Upload
-            </button>
-            <button
-              type="button"
-              onClick={() => openPreviewModal("yesbank")}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap text-sm font-medium"
-            >
-              YesBank Upload
-            </button>
-            <button
-              type="button"
-              onClick={() => openPreviewModal("paytm")}
-              className="px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 whitespace-nowrap text-sm font-medium"
-            >
-              Paytm Upload
-            </button>
-            <button
-              type="button"
-              onClick={() => openPreviewModal("telering")}
-              className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap text-sm font-medium"
-            >
-              Telering Upload
-            </button>
+            {isSuperAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openPreviewModal("pinelab")}
+                  className="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 whitespace-nowrap text-sm font-medium"
+                >
+                  Pinelab Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPreviewModal("yesbank")}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap text-sm font-medium"
+                >
+                  YesBank Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPreviewModal("paytm")}
+                  className="px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 whitespace-nowrap text-sm font-medium"
+                >
+                  Paytm Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPreviewModal("telering")}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 whitespace-nowrap text-sm font-medium"
+                >
+                  Telering Upload
+                </button>
+              </>
+            )}
             <button
               type="submit"
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
