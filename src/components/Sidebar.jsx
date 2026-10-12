@@ -92,24 +92,24 @@ const Sidebar = ({ currentUser }) => {
       path: "/admin/reports",
       icon: <FaChartBar />,
       permission: "reports.read",
-      subMenu: [
-        {
-          name: "All Reports Hub",
-          path: "/admin/reports",
-        },
-        {
-          name: "Transaction Reports",
-          path: "/admin/reports/transactions",
-        },
-        {
-          name: "Commission Report",
-          path: "/admin/reports/commission",
-        },
-        {
-          name: "Service Wise Reports",
-          path: "/admin/reports/service-wise",
-        },
-      ],
+      // subMenu: [
+      //   {
+      //     name: "All Reports Hub",
+      //     path: "/admin/reports",
+      //   },
+      //   {
+      //     name: "Transaction Reports",
+      //     path: "/admin/reports/transactions",
+      //   },
+      //   {
+      //     name: "Commission Report",
+      //     path: "/admin/reports/commission",
+      //   },
+      //   {
+      //     name: "Service Wise Reports",
+      //     path: "/admin/reports/service-wise",
+      //   },
+      // ],
     },
     {
       name: "Ledger",
