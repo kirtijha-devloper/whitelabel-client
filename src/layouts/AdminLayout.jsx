@@ -662,7 +662,7 @@ export default function AdminLayout() {
               <Route
                 path="stock-pos/add"
                 element={guardRoute(
-                  canManageStockPos,
+                  isSuperAdminViewer,
                   <AddPOSMachine currentUser={currentUser} />,
                 )}
               />

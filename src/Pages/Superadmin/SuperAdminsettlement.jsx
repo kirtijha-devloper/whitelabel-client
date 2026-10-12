@@ -228,6 +228,18 @@ const SuperAdminsettlement = ({ currentUser }) => {
           daily_limit: numValue,
         });
       } else {
+        if (limitType === "payin") {
+          const allocated = Number(admin.payin_allocated || 0);
+          if (allocated > 0 && numValue < allocated) {
+            const currentPool = Number(admin.t0_daily_limit || 0);
+            const maxReduction = Math.max(0, currentPool - allocated);
+            toast.error(
+              `Cannot reduce Payin limit to ₹${numValue.toLocaleString("en-IN")}. Already allocated to downstream users: ₹${allocated.toLocaleString("en-IN")}. Maximum allowed reduction is ₹${maxReduction.toLocaleString("en-IN")} (remaining available limit). Minimum Payin limit allowed is ₹${allocated.toLocaleString("en-IN")}.`,
+            );
+            return;
+          }
+        }
+
         // Prepare payload to sync with backend database
         const payload = {};
         if (limitType === "payout") {
@@ -259,7 +271,11 @@ const SuperAdminsettlement = ({ currentUser }) => {
       await queryClient.invalidateQueries({ queryKey: ["sharedCcBillLimit"] });
     } catch (err) {
       console.error("Database limit save error:", err);
-      toast.error(err?.message || "Failed to update limit in database");
+      toast.error(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to update limit in database",
+      );
     } finally {
       setSavingKey(null);
     }
@@ -368,6 +384,26 @@ const SuperAdminsettlement = ({ currentUser }) => {
               <span className="block text-[10px] text-gray-500 font-normal">
                 Used: ₹{Number(sharedLimit.consumed_amount || 0).toLocaleString("en-IN")}
               </span>
+            </div>
+          ) : limitType === "payin" ? (
+            <div className="text-right leading-tight">
+              {currentVal !== "" && Number(currentVal) > 0 ? (
+                <span className="text-emerald-700 font-semibold">
+                  ₹{Number(currentVal).toLocaleString("en-IN")}
+                </span>
+              ) : (
+                <span className="text-gray-400">No Limit</span>
+              )}
+              {row.payin_allocated !== undefined && Number(row.payin_allocated) > 0 ? (
+                <span className="block text-[10px] text-amber-600 font-medium" title="Allocated to downstream users (Super Franchises, Franchises, Merchants)">
+                  Allocated: ₹{Number(row.payin_allocated).toLocaleString("en-IN")}
+                </span>
+              ) : null}
+              {row.payin_remaining !== undefined && row.payin_remaining !== null && (
+                <span className="block text-[10px] text-teal-600 font-medium" title="Remaining limit available to allocate or reduce">
+                  Remaining: ₹{Number(row.payin_remaining).toLocaleString("en-IN")}
+                </span>
+              )}
             </div>
           ) : currentVal !== "" && Number(currentVal) > 0 ? (
             <span className="text-emerald-700 font-semibold">
