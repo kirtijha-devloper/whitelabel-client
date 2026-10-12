@@ -8,6 +8,7 @@ export const normalizeUserRole = (value) => {
   const normalized = String(roleValue || "").trim().toLowerCase();
   if (normalized === "franchaise") return "franchise";
   if (normalized === "superfranchise" || normalized === "super_franchise" || normalized === "super-franchise") return "super_franchise";
+  if (normalized === "superadmin" || normalized === "super_admin" || normalized === "super-admin") return "super_admin";
   return normalized;
 };
 

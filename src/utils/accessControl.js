@@ -256,7 +256,7 @@ const getResolvedUserPermissions = (user) => {
 
 export const hasPermission = (user, permission) => {
   if (!permission) return false;
-  if (isAdminUser(user)) return true;
+  if (isSuperAdminUser(user) || isAdminUser(user)) return true;
   if (!isEmployeeUser(user)) return false;
 
   const normalized = getResolvedUserPermissions(user);
@@ -280,13 +280,13 @@ export const hasPermission = (user, permission) => {
 };
 
 export const hasAnyPermission = (user, permissions = []) => {
-  if (isAdminUser(user)) return true;
+  if (isSuperAdminUser(user) || isAdminUser(user)) return true;
   if (!isEmployeeUser(user)) return false;
   return permissions.some((permission) => hasPermission(user, permission));
 };
 
 export const hasAllPermissions = (user, permissions = []) => {
-  if (isAdminUser(user)) return true;
+  if (isSuperAdminUser(user) || isAdminUser(user)) return true;
   if (!isEmployeeUser(user)) return false;
   return permissions.every((permission) => hasPermission(user, permission));
 };

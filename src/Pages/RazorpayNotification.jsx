@@ -340,9 +340,17 @@ const RazorpayNotification = ({ currentUser }) => {
   const [appliedFilters, setAppliedFilters] = useState(baseFilters);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-  const canViewNotifications = hasPermission(currentUser, "razorpay.notifications.list");
-  const canReadNotifications = hasPermission(currentUser, "razorpay.notifications.read");
-  const isSuperAdmin = isSuperAdminUser(currentUser);
+  const storedUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  }, []);
+  const activeUser = currentUser || storedUser;
+  const isSuperAdmin = isSuperAdminUser(activeUser);
+  const canViewNotifications = isSuperAdmin || hasPermission(activeUser, "razorpay.notifications.list");
+  const canReadNotifications = isSuperAdmin || hasPermission(activeUser, "razorpay.notifications.read");
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [processMode, setProcessMode] = useState("rule");
   const [processingRow, setProcessingRow] = useState(null);
@@ -1009,7 +1017,7 @@ const RazorpayNotification = ({ currentUser }) => {
   }
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 min-h-screen p-4 sm:p-6">
       <div className="bg-white shadow-sm rounded-lg p-4 mb-4">
         <h2 className="text-xl font-semibold mb-4">Razorpay Notification Report</h2>
         <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

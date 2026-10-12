@@ -212,10 +212,12 @@ export default function AdminLayout() {
     "stock.pos.read",
     "stock.pos.manage",
   ]);
-  const canViewRazorpayNotifications = hasAnyPermission(currentUser, [
-    "razorpay.notifications.list",
-    "razorpay.notifications.read",
-  ]);
+  const canViewRazorpayNotifications =
+    isSuperAdminViewer ||
+    hasAnyPermission(currentUser, [
+      "razorpay.notifications.list",
+      "razorpay.notifications.read",
+    ]);
   const canViewWallet = hasAnyPermission(currentUser, [
     "wallet.read",
     "wallet.credit",
@@ -911,6 +913,13 @@ export default function AdminLayout() {
               />
               <Route
                 path="razorpay-notifications"
+                element={guardRoute(
+                  canViewRazorpayNotifications,
+                  <RazorpayNotification currentUser={currentUser} />,
+                )}
+              />
+              <Route
+                path="super-admin/razorpay-notifications"
                 element={guardRoute(
                   canViewRazorpayNotifications,
                   <RazorpayNotification currentUser={currentUser} />,

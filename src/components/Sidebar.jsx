@@ -56,6 +56,13 @@ const Sidebar = ({ currentUser }) => {
     ) {
       return true;
     }
+    if (
+      isSuperAdmin &&
+      path === "/super-admin/razorpay-notifications" &&
+      (location.pathname === "/admin/razorpay-notifications" || location.pathname.startsWith("/admin/razorpay-notifications/"))
+    ) {
+      return true;
+    }
     return false;
   };
 
@@ -197,31 +204,15 @@ const Sidebar = ({ currentUser }) => {
       path: "/super-admin/rate-setting",
       icon: <FaMoneyBillWave />,
     },
-    // {
-    //   name: "Reports",
-    //   icon: <FaChartBar />,
-    //   subMenu: [
-    //     {
-    //       name: "Transaction Reports",
-    //       path: "/super-admin/reports/transactions",
-    //       icon: <FaFileAlt />,
-    //     },
-    //     {
-    //       name: "Commission Report",
-    //       path: "/super-admin/reports/commission",
-    //       icon: <FaPercentage />,
-    //     },
-    //     {
-    //       name: "Service Wise Reports",
-    //       path: "/super-admin/reports/service-wise",
-    //       icon: <FaLayerGroup />,
-    //     },
-    //   ],
-    // },
+    {
+      name: "Razorpay Notifications",
+      path: "/super-admin/razorpay-notifications",
+      icon: <FaFileAlt />,
+    },
     {
       name: "Reports",
       path: "/super-admin/reports",
-      icon: <FaFileAlt />,
+      icon: <FaChartBar />,
     },
     {
       name: "Settlement",
