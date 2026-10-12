@@ -1077,6 +1077,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const SCOPE_BADGES = {
+    super_admin_default: { label: 'Platform Default', color: 'bg-indigo-100 text-indigo-800' },
+    super_admin_admin: { label: 'SuperAdmin→Admin', color: 'bg-indigo-100 text-indigo-800' },
     admin_default: { label: 'Global Default', color: 'bg-blue-100 text-blue-800' },
     admin_franchise: { label: 'Admin→Franchise', color: 'bg-purple-100 text-purple-800' },
     admin_merchant: { label: 'Admin→Merchant', color: 'bg-orange-100 text-orange-800' },
