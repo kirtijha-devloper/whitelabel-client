@@ -1528,6 +1528,17 @@ const UserList = ({
       return;
     }
 
+    const adminBalance = parseFloat(currentUser?.wallet ?? 0);
+    if (
+      walletModalState.action === "credit" &&
+      amount > adminBalance
+    ) {
+      toast.error(
+        `Credit amount cannot exceed your available admin wallet balance (₹${adminBalance.toFixed(2)}).`
+      );
+      return;
+    }
+
     if (!walletForm.idempotencyKey) {
       toast.error("Idempotency key is required.");
       return;
@@ -1604,6 +1615,10 @@ const UserList = ({
         responseKeys: Object.keys(response || {}),
       });
       toast.success(successMessage);
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["userSearch"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       closeWalletModal();
     } catch (error) {
       console.error("[wallet-adjustment][ui-failed]", {
@@ -2735,20 +2750,33 @@ const UserList = ({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                <p className="text-xs text-gray-500">Current Wallet Balance</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {canViewWalletAmount
-                    ? walletBalanceState.loading
-                      ? "Loading..."
-                      : walletBalanceState.balance !== null
-                        ? `₹${walletBalanceState.balance.toFixed(2)}`
-                        : "N/A"
-                    : "Hidden"}
-                </p>
-                {canViewWalletAmount && walletBalanceState.error && (
-                  <p className="text-xs text-rose-600 mt-1">{walletBalanceState.error}</p>
-                )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`rounded-lg border px-3 py-2 ${walletModalState.action === "debit" ? "border-rose-200 bg-rose-50/70" : "border-gray-200 bg-gray-50"}`}>
+                  <p className={`text-xs ${walletModalState.action === "debit" ? "text-rose-700 font-medium" : "text-gray-500"}`}>
+                    User Balance {walletModalState.action === "debit" ? "(Max Debit)" : ""}
+                  </p>
+                  <p className={`text-sm font-bold ${walletModalState.action === "debit" ? "text-rose-700" : "text-gray-800"}`}>
+                    {canViewWalletAmount
+                      ? walletBalanceState.loading
+                        ? "Loading..."
+                        : walletBalanceState.balance !== null
+                          ? `₹${walletBalanceState.balance.toFixed(2)}`
+                          : "N/A"
+                      : "Hidden"}
+                  </p>
+                  {canViewWalletAmount && walletBalanceState.error && (
+                    <p className="text-xs text-rose-600 mt-1">{walletBalanceState.error}</p>
+                  )}
+                </div>
+
+                <div className={`rounded-lg border px-3 py-2 ${walletModalState.action === "credit" ? "border-emerald-200 bg-emerald-50/70" : "border-gray-200 bg-gray-50"}`}>
+                  <p className={`text-xs ${walletModalState.action === "credit" ? "text-emerald-700 font-medium" : "text-gray-500"}`}>
+                    Your Pool Balance {walletModalState.action === "credit" ? "(Max Credit)" : ""}
+                  </p>
+                  <p className={`text-sm font-bold ${walletModalState.action === "credit" ? "text-emerald-700" : "text-gray-800"}`}>
+                    ₹{parseFloat(currentUser?.wallet ?? 0).toFixed(2)}
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -2778,6 +2806,12 @@ const UserList = ({
                 />
                 {isAmountInvalid && (
                   <p className="text-xs text-rose-600 mt-1">Amount must be greater than 0.</p>
+                )}
+                {walletModalState.action === "credit" && Number(walletForm.amount) > parseFloat(currentUser?.wallet ?? 0) && (
+                  <p className="text-xs text-rose-600 mt-1 font-medium">⚠️ Amount exceeds your available pool balance (₹{parseFloat(currentUser?.wallet ?? 0).toFixed(2)}).</p>
+                )}
+                {walletModalState.action === "debit" && walletBalanceState.balance !== null && Number(walletForm.amount) > walletBalanceState.balance && (
+                  <p className="text-xs text-rose-600 mt-1 font-medium">⚠️ Amount exceeds target user's wallet balance (₹{walletBalanceState.balance.toFixed(2)}).</p>
                 )}
               </div>
 

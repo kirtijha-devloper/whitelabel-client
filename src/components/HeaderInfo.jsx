@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, LayoutDashboard, Shield, Sliders } from "lucide-react";
+import { Clock, LayoutDashboard, Shield, Sliders, Wallet } from "lucide-react";
 import { normalizeUserRole, getParentFranchiseId, extractUsersArray } from "../utils/userAccess";
 import {
   getEffectiveUserDailyLimit,
@@ -239,39 +239,20 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
         </div>
 
         <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3 sm:gap-6 items-stretch sm:items-center">
-          {/* Dual Wallet Display: T0 Main Wallet & T1 Wallet (Hidden for Admin & Employee) */}
-          {!(normalizedRole === "admin" || normalizedRole === "employee") && (() => {
-            const walletNum = parseFloat(currentUser?.wallet ?? 0);
-
-            return (
-              <div className="flex flex-col gap-2 min-w-[240px]">
-                {/* <div className="flex flex-col gap-1 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 p-3 shadow-sm text-xs"> */}
-                  {/* Total Row */}
-                  {/* <div className="flex justify-between items-center gap-3">
-                    <span className="text-slate-500 font-medium">Total</span>
-                    <span className="font-bold text-slate-900">₹{walletNum.toFixed(2)}</span>
-                  </div> */}
-
-                  {/* On Settlement Hold Row */}
-                  {/* {(() => {
-                    const holdAmt = Math.max(0, walletNum - usableBal);
-                    return holdAmt > 0 ? (
-                      <div className="flex justify-between items-center gap-3">
-                        <span className="text-amber-600 font-medium">On Settlement Hold</span>
-                        <span className="font-bold text-amber-600">- ₹{holdAmt.toFixed(2)}</span>
-                      </div>
-                    ) : null;
-                  })()} */}
-
-                  {/* Available Row */}
-                  {/* <div className="flex justify-between items-center gap-3 pt-1 border-t border-slate-200">
-                    <span className="text-emerald-700 font-medium">Available</span>
-                    <span className="font-bold text-emerald-700">₹{usableBal.toFixed(2)}</span>
-                  </div>
-                </div> */}
+          {/* Admin Pool Wallet Display */}
+          {normalizedRole === "admin" && (
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-3 sm:p-4 rounded-xl shadow-sm flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+              <div className="bg-emerald-600 text-white p-2.5 rounded-lg shadow-sm">
+                <Wallet size={20} />
               </div>
-            );
-          })()}
+              <div className="min-w-0">
+                <p className="text-gray-500 font-medium text-xs">Admin Pool Wallet</p>
+                <p className="text-emerald-700 font-bold text-lg sm:text-xl leading-tight">
+                  ₹{Number(currentUser?.wallet ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Right Section: Date and Day */}
           <div className="bg-gradient-to-br from-indigo-50 to-gray-100 p-3 sm:p-4 rounded-xl shadow-md flex items-center gap-3 sm:gap-4 hover:shadow-lg transition-shadow">
