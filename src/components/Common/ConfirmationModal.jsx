@@ -15,6 +15,7 @@ const ConfirmationModal = ({
   variant = "primary", // "primary" | "danger" | "warning" | "success"
   isLoading = false,
 }) => {
+  console.log("ConfirmationModal isOpen:", isOpen, "isLoading:", isLoading);
   if (!isOpen) return null;
 
   const variantStyles = {

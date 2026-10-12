@@ -21,7 +21,8 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { toast } from "react-toastify";
 import { getLedgerStatements } from "../../api/ledgerApi";
-import { getAllPosTransactionReport, getWalletReport } from "../../api/reportsApi";
+import ReportTabs from "../../components/Reports/ReportTabs";
+import CombinedReportDownloadButton from "../../components/Reports/CombinedReportDownloadButton";
 
 // Comprehensive Mock fallback transactions for seamless demonstration
 const SAMPLE_TRANSACTIONS = [
@@ -160,7 +161,7 @@ const SERVICE_FILTER_OPTIONS = [
   "PG MID Routing",
 ];
 
-const TransactionReports = () => {
+const TransactionReports = ({ currentUser }) => {
   const navigate = useNavigate();
 
   const [dateRange, setDateRange] = useState({
@@ -270,6 +271,11 @@ const TransactionReports = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 space-y-6">
+      <h1 className="mb-5 text-2xl font-bold text-gray-800">Reports</h1>
+      <ReportTabs 
+        trailingAction={<CombinedReportDownloadButton />}
+        currentUser={currentUser}
+      />
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
