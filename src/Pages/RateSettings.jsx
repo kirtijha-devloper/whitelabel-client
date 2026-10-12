@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Table from "../components/Table";
 import { Loader2 } from "lucide-react";
@@ -10,7 +11,6 @@ import {
   listPosRentals,
   createPayoutCharge,
   listPayoutCharges,
-  getPayoutChargeById,
   updatePayoutCharge,
   deletePayoutCharge,
   updatePosRental,
@@ -27,15 +27,22 @@ import {
 } from "../api/rateSettingsApi";
 import PayoutRateSettings from "./PayoutRateSettings";
 
-const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
+const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmin = false }) => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState(initialTab); // pos_rental | pos_txn | payout | bbps_cc
+  const location = useLocation();
+  const effectiveInitialTab = isSuperAdmin && initialTab === "pos_txn"
+    ? "pos_rental"
+    : initialTab;
+  const [activeTab, setActiveTab] = useState(effectiveInitialTab); // pos_rental | pos_txn | payout | bbps_cc
 
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      const tabToSet = isSuperAdmin && initialTab === "pos_txn"
+        ? "pos_rental"
+        : initialTab;
+      setActiveTab(tabToSet);
     }
-  }, [initialTab]);
+  }, [initialTab, isSuperAdmin]);
 
   useEffect(() => {
     // Only force POS rental when tabs are hidden and no other tab is explicitly requested.
@@ -43,6 +50,12 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
       setActiveTab("pos_rental");
     }
   }, [hideTabs, initialTab]);
+
+  useEffect(() => {
+    if (isSuperAdmin && activeTab === "pos_txn") {
+      setActiveTab("pos_rental");
+    }
+  }, [isSuperAdmin, activeTab]);
 
   // Shared merchant list
   const {
@@ -53,6 +66,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
   } = useQuery({
     queryKey: ["merchants", "active"],
     queryFn: () => MerchantAllUsers({ page: 1, limit: 1000 }), // Get all merchants for dropdown
+    enabled: !isSuperAdmin && activeTab === "pos_txn",
   });
 
   // Extract merchants array from paginated response
@@ -62,7 +76,8 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     return Array.isArray(merchantsData.data) ? merchantsData.data : [];
   }, [merchantsData]);
 
-  // POS Rental state — Admin: two independent cards (franchise rate + standalone merchant rate)
+  // POS Rental state — Admin: two independent cards (franchise rate + standalone merchant rate) + Super Admin: admin rate
+  const [adminRateForm, setAdminRateForm] = useState({ amount: "", status: "active" });
   const [franchiseRateForm, setFranchiseRateForm] = useState({ amount: "", status: "active" });
   const [merchantRateForm, setMerchantRateForm] = useState({ amount: "", status: "active" });
 
@@ -73,7 +88,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     error: rentalErrObj,
   } = useQuery({
     queryKey: ["pos_rentals"],
-    queryFn: listPosRentals,
+    queryFn: () => listPosRentals({ limit: 100 }),
     enabled: activeTab === "pos_rental",
   });
 
@@ -324,6 +339,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     return arr.filter((r) => r.franchaise_id === null || r.franchaise_id === undefined);
   }, [rentalListData]);
 
+  const adminRate = useMemo(
+    () => rentalRates.find((r) => r.target_user_type === "admin") ?? null,
+    [rentalRates]
+  );
   const franchiseRate = useMemo(
     () => rentalRates.find((r) => r.target_user_type === "franchise") ?? null,
     [rentalRates]
@@ -332,6 +351,12 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     () => rentalRates.find((r) => r.target_user_type === "merchant") ?? null,
     [rentalRates]
   );
+
+  useEffect(() => {
+    if (adminRate) {
+      setAdminRateForm({ amount: parseFloat(adminRate.amount) || "", status: adminRate.status || "active" });
+    }
+  }, [adminRate?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (franchiseRate) {
@@ -370,8 +395,33 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     [posTxnCharges, merchants]
   );
 
+  const handleSaveAdminRate = (e) => {
+    e.preventDefault();
+    const amount = parseFloat(adminRateForm.amount);
+    if (!adminRateForm.amount || !Number.isFinite(amount) || amount <= 0) {
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+    if (adminRate) {
+      updateRentalMutation.mutate({ id: adminRate.id, payload: { amount, status: adminRateForm.status } });
+    } else {
+      createRentalMutation.mutate({ amount, status: adminRateForm.status, type: "pos", target_user_type: "admin" });
+    }
+  };
+
+  const handleDeleteAdminRate = () => {
+    if (!adminRate?.id) return;
+    if (window.confirm("Are you sure you want to delete this admin rental rate?")) {
+      deleteRentalMutation.mutate(adminRate.id);
+    }
+  };
+
   const handleCreateOrUpdatePosTxn = (e) => {
     e.preventDefault();
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot configure merchant POS transaction charges.");
+      return;
+    }
     if (!posTxnForm.merchant_id || !posTxnForm.rate_percentage) {
       toast.error("Please fill required fields");
       return;
@@ -398,6 +448,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
   };
 
   const handleDeletePosTxn = (row) => {
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot delete merchant POS transaction charges.");
+      return;
+    }
     const id = row?.id || row?._id || row?.pos_transaction_charge_id;
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this POS transaction charge?")) {
@@ -407,6 +461,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
 
   const handleSaveFranchiseRate = (e) => {
     e.preventDefault();
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot configure franchise rental rates.");
+      return;
+    }
     const amount = parseFloat(franchiseRateForm.amount);
     if (!franchiseRateForm.amount || !Number.isFinite(amount) || amount <= 0) {
       toast.error("Amount must be greater than 0");
@@ -420,6 +478,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
   };
 
   const handleDeleteFranchiseRate = () => {
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot delete franchise rental rates.");
+      return;
+    }
     if (!franchiseRate?.id) return;
     if (window.confirm("Are you sure you want to delete this franchise rental rate?")) {
       deleteRentalMutation.mutate(franchiseRate.id);
@@ -428,6 +490,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
 
   const handleSaveMerchantRate = (e) => {
     e.preventDefault();
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot configure merchant rental rates.");
+      return;
+    }
     const amount = parseFloat(merchantRateForm.amount);
     if (!merchantRateForm.amount || !Number.isFinite(amount) || amount <= 0) {
       toast.error("Amount must be greater than 0");
@@ -441,6 +507,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
   };
 
   const handleDeleteMerchantRate = () => {
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot delete merchant rental rates.");
+      return;
+    }
     if (!standaloneRate?.id) return;
     if (window.confirm("Are you sure you want to delete this standalone merchant rental rate?")) {
       deleteRentalMutation.mutate(standaloneRate.id);
@@ -502,10 +572,9 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
   };
 
   const handleDeletePayout = (rule) => {
-    const id = rule?.id;
-    if (!id) return;
+    if (!rule?.id) return;
     if (window.confirm("Are you sure you want to delete this payout charge rule?")) {
-      deletePayoutMutation.mutate(id);
+      deletePayoutMutation.mutate(rule.id);
     }
   };
 
@@ -564,21 +633,31 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
     }
   };
 
-  const getStatusBadgeClass = (status) => {
-    const value = String(status || "").toLowerCase();
-    if (value === "active" || value === "completed") return "bg-green-100 text-green-800";
-    if (value === "pending") return "bg-yellow-100 text-yellow-800";
-    return "bg-red-100 text-red-800";
-  };
 
   return (
     <div className="bg-gray-100 min-h-screen">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">Rate Settings</h1>
+        <div className="mb-2">
+          <Link
+            to={location.pathname.startsWith('/super-admin') || isSuperAdmin ? '/super-admin/rate-setting' : '/admin/rate-setting'}
+            className="text-sm text-[#1855e4] hover:text-blue-800 font-medium"
+          >
+            &larr; Rate Settings Home
+          </Link>
+        </div>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-4">
+          {isSuperAdmin && activeTab === "pos_rental"
+            ? "POS Rental Charges (Admin Accounts)"
+            : isSuperAdmin && activeTab === "bbps_cc"
+            ? "CC Bill Pay Charges"
+            : isSuperAdmin && activeTab === "payout"
+            ? "Payout Charges"
+            : "Rate Settings"}
+        </h1>
 
         {/* Tabs */}
         {!hideTabs && (
-          <div className="grid grid-cols-3 md:flex border-b border-gray-200 mb-6">
+          <div className="grid grid-cols-2 md:flex border-b border-gray-200 mb-6">
             <button
               className={`px-2 md:px-6 py-2 text-xs md:text-sm font-medium text-center leading-tight transition-all duration-200 ${
                 activeTab === "pos_rental"
@@ -589,16 +668,18 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
             >
               POS Rental
             </button>
-            <button
-              className={`px-2 md:px-6 py-2 text-xs md:text-sm font-medium text-center leading-tight transition-all duration-200 ${
-                activeTab === "pos_txn"
-                  ? "border-b-2 border-gray-900 text-gray-800 bg-blue-50"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
-              onClick={() => setActiveTab("pos_txn")}
-            >
-              POS Transactions
-            </button>
+            {!isSuperAdmin && (
+              <button
+                className={`px-2 md:px-6 py-2 text-xs md:text-sm font-medium text-center leading-tight transition-all duration-200 ${
+                  activeTab === "pos_txn"
+                    ? "border-b-2 border-gray-900 text-gray-800 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+                onClick={() => setActiveTab("pos_txn")}
+              >
+                POS Transactions
+              </button>
+            )}
             <button
               className={`px-2 md:px-6 py-2 text-xs md:text-sm font-medium text-center leading-tight transition-all duration-200 ${
                 activeTab === "payout"
@@ -633,117 +714,180 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental" }) => {
               <p className="text-red-600 px-1">{rentalErrObj?.message || "Failed to load rental rates"}</p>
             ) : (
               <>
-                {/* Rate for Franchises */}
-                <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Franchises</h2>
-                  <p className="text-sm text-gray-500 mb-4">Charged to all franchise accounts every 30 days</p>
-                  <form onSubmit={handleSaveFranchiseRate} className="flex flex-col md:flex-row items-end gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
-                      <input
-                        type="number"
-                        value={franchiseRateForm.amount}
-                        onChange={(e) =>
-                          setFranchiseRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
-                        }
-                        onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder="500"
-                        min="0.01"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                      <select
-                        value={franchiseRateForm.status}
-                        onChange={(e) => setFranchiseRateForm((p) => ({ ...p, status: e.target.value }))}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
-                        className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
-                      >
-                        {createRentalMutation.isPending || updateRentalMutation.isPending ? (
-                          <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
-                        ) : franchiseRate ? "Update" : "Create"}
-                      </button>
-                      {franchiseRate && (
-                        <button
-                          type="button"
-                          onClick={handleDeleteFranchiseRate}
-                          disabled={deleteRentalMutation.isPending}
-                          className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
+                {/* Rate for Admin Accounts - Super Admin only */}
+                {isSuperAdmin && (
+                  <div className="bg-white p-4 rounded-xl shadow-sm">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Admin Accounts</h2>
+                    <p className="text-sm text-gray-500 mb-4">Charged to all admin accounts every 30 days</p>
+                    <form onSubmit={handleSaveAdminRate} className="flex flex-col md:flex-row items-end gap-4">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                        <input
+                          type="number"
+                          value={adminRateForm.amount}
+                          onChange={(e) =>
+                            setAdminRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
+                          }
+                          onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="500"
+                          min="0.01"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select
+                          value={adminRateForm.status}
+                          onChange={(e) => setAdminRateForm((p) => ({ ...p, status: e.target.value }))}
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                         >
-                          Delete
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
+                          className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                        >
+                          {createRentalMutation.isPending || updateRentalMutation.isPending ? (
+                            <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
+                          ) : adminRate ? "Update" : "Create"}
                         </button>
-                      )}
-                    </div>
-                  </form>
-                </div>
+                        {adminRate && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteAdminRate}
+                            disabled={deleteRentalMutation.isPending}
+                            className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+                )}
 
-                {/* Rate for Standalone Merchants */}
-                <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Standalone Merchants</h2>
-                  <p className="text-sm text-gray-500 mb-4">Charged to merchants not under any franchise</p>
-                  <form onSubmit={handleSaveMerchantRate} className="flex flex-col md:flex-row items-end gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
-                      <input
-                        type="number"
-                        value={merchantRateForm.amount}
-                        onChange={(e) =>
-                          setMerchantRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
-                        }
-                        onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder="300"
-                        min="0.01"
-                        step="0.01"
-                        required
-                      />
+                {/* Rate for Franchises & Rate for Standalone Merchants - Admin only */}
+                {!isSuperAdmin && (
+                  <>
+                    {/* Rate for Franchises */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm">
+                      <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Franchises</h2>
+                      <p className="text-sm text-gray-500 mb-4">Charged to all franchise accounts every 30 days</p>
+                      <form onSubmit={handleSaveFranchiseRate} className="flex flex-col md:flex-row items-end gap-4">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                          <input
+                            type="number"
+                            value={franchiseRateForm.amount}
+                            onChange={(e) =>
+                              setFranchiseRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
+                            }
+                            onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="500"
+                            min="0.01"
+                            step="0.01"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            value={franchiseRateForm.status}
+                            onChange={(e) => setFranchiseRateForm((p) => ({ ...p, status: e.target.value }))}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
+                            className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {createRentalMutation.isPending || updateRentalMutation.isPending ? (
+                              <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
+                            ) : franchiseRate ? "Update" : "Create"}
+                          </button>
+                          {franchiseRate && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteFranchiseRate}
+                              disabled={deleteRentalMutation.isPending}
+                              className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </form>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                      <select
-                        value={merchantRateForm.status}
-                        onChange={(e) => setMerchantRateForm((p) => ({ ...p, status: e.target.value }))}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
+
+                    {/* Rate for Standalone Merchants */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm">
+                      <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Standalone Merchants</h2>
+                      <p className="text-sm text-gray-500 mb-4">Charged to merchants not under any franchise</p>
+                      <form onSubmit={handleSaveMerchantRate} className="flex flex-col md:flex-row items-end gap-4">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                          <input
+                            type="number"
+                            value={merchantRateForm.amount}
+                            onChange={(e) =>
+                              setMerchantRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
+                            }
+                            onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="300"
+                            min="0.01"
+                            step="0.01"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            value={merchantRateForm.status}
+                            onChange={(e) => setMerchantRateForm((p) => ({ ...p, status: e.target.value }))}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
+                            className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {createRentalMutation.isPending || updateRentalMutation.isPending ? (
+                              <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
+                            ) : standaloneRate ? "Update" : "Create"}
+                          </button>
+                          {standaloneRate && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteMerchantRate}
+                              disabled={deleteRentalMutation.isPending}
+                              className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </form>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
-                        className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
-                      >
-                        {createRentalMutation.isPending || updateRentalMutation.isPending ? (
-                          <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
-                        ) : standaloneRate ? "Update" : "Create"}
-                      </button>
-                      {standaloneRate && (
-                        <button
-                          type="button"
-                          onClick={handleDeleteMerchantRate}
-                          disabled={deleteRentalMutation.isPending}
-                          className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                </div>
+                  </>
+                )}
               </>
             )}
           </div>

@@ -44,8 +44,20 @@ const Sidebar = ({ currentUser }) => {
   const landingPath = getAdminLandingPathForUser(currentUser);
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
-  const isActivePath = (path) =>
-    path ? location.pathname === path || location.pathname.startsWith(`${path}/`) : false;
+  const isActivePath = (path) => {
+    if (!path) return false;
+    if (location.pathname === path || location.pathname.startsWith(`${path}/`)) {
+      return true;
+    }
+    if (
+      isSuperAdmin &&
+      path === "/super-admin/rate-setting" &&
+      (location.pathname === "/admin/rate-setting" || location.pathname.startsWith("/admin/rate-setting/"))
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   const menuItems = [
     {

@@ -763,68 +763,106 @@ export default function AdminLayout() {
                 path="rate-setting/txn"
                 element={guardRoute(
                   canViewRateSettings,
-                  <AdminRateSetting mode="pos_txn" initialTab="default" />,
+                  <AdminRateSetting
+                    mode="pos_txn"
+                    initialTab="default"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
                 )}
               />
               <Route
                 path="rate-setting/rental"
                 element={guardRoute(
                   canViewRateSettings,
-                  <RateSettings hideTabs initialTab="pos_rental" />,
+                  <RateSettings
+                    hideTabs
+                    initialTab="pos_rental"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
                 )}
               />
               <Route
                 path="rate-setting/cc-bill"
                 element={guardRoute(
                   canViewRateSettings,
-                  <RateSettings hideTabs initialTab="bbps_cc" />,
+                  <RateSettings
+                    hideTabs
+                    initialTab="bbps_cc"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
                 )}
               />
               <Route
                 path="rate-setting/payout"
                 element={guardRoute(
                   canViewRateSettings,
-                  <RateSettings hideTabs initialTab="payout" />,
+                  <RateSettings
+                    hideTabs
+                    initialTab="payout"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
                 )}
               />
               <Route
                 path="rate-setting/default"
                 element={guardRoute(
                   canViewRateSettings,
-                  <AdminRateSetting initialTab="default" />,
+                  <AdminRateSetting
+                    initialTab="default"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
                 )}
               />
               <Route
                 path="rate-setting/franchise"
                 element={guardRoute(
                   canViewRateSettings,
-                  <AdminRateSetting initialTab="specific" />,
+                  isSuperAdminViewer ? (
+                    <Navigate to="/super-admin/rate-setting/txn" replace />
+                  ) : (
+                    <AdminRateSetting initialTab="specific" />
+                  ),
                 )}
               />
               <Route
                 path="rate-setting/unassigned"
                 element={guardRoute(
                   canViewRateSettings,
-                  <AdminRateSetting initialTab="unassigned" />,
+                  isSuperAdminViewer ? (
+                    <Navigate to="/super-admin/rate-setting/txn" replace />
+                  ) : (
+                    <AdminRateSetting initialTab="unassigned" />
+                  ),
                 )}
               />
               <Route
                 path="rate-setting/pos-txn"
                 element={guardRoute(
                   canViewRateSettings,
-                  <RateSettings hideTabs initialTab="pos_txn" />,
+                  isSuperAdminViewer ? (
+                    <Navigate to="/super-admin/rate-setting/txn" replace />
+                  ) : (
+                    <RateSettings hideTabs initialTab="pos_txn" />
+                  ),
                 )}
               />
               <Route
                 path="franchise-rates"
                 element={guardRoute(
                   canViewRateSettings,
-                  <AdminRateSetting initialTab="specific" />,
+                  isSuperAdminViewer ? (
+                    <Navigate to="/super-admin/rate-setting/txn" replace />
+                  ) : (
+                    <AdminRateSetting initialTab="specific" />
+                  ),
                 )}
               />
               <Route
                 path="rate-settings"
-                element={guardRoute(canViewRateSettings, <RateSettings />)}
+                element={guardRoute(
+                  canViewRateSettings,
+                  <RateSettings isSuperAdmin={isSuperAdminViewer} />,
+                )}
               />
               <Route path="logout" element={<Logout />} />
               <Route
@@ -905,7 +943,9 @@ export default function AdminLayout() {
                 element={
                   <Navigate
                     to={
-                      isEmployeeViewer
+                      isSuperAdminViewer
+                        ? "/super-admin/dashboard"
+                        : isEmployeeViewer
                         ? employeeLandingPath
                         : "/admin/dashboard"
                     }

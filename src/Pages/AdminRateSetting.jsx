@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   getFranchises,
   getFranchiseRates,
@@ -58,17 +58,27 @@ const extractSearchUsersArray = (payload) => {
 const getSearchEntityFranchiseId = (entity) =>
   entity?.franchaise_id ?? entity?.franchise_id ?? entity?.franchiseId ?? null;
 
-const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
+const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin = false }) => {
+  const location = useLocation();
   const isPosTxnMode = mode === 'pos_txn';
-  const [activeTab, setActiveTab] = useState(initialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
-  const [viewMode, setViewMode] = useState(initialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
+  const effectiveInitialTab = isSuperAdmin ? 'default' : initialTab;
+  const [activeTab, setActiveTab] = useState(effectiveInitialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
+  const [viewMode, setViewMode] = useState(effectiveInitialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
   const [specificSettlementFilter, setSpecificSettlementFilter] = useState(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
 
   useEffect(() => {
-    setActiveTab(initialTab);
-    setViewMode(initialTab === 'default' ? 'detail' : 'matrix');
+    const tabToSet = isSuperAdmin ? 'default' : initialTab;
+    setActiveTab(tabToSet);
+    setViewMode(tabToSet === 'default' ? 'detail' : 'matrix');
     setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-  }, [initialTab]);
+  }, [initialTab, isSuperAdmin]);
+
+  useEffect(() => {
+    if (isSuperAdmin && ['specific', 'unassigned', 'payout'].includes(activeTab)) {
+      setActiveTab('default');
+      setViewMode('detail');
+    }
+  }, [isSuperAdmin, activeTab]);
 
   const [franchises, setFranchises] = useState([]);
   const [unassignedMerchants, setUnassignedMerchants] = useState([]);
@@ -558,6 +568,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
   };
 
   const handleUpdate = async (rate) => {
+    if (isSuperAdmin && activeTab !== 'default') {
+      toast.error('Unauthorized: Super Admin can only configure default/admin-level rates.');
+      return;
+    }
     if (editValue === '') {
       toast.error('Please enter a valid rate.');
       return;
@@ -671,6 +685,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
   const confirmDelete = async () => {
     const rate = pendingDelete?.rate;
     const tab = pendingDelete?.tab;
+    if (isSuperAdmin && tab !== 'default') {
+      toast.error('Unauthorized: Super Admin can only delete default/admin-level rates.');
+      setPendingDelete(null);
+      return;
+    }
     if (!rate?.id) return;
 
     const deleteId = rate.rule_id || rate.id;
@@ -733,6 +752,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
   };
 
   const handleSavePosTxnEdit = async () => {
+    if (isSuperAdmin && activeTab !== 'default') {
+      toast.error('Unauthorized: Super Admin can only edit default/admin-level rates.');
+      setIsPosTxnEditModalOpen(false);
+      return;
+    }
     if (!posTxnEditForm.chargeValue) {
       toast.error('Please enter a charge amount.');
       return;
@@ -1479,7 +1503,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
           <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gray-50/50 rounded-t-lg">
             <div>
               <div className="mb-2">
-                <Link to="/admin/rate-setting" className="text-sm text-[#1855e4] hover:text-blue-800 font-medium">
+                <Link
+                  to={location.pathname.startsWith('/super-admin') || isSuperAdmin ? '/super-admin/rate-setting' : '/admin/rate-setting'}
+                  className="text-sm text-[#1855e4] hover:text-blue-800 font-medium"
+                >
                   &larr; Rate Settings Home
                 </Link>
               </div>
@@ -1578,44 +1605,48 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific' }) => {
             >
               Default Rates
             </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('specific');
-                setViewMode('matrix');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                setSelectedMerchantId('');
-              }}
-            >
-              Franchise Rates
-            </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('unassigned');
-                setViewMode('matrix');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                setSelectedFranchiseId('');
-              }}
-            >
-              Merchants under admin rates
-            </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('payout');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSelectedFranchiseId('');
-                setSelectedMerchantId('');
-              }}
-            >
-              Payout Rates
-            </button>
+            {!isSuperAdmin && (
+              <>
+                <button
+                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => {
+                    setActiveTab('specific');
+                    setViewMode('matrix');
+                    setDetailReadOnly(false);
+                    setSearchTerm('');
+                    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                    setSelectedMerchantId('');
+                  }}
+                >
+                  Franchise Rates
+                </button>
+                <button
+                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => {
+                    setActiveTab('unassigned');
+                    setViewMode('matrix');
+                    setDetailReadOnly(false);
+                    setSearchTerm('');
+                    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                    setSelectedFranchiseId('');
+                  }}
+                >
+                  Merchants under admin rates
+                </button>
+                <button
+                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => {
+                    setActiveTab('payout');
+                    setDetailReadOnly(false);
+                    setSearchTerm('');
+                    setSelectedFranchiseId('');
+                    setSelectedMerchantId('');
+                  }}
+                >
+                  Payout Rates
+                </button>
+              </>
+            )}
 
             {!isPosTxnMode && (
               <>
