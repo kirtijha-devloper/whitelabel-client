@@ -399,7 +399,7 @@ const SuperAdminPOSInventory = () => {
           {/* ACTION BUTTONS */}
           <div className="flex flex-wrap items-center gap-3">
 
-            ADD COMPANY
+            {/* ADD COMPANY */}
             {/* <button
               type="button"
               onClick={handleAddCompany}
