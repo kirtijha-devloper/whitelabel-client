@@ -245,37 +245,9 @@ const SuperAdminInventoryHub = () => {
                   <p className="text-xs font-medium text-gray-400 mt-0.5">
                     {card.subtitle}
                   </p>
-                  <p className="text-sm text-gray-600 mt-3 line-clamp-2 leading-relaxed">
-                    {card.description}
-                  </p>
-                </div>
-
-                {/* Sub-Badges */}
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {card.quickBadges.map((badge, idx) => (
-                    <span
-                      key={idx}
-                      className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 font-medium"
-                    >
-                      {badge}
-                    </span>
-                  ))}
                 </div>
               </div>
 
-              {/* Card Stats Grid */}
-              <div className="bg-gray-50/80 px-6 py-4 border-t border-gray-100 grid grid-cols-2 gap-3">
-                {card.stats.map((st, i) => (
-                  <div key={i} className="bg-white p-2.5 rounded-xl border border-gray-100">
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">
-                      {st.label}
-                    </p>
-                    <p className="text-sm font-bold text-gray-800 mt-0.5">
-                      {st.value}
-                    </p>
-                  </div>
-                ))}
-              </div>
 
               {/* Card Footer Button */}
               <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between group-hover:bg-[#00D3CD]/5 transition-colors">
@@ -286,42 +258,6 @@ const SuperAdminInventoryHub = () => {
                   <FaArrowRight className="w-3.5 h-3.5" />
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* RECENT INVENTORY ACTIVITY LOG */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-gray-900">
-            Recent Inventory Movements & Logs
-          </h3>
-          <span className="text-xs text-gray-400">Live Updates</span>
-        </div>
-
-        <div className="divide-y divide-gray-100">
-          {recentStockEvents.map((evt, idx) => (
-            <div
-              key={idx}
-              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 px-2 rounded-xl transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold ${evt.badgeClass}`}
-                >
-                  {evt.type}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {evt.action}
-                  </p>
-                  <p className="text-xs text-gray-500">{evt.detail}</p>
-                </div>
-              </div>
-              <span className="text-xs font-medium text-gray-400 shrink-0">
-                {evt.time}
-              </span>
             </div>
           ))}
         </div>

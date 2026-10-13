@@ -399,35 +399,35 @@ const SuperAdminPOSInventory = () => {
           {/* ACTION BUTTONS */}
           <div className="flex flex-wrap items-center gap-3">
 
-            {/* ADD COMPANY */}
-            <button
+            ADD COMPANY
+            {/* <button
               type="button"
               onClick={handleAddCompany}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
             >
               <FaPlus />
               Add Company Name
-            </button>
+            </button> */}
 
             {/* ADD MACHINE */}
-            <button
+            {/* <button
               type="button"
               onClick={() => navigate("/super-admin/inventory/pos/add")}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
             >
               <FaPlus />
               Add New Machine
-            </button>
+            </button> */}
 
             {/* BULK UPLOAD */}
-            <button
+            {/* <button
               type="button"
               onClick={handleBulkUpload}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
             >
               <FaDownload />
               Bulk Upload
-            </button>
+            </button> */}
 
             {/* EXPORT */}
             <button
