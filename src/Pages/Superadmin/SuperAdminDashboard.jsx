@@ -17,6 +17,7 @@ const SuperAdminDashboard = () => {
     failedTransactions: 0,
     successfulTransactions: 0,
     spending: [],
+    serviceUsage : [],
   });
 
   useEffect(() => {
@@ -35,6 +36,7 @@ const SuperAdminDashboard = () => {
             failedTransactions: res.failedTransactions || 0,
             successfulTransactions: res.successfulTransactions || 0,
             spending: res.spending || [],
+            serviceUsage : res.serviceUsage || [],
           });
         }
 
@@ -194,12 +196,12 @@ const SuperAdminDashboard = () => {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           {/* Service Usage Chart */}
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md">
-            <ServiceUsageChart />
+            <ServiceUsageChart data={ dashboardData.serviceUsage }/>
           </div>
 
           {/* Admin Spending Chart */}
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md">
-            <AdminSpendingChart />
+            <AdminSpendingChart data={ dashboardData.spending }/>
           </div>
         </div>
       </div>

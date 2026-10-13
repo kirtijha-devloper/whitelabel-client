@@ -104,7 +104,7 @@ const AdminStatCard = ({ title, value, type, subtitle }) => {
             {title}
           </p>
           <h3
-            className={`mt-2 break-words text-2xl sm:text-3xl font-extrabold leading-tight tracking-tight ${config.valueClass}`}
+            className={`mt-2 break-words text-2xl font-extrabold leading-tight tracking-tight ${config.valueClass}`}
           >
             {value}
           </h3>

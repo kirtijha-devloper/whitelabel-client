@@ -8,32 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const serviceData = [
-  {
-    name: "POS",
-    value: 30,
-  },
-  {
-    name: "PG",
-    value: 20,
-  },
-  {
-    name: "QR",
-    value: 15,
-  },
-  {
-    name: "Soundbox",
-    value: 10,
-  },
-  {
-    name: "DMT",
-    value: 15,
-  },
-  {
-    name: "Bill Payments",
-    value: 10,
-  },
-];
+import { PieChart as PieChartIcon } from "lucide-react";
 
 const COLORS = [
   "#00D3CD", // Brand Primary Teal
@@ -145,7 +120,8 @@ const CustomTooltip = ({ active, payload }) => {
    SERVICE USAGE CHART
    ========================================= */
 
-const ServiceUsageChart = () => {
+const ServiceUsageChart = ({ data }) => {
+  const hasData = Array.isArray(data) && data.length > 0;
   return (
     <div className="w-full rounded-2xl bg-white p-6 shadow-sm">
 
@@ -160,54 +136,65 @@ const ServiceUsageChart = () => {
         </p>
       </div>
 
-      {/* CHART */}
-      <div className="h-[360px] w-full">
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
-          <PieChart>
+      {/* CHART OR EMPTY STATE*/}
+      {hasData ? (
+        <div className="h-[360px] w-full">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+            <PieChart>
 
-            <Pie
-              data={serviceData}
-              cx="50%"
-              cy="45%"
-              innerRadius={70}
-              outerRadius={120}
-              paddingAngle={3}
-              dataKey="value"
-              nameKey="name"
+              <Pie
+                data={data}
+                cx="50%"
+                cy="45%"
+                innerRadius={70}
+                outerRadius={120}
+                paddingAngle={3}
+                dataKey="value"
+                nameKey="name"
 
-              /* PERCENTAGE OUTSIDE */
-              label={renderCustomizedLabel}
-              labelLine={false}
-            >
-              {serviceData.map((entry, index) => (
-                <Cell
-                  key={`service-${index}`}
-                  fill={
-                    COLORS[index % COLORS.length]
-                  }
-                />
-              ))}
-            </Pie>
+                /* PERCENTAGE OUTSIDE */
+                label={renderCustomizedLabel}
+                labelLine={false}
+              >
+                {data.map((entry, index) => (
+                  <Cell
+                    key={`service-${index}`}
+                    fill={
+                      COLORS[index % COLORS.length]
+                    }
+                  />
+                ))}
+              </Pie>
 
-            {/* HOVER */}
-            <Tooltip
-              content={<CustomTooltip />}
-            />
+              {/* HOVER */}
+              <Tooltip
+                content={<CustomTooltip />}
+              />
 
-            {/* LEGEND */}
-            <Legend
-              verticalAlign="bottom"
-              height={50}
-              iconType="circle"
-            />
+              {/* LEGEND */}
+              <Legend
+                verticalAlign="bottom"
+                height={50}
+                iconType="circle"
+              />
 
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="flex h-[360px] flex-col items-center justify-center text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50 border border-gray-100 text-gray-400 mb-3">
+            <PieChartIcon className="h-6 w-6" />
+          </div>
+          <p className="text-sm font-semibold text-gray-700">No Data Available</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Data will appear here once transactions are recorded
+          </p>
+        </div>
+      )}
     </div>
   );
 };
