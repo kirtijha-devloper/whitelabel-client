@@ -141,7 +141,7 @@ const SuperAdminInventoryHub = () => {
       </div>
 
       {/* TOP OVERVIEW STAT CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
@@ -201,7 +201,7 @@ const SuperAdminInventoryHub = () => {
             <FaExclamationTriangle className="w-6 h-6" />
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* MAIN INVENTORY HUB CARDS SECTION */}
       <div>
