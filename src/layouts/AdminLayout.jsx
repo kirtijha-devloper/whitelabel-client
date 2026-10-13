@@ -709,7 +709,7 @@ export default function AdminLayout() {
                 path="reports"
                 element={
                   isSuperAdminViewer ? (
-                    <Reports currentUser={currentUser} />
+                    <SuperAdminReports currentUser={currentUser} />
                   ) : (
                     guardRoute(canViewReports, <Reports currentUser={currentUser} />)
                   )

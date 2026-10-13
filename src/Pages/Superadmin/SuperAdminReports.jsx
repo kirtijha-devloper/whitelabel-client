@@ -242,13 +242,23 @@ export default function SuperAdminReports({ currentUser }) {
 
   const transactionColumns = [
     {
+      header: "#",
+      key: "sl",
       Header: "#",
       accessor: "sl",
+      render: (_, row, index) => <span className="text-gray-500 font-medium text-xs">{baseIndex + index + 1}</span>,
       Cell: ({ row }) => <span className="text-gray-500 font-medium text-xs">{baseIndex + row.index + 1}</span>,
     },
     {
+      header: "Date & Time",
+      key: "created_at",
       Header: "Date & Time",
       accessor: "created_at",
+      render: (value) => (
+        <span className="text-xs text-gray-700 whitespace-nowrap">
+          {value ? new Date(value).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "-"}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="text-xs text-gray-700 whitespace-nowrap">
           {value ? new Date(value).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "-"}
@@ -256,8 +266,20 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Domain / Company",
+      key: "company",
       Header: "Domain / Company",
       accessor: "company",
+      render: (value) => (
+        <div className="flex flex-col min-w-[140px]">
+          <span className="font-semibold text-gray-900 text-xs truncate" title={value?.domain_name}>
+            {value?.domain_name || "-"}
+          </span>
+          <span className="text-[11px] text-gray-500 truncate" title={value?.company_name}>
+            {value?.company_name || "-"}
+          </span>
+        </div>
+      ),
       Cell: ({ value }) => (
         <div className="flex flex-col min-w-[140px]">
           <span className="font-semibold text-gray-900 text-xs truncate" title={value?.domain_name}>
@@ -270,8 +292,20 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Txn ID / RRN",
+      key: "txn_id",
       Header: "Txn ID / RRN",
       accessor: "txn_id",
+      render: (_, row) => (
+        <div className="flex flex-col">
+          <span className="font-mono text-xs font-semibold text-gray-900 truncate" title={row?.txn_id}>
+            {row?.txn_id || "-"}
+          </span>
+          <span className="text-[11px] font-mono text-gray-500 truncate">
+            {row?.rr_number ? `RRN: ${row.rr_number}` : "-"}
+          </span>
+        </div>
+      ),
       Cell: ({ row }) => (
         <div className="flex flex-col">
           <span className="font-mono text-xs font-semibold text-gray-900 truncate" title={row.original.txn_id}>
@@ -284,8 +318,16 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Merchant",
+      key: "merchant",
       Header: "Merchant",
       accessor: "merchant",
+      render: (value) => (
+        <div className="flex flex-col min-w-[130px]">
+          <span className="font-medium text-xs text-gray-900 truncate">{value?.name || "-"}</span>
+          <span className="text-[11px] text-gray-500 truncate">{value?.abheepay_id || value?.mobile_number || "-"}</span>
+        </div>
+      ),
       Cell: ({ value }) => (
         <div className="flex flex-col min-w-[130px]">
           <span className="font-medium text-xs text-gray-900 truncate">{value?.name || "-"}</span>
@@ -294,8 +336,16 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "POS Machine",
+      key: "pos_machine",
       Header: "POS Machine",
       accessor: "pos_machine",
+      render: (value) => (
+        <div className="flex flex-col text-xs">
+          <span className="text-gray-800 font-medium">{value?.tid_number ? `TID: ${value.tid_number}` : "-"}</span>
+          <span className="text-[11px] text-gray-500">{value?.mid_number ? `MID: ${value.mid_number}` : "-"}</span>
+        </div>
+      ),
       Cell: ({ value }) => (
         <div className="flex flex-col text-xs">
           <span className="text-gray-800 font-medium">{value?.tid_number ? `TID: ${value.tid_number}` : "-"}</span>
@@ -304,8 +354,19 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Payment Mode",
+      key: "payment_method",
       Header: "Payment Mode",
       accessor: "payment_method",
+      render: (_, row) => {
+        const method = row?.payment_method || "-";
+        const cardType = row?.card_type;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-800 capitalize">
+            {cardType ? `${method} (${cardType})` : method}
+          </span>
+        );
+      },
       Cell: ({ row }) => {
         const method = row.original.payment_method || "-";
         const cardType = row.original.card_type;
@@ -317,8 +378,15 @@ export default function SuperAdminReports({ currentUser }) {
       },
     },
     {
+      header: "Amount (₹)",
+      key: "amount",
       Header: "Amount (₹)",
       accessor: "amount",
+      render: (value) => (
+        <span className="font-bold text-gray-900 text-xs">
+          ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="font-bold text-gray-900 text-xs">
           ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -326,8 +394,27 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Status",
+      key: "status",
       Header: "Status",
       accessor: "status",
+      render: (value) => {
+        const st = String(value || "").toLowerCase();
+        let badgeStyle = "bg-gray-100 text-gray-700 border-gray-200";
+        if (st === "completed" || st === "success" || st === "captured") {
+          badgeStyle = "bg-green-50 text-green-700 border-green-200";
+        } else if (st === "pending" || st === "created") {
+          badgeStyle = "bg-yellow-50 text-yellow-700 border-yellow-200";
+        } else if (st === "failed") {
+          badgeStyle = "bg-red-50 text-red-700 border-red-200";
+        }
+
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badgeStyle} capitalize`}>
+            {value || "Unknown"}
+          </span>
+        );
+      },
       Cell: ({ value }) => {
         const st = String(value || "").toLowerCase();
         let badgeStyle = "bg-gray-100 text-gray-700 border-gray-200";
@@ -350,13 +437,23 @@ export default function SuperAdminReports({ currentUser }) {
 
   const commissionColumns = [
     {
+      header: "#",
+      key: "sl",
       Header: "#",
       accessor: "sl",
+      render: (_, row, index) => <span className="text-gray-500 font-medium text-xs">{baseIndex + index + 1}</span>,
       Cell: ({ row }) => <span className="text-gray-500 font-medium text-xs">{baseIndex + row.index + 1}</span>,
     },
     {
+      header: "Date & Time",
+      key: "createdAt",
       Header: "Date & Time",
       accessor: "createdAt",
+      render: (value) => (
+        <span className="text-xs text-gray-700 whitespace-nowrap">
+          {value ? new Date(value).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "-"}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="text-xs text-gray-700 whitespace-nowrap">
           {value ? new Date(value).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "-"}
@@ -364,8 +461,20 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Domain / Company",
+      key: "company",
       Header: "Domain / Company",
       accessor: "company",
+      render: (value) => (
+        <div className="flex flex-col min-w-[140px]">
+          <span className="font-semibold text-gray-900 text-xs truncate" title={value?.domain_name}>
+            {value?.domain_name || "-"}
+          </span>
+          <span className="text-[11px] text-gray-500 truncate" title={value?.company_name}>
+            {value?.company_name || "-"}
+          </span>
+        </div>
+      ),
       Cell: ({ value }) => (
         <div className="flex flex-col min-w-[140px]">
           <span className="font-semibold text-gray-900 text-xs truncate" title={value?.domain_name}>
@@ -378,8 +487,20 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Txn ID",
+      key: "razorpay_transaction_id",
       Header: "Txn ID",
       accessor: "razorpay_transaction_id",
+      render: (_, row) => (
+        <div className="flex flex-col">
+          <span className="font-mono text-xs font-semibold text-gray-900 truncate" title={row?.razorpay_transaction_id}>
+            {row?.razorpay_transaction_id || "-"}
+          </span>
+          <span className="text-[11px] font-mono text-gray-500 truncate">
+            {row?.rr_number ? `RRN: ${row.rr_number}` : "-"}
+          </span>
+        </div>
+      ),
       Cell: ({ row }) => (
         <div className="flex flex-col">
           <span className="font-mono text-xs font-semibold text-gray-900 truncate" title={row.original.razorpay_transaction_id}>
@@ -392,8 +513,16 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Merchant",
+      key: "merchant",
       Header: "Merchant",
       accessor: "merchant",
+      render: (value) => (
+        <div className="flex flex-col min-w-[130px]">
+          <span className="font-medium text-xs text-gray-900 truncate">{value?.name || "-"}</span>
+          <span className="text-[11px] text-gray-500 truncate">{value?.abheepay_id || value?.mobile_number || "-"}</span>
+        </div>
+      ),
       Cell: ({ value }) => (
         <div className="flex flex-col min-w-[130px]">
           <span className="font-medium text-xs text-gray-900 truncate">{value?.name || "-"}</span>
@@ -402,8 +531,15 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Txn Amount (₹)",
+      key: "transaction_amount",
       Header: "Txn Amount (₹)",
       accessor: "transaction_amount",
+      render: (value) => (
+        <span className="font-semibold text-gray-800 text-xs">
+          ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="font-semibold text-gray-800 text-xs">
           ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -411,8 +547,15 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Comm Rate",
+      key: "charge_rate",
       Header: "Comm Rate",
       accessor: "charge_rate",
+      render: (value) => (
+        <span className="text-xs font-medium text-gray-700">
+          {value ? `${Number(value).toFixed(2)}%` : "-"}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="text-xs font-medium text-gray-700">
           {value ? `${Number(value).toFixed(2)}%` : "-"}
@@ -420,8 +563,15 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Commission (₹)",
+      key: "charge_amount",
       Header: "Commission (₹)",
       accessor: "charge_amount",
+      render: (value) => (
+        <span className="font-bold text-[#00D3CD] text-xs">
+          ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="font-bold text-[#00D3CD] text-xs">
           ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -429,8 +579,15 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "GST (₹)",
+      key: "gst_amount",
       Header: "GST (₹)",
       accessor: "gst_amount",
+      render: (_, row) => (
+        <span className="text-xs text-gray-600">
+          ₹{Number(row?.gst_amount || 0).toFixed(2)} ({row?.gst_percent || 18}%)
+        </span>
+      ),
       Cell: ({ row }) => (
         <span className="text-xs text-gray-600">
           ₹{Number(row.original.gst_amount || 0).toFixed(2)} ({row.original.gst_percent || 18}%)
@@ -438,8 +595,15 @@ export default function SuperAdminReports({ currentUser }) {
       ),
     },
     {
+      header: "Net Payout (₹)",
+      key: "net_amount",
       Header: "Net Payout (₹)",
       accessor: "net_amount",
+      render: (value) => (
+        <span className="font-bold text-emerald-700 text-xs">
+          ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
       Cell: ({ value }) => (
         <span className="font-bold text-emerald-700 text-xs">
           ₹{Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -547,8 +711,8 @@ export default function SuperAdminReports({ currentUser }) {
         >
           <SlidersHorizontal className="h-4 w-4" />
           <span>Service Management</span>
-        </button> */}
-      </div>
+        </button>
+      </div> */}
 
       {activeTab === "service_reports" && (
         <ServiceWiseReports embedded currentUser={currentUser} />
@@ -868,6 +1032,7 @@ export default function SuperAdminReports({ currentUser }) {
       </div>
         </>
       )}
+    </div>
     </div>
   );
 }

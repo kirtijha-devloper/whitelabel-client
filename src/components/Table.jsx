@@ -39,7 +39,7 @@ const Table = ({
                 key={index}
                 className={`${headerCellClassName} ${column.headerClassName || ""}`.trim()}
               >
-                {column.header}
+                {column.header !== undefined ? column.header : column.Header}
               </th>
             ))}
             {actions && (
@@ -56,16 +56,35 @@ const Table = ({
               className="hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => onRowClick && onRowClick(row)}
             >
-              {columns.map((column, colIndex) => (
-                <td
-                  key={colIndex}
-                  className={`${bodyCellClassName} ${column.cellClassName || ""}`.trim()}
-                >
-                  {column.render
-                    ? column.render(row[column.key], row, rowIndex)
-                    : row[column.key]}
-                </td>
-              ))}
+              {columns.map((column, colIndex) => {
+                const columnKey = column.key !== undefined ? column.key : column.accessor;
+                const cellValue = columnKey ? row[columnKey] : undefined;
+
+                let renderedContent = null;
+                if (column.render) {
+                  renderedContent = column.render(cellValue, row, rowIndex);
+                } else if (column.Cell) {
+                  renderedContent =
+                    typeof column.Cell === "function"
+                      ? column.Cell({
+                          value: cellValue,
+                          row: { original: row, index: rowIndex },
+                          data,
+                        })
+                      : column.Cell;
+                } else {
+                  renderedContent = cellValue;
+                }
+
+                return (
+                  <td
+                    key={colIndex}
+                    className={`${bodyCellClassName} ${column.cellClassName || ""}`.trim()}
+                  >
+                    {renderedContent}
+                  </td>
+                );
+              })}
               {actions && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className={`flex items-center gap-2 ${contentAlignClass}`}>
