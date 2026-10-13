@@ -9,8 +9,8 @@ import Select from "react-select";
 import { toast } from 'react-toastify';
 import { updateUserProfile, userDetail } from '../api/authApi';
 import { BASE_SITE_URL } from '../constants';
-import { normalizePermissions } from '../utils/accessControl';
-import { normalizeUserRole, maskEmailForUser } from '../utils/userAccess';
+import { normalizePermissions, isEmployeeUser, isSuperAdminUser } from '../utils/accessControl';
+import { normalizeUserRole, maskEmailForUser, isSuperAdmin } from '../utils/userAccess';
 import { fetchEmployeeAccessRoles } from '../api/employeeAccessRoleApi';
 
 const FILE_FIELDS = ['aadhar_photo', 'aadhar_back_photo', 'pan_photo', 'bank_passbook', 'shop_photo'];
@@ -187,9 +187,12 @@ function AddUser({ currentUser }) {
   const [showPassword, setShowPassword] = useState(false);
   const normalizedRole = String(currentUser?.role || "").trim().toLowerCase();
   const isActualAdminUser = normalizedRole === "admin";
+  const isEmployee = normalizedRole === "employee" || isEmployeeUser(currentUser);
+  const isSuperAdminViewer = normalizedRole === "super_admin" || isSuperAdminUser(currentUser) || isSuperAdmin(currentUser);
   const isAdminArea = location.pathname.startsWith("/admin/");
   const isFranchiseUser = normalizedRole === "franchise" || location.pathname.startsWith("/franchise/");
   const isSuperFranchiseUser = normalizedRole === "super_franchise" || location.pathname.startsWith("super-frenchise");
+  const canCreateSuperFranchise = !isFranchiseUser && (isActualAdminUser || isEmployee || isSuperAdminViewer);
   const parsedEditUserId = Number(routeUserId);
   const isEditMode = Boolean(routeUserId) && location.pathname.endsWith("/edit") && isAdminArea;
   const isRoleSelectionDisabled = isFranchiseUser || isEditMode ;
@@ -647,7 +650,7 @@ function AddUser({ currentUser }) {
                       Franchise
                     </label>
                   )}
-                  {isActualAdminUser && !isFranchiseUser && (
+                  {canCreateSuperFranchise && (
                     <label className="flex items-center gap-2">
                       <input
                         type="radio"

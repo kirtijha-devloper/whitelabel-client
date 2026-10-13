@@ -6,6 +6,8 @@ import { createUser } from '../api/userCreateApi';
 import { useUserCreation } from '../context/UserCreationContext';
 import StepIndicator from '../components/StepIndicator';
 import { toast } from 'react-toastify';
+import { isEmployeeUser, isSuperAdminUser } from '../utils/accessControl';
+import { normalizeUserRole, isSuperAdmin } from '../utils/userAccess';
 
 const steps = ['Basic Info', 'Address & Documents', 'POS Assignment', 'ChargeSet'];
 
@@ -14,6 +16,11 @@ function CreateUser({ currentUser }) {
   const { state, dispatch } = useUserCreation();
   const { mutate: signup, isPending, isError, error } = createUser();
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const normalizedCurrentUserRole = normalizeUserRole(currentUser?.role);
+  const isEmployee = isEmployeeUser(currentUser) || normalizedCurrentUserRole === 'employee';
+  const isSuperAdminViewer = isSuperAdminUser(currentUser) || isSuperAdmin(currentUser) || normalizedCurrentUserRole === 'super_admin';
+  const canCreateSuperFranchise = Boolean(isEmployee || isSuperAdminViewer);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,7 +75,7 @@ function CreateUser({ currentUser }) {
                     onChange={handleChange}
                   /> Merchant
                 </label>
-                {currentUser.role !== 'franchise' && (
+                {currentUser?.role !== 'franchise' && (
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
@@ -77,6 +84,17 @@ function CreateUser({ currentUser }) {
                       checked={state.formData.role === 'franchise'}
                       onChange={handleChange}
                     /> Franchise
+                  </label>
+                )}
+                {canCreateSuperFranchise && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="super_franchise"
+                      checked={state.formData.role === 'super_franchise'}
+                      onChange={handleChange}
+                    /> Super Franchise
                   </label>
                 )}
               </div>
