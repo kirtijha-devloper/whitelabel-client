@@ -346,6 +346,9 @@ const USER_SERVICE_INLINE_LABELS = {
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
   mx_payout: "Payout MX",
+  pos_inventory: "POS Machine",
+  qr_inventory: "QR & Soundbox",
+  pg_inventory: "PG Routing",
 };
 
 const MASTER_SERVICE_CONTROLS = [
@@ -931,7 +934,7 @@ const UserList = ({
 
     return (
       <div
-        className={`inline-grid grid-cols-2 items-start gap-x-5 gap-y-1.5 whitespace-normal ${className}`.trim()}
+        className={`grid grid-cols-2 items-center gap-x-3 gap-y-1.5 w-full ${className}`.trim()}
       >
         {SERVICE_FLAG_CONFIG.filter((service) => service.key !== "user_daily_limit" && service.key !== "pos_t0_settlement").map((service) => {
           const { rawEnabled, isSuperAdminDisabled, isAdminGlobalDisabled, isGloballyBlocked } = getServiceToggleState(row, service.key);
@@ -945,38 +948,43 @@ const UserList = ({
             : undefined;
 
           return (
-            <div key={service.key} className="flex items-center">
+            <div key={service.key} className="flex items-center min-w-0">
               <label
-                title={tooltip}
-                className={`inline-flex items-center gap-2 whitespace-nowrap rounded px-0.5 py-0.5 text-[13px] ${
-                  isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700"
+                title={tooltip || service.label}
+                className={`flex items-center justify-between w-full gap-1.5 rounded px-1 py-0.5 text-xs transition-colors ${
+                  isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700 hover:bg-gray-100/70"
                 }`}
               >
-                <span className={`font-medium leading-none ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}>
+                <span
+                  className={`truncate font-medium ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}
+                  title={service.label}
+                >
                   {USER_SERVICE_INLINE_LABELS[service.key] || service.label}
                 </span>
 
-                {isSuperAdminDisabled ? (
-                  <span title="Locked globally by Super Admin" className="inline-flex items-center text-rose-500">
-                    <Lock className="h-3 w-3" />
-                  </span>
-                ) : isAdminGlobalDisabled ? (
-                  <span title="Disabled in Organization Settings by Admin" className="inline-flex items-center text-amber-500">
-                    <AlertTriangle className="h-3 w-3" />
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                  {isSuperAdminDisabled ? (
+                    <span title="Locked globally by Super Admin" className="inline-flex items-center text-rose-500">
+                      <Lock className="h-3 w-3" />
+                    </span>
+                  ) : isAdminGlobalDisabled ? (
+                    <span title="Disabled in Organization Settings by Admin" className="inline-flex items-center text-amber-500">
+                      <AlertTriangle className="h-3 w-3" />
+                    </span>
+                  ) : null}
 
-                <input
-                  type="checkbox"
-                  checked={!isGloballyBlocked && rawEnabled}
-                  disabled={!canManageUserServiceSettings || isUpdating || isGloballyBlocked}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    if (isGloballyBlocked) return;
-                    confirmToggleUserService(row, service, event.target.checked);
-                  }}
-                  className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-primary focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed"
-                />
+                  <input
+                    type="checkbox"
+                    checked={!isGloballyBlocked && rawEnabled}
+                    disabled={!canManageUserServiceSettings || isUpdating || isGloballyBlocked}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      if (isGloballyBlocked) return;
+                      confirmToggleUserService(row, service, event.target.checked);
+                    }}
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed cursor-pointer"
+                  />
+                </div>
               </label>
             </div>
           );
@@ -1109,7 +1117,7 @@ const UserList = ({
       {
         header: "Services",
         key: "user_service_settings",
-        render: (_value, row) => renderServiceSettingsInline(row, "min-w-[190px]"),
+        render: (_value, row) => renderServiceSettingsInline(row, "min-w-[260px]"),
       },
       {
         header: "KYC",
@@ -2122,7 +2130,7 @@ const UserList = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {MASTER_SERVICE_CONTROLS.map((service) => {
                 const isPending = bulkServiceUpdatingKey === service.key;
                 const masterConfig = masterServiceSettingsData?.[service.key];
