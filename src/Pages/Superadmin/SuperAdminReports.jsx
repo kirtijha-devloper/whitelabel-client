@@ -15,6 +15,9 @@ import {
   CheckCircle2,
   Layers,
   SlidersHorizontal,
+  FileX2,
+  Inbox,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { normalizeUserRole } from "../../utils/userAccess";
@@ -401,7 +404,7 @@ export default function SuperAdminReports({ currentUser }) {
       render: (value) => {
         const st = String(value || "").toLowerCase();
         let badgeStyle = "bg-gray-100 text-gray-700 border-gray-200";
-        if (st === "completed" || st === "success" || st === "captured") {
+        if (st === "completed" || st === "success" || st === "captured" || st === "authorized") {
           badgeStyle = "bg-green-50 text-green-700 border-green-200";
         } else if (st === "pending" || st === "created") {
           badgeStyle = "bg-yellow-50 text-yellow-700 border-yellow-200";
@@ -418,7 +421,7 @@ export default function SuperAdminReports({ currentUser }) {
       Cell: ({ value }) => {
         const st = String(value || "").toLowerCase();
         let badgeStyle = "bg-gray-100 text-gray-700 border-gray-200";
-        if (st === "completed" || st === "success" || st === "captured") {
+        if (st === "completed" || st === "success" || st === "captured" || st === "authorized") {
           badgeStyle = "bg-green-50 text-green-700 border-green-200";
         } else if (st === "pending" || st === "created") {
           badgeStyle = "bg-yellow-50 text-yellow-700 border-yellow-200";
@@ -613,18 +616,18 @@ export default function SuperAdminReports({ currentUser }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="w-full min-h-full bg-gray-50/60 p-4 sm:p-6 lg:p-8 space-y-6">
       {/* ── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
             {activeTab === "service_reports"
               ? "Service Wise Reports"
               : activeTab === "service_management"
               ? "Service Management"
               : "Reports"}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
             {activeTab === "service_reports"
               ? "Volume, success rates, charge collections, and partner commissions categorized by individual service."
               : activeTab === "service_management"
@@ -634,12 +637,12 @@ export default function SuperAdminReports({ currentUser }) {
         </div>
 
         {(activeTab === "transactions" || activeTab === "commissions") && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => (activeTab === "transactions" ? refetchTxn() : refetchComm())}
               disabled={isFetching}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
               title="Refresh current report"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin text-[#00D3CD]" : ""}`} />
@@ -650,7 +653,7 @@ export default function SuperAdminReports({ currentUser }) {
               type="button"
               onClick={handleExport}
               disabled={isExporting || isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
             >
               <Download className="h-4 w-4" />
               <span>{isExporting ? "Exporting..." : "Download Excel"}</span>
@@ -660,14 +663,14 @@ export default function SuperAdminReports({ currentUser }) {
       </div>
 
       {/* ── Top Clickable Tab Bar ────────────────────────────────────────────── */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto p-1.5 bg-gray-200/60 rounded-2xl w-fit max-w-full no-scrollbar border border-gray-200/70">
         <button
           type="button"
           onClick={() => handleTabSwitch("transactions")}
-          className={`flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+          className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-bold transition-all ${
             activeTab === "transactions"
-              ? "border-[#00D3CD] bg-[#00D3CD] text-white ring-2 ring-[#00D3CD]/20"
-              : "border-gray-300 bg-white text-gray-700 hover:border-[#00D3CD] hover:text-[#00D3CD]"
+              ? "bg-[#00D3CD] text-white shadow-md shadow-[#00D3CD]/25"
+              : "text-gray-600 hover:text-gray-900 hover:bg-white/60"
           }`}
         >
           <Activity className="h-4 w-4" />
@@ -677,10 +680,10 @@ export default function SuperAdminReports({ currentUser }) {
         <button
           type="button"
           onClick={() => handleTabSwitch("commissions")}
-          className={`flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+          className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-bold transition-all ${
             activeTab === "commissions"
-              ? "border-[#00D3CD] bg-[#00D3CD] text-white ring-2 ring-[#00D3CD]/20"
-              : "border-gray-300 bg-white text-gray-700 hover:border-[#00D3CD] hover:text-[#00D3CD]"
+              ? "bg-[#00D3CD] text-white shadow-md shadow-[#00D3CD]/25"
+              : "text-gray-600 hover:text-gray-900 hover:bg-white/60"
           }`}
         >
           <DollarSign className="h-4 w-4" />
@@ -690,29 +693,16 @@ export default function SuperAdminReports({ currentUser }) {
         <button
           type="button"
           onClick={() => handleTabSwitch("service_reports")}
-          className={`flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+          className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-bold transition-all ${
             activeTab === "service_reports"
-              ? "border-[#00D3CD] bg-[#00D3CD] text-white ring-2 ring-[#00D3CD]/20"
-              : "border-gray-300 bg-white text-gray-700 hover:border-[#00D3CD] hover:text-[#00D3CD]"
+              ? "bg-[#00D3CD] text-white shadow-md shadow-[#00D3CD]/25"
+              : "text-gray-600 hover:text-gray-900 hover:bg-white/60"
           }`}
         >
           <Layers className="h-4 w-4" />
           <span>Service Wise Reports</span>
         </button>
-
-        {/* <button
-          type="button"
-          onClick={() => handleTabSwitch("service_management")}
-          className={`flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition-all shadow-sm ${
-            activeTab === "service_management"
-              ? "border-[#00D3CD] bg-[#00D3CD] text-white ring-2 ring-[#00D3CD]/20"
-              : "border-gray-300 bg-white text-gray-700 hover:border-[#00D3CD] hover:text-[#00D3CD]"
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span>Service Management</span>
-        </button>
-      </div> */}
+      </div>
 
       {activeTab === "service_reports" && (
         <ServiceWiseReports embedded currentUser={currentUser} />
@@ -725,288 +715,547 @@ export default function SuperAdminReports({ currentUser }) {
       {(activeTab === "transactions" || activeTab === "commissions") && (
         <>
           {/* ── Summary KPI Cards ────────────────────────────────────────────────── */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {activeTab === "transactions" ? (
-          <>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Volume</span>
-                <span className="rounded-lg bg-[#00D3CD]/10 p-2 text-[#00D3CD]">
-                  <TrendingUp className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                ₹{Number(summary.total_volume || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">Total transaction throughput</p>
-            </div>
+          <div className="w-full mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {activeTab === "transactions" ? (
+              <>
+                {/* Total Volume */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Volume</span>
+                    <span className="rounded-xl bg-[#00D3CD]/10 p-2.5 text-[#00D3CD]">
+                      <TrendingUp className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                      ₹{Number(summary.total_volume || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00D3CD]" />
+                      Total transaction throughput
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Transactions</span>
-                <span className="rounded-lg bg-blue-50 p-2 text-blue-600">
-                  <Activity className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{summary.total_count || 0}</p>
-              <p className="mt-1 text-xs text-gray-400">Total records matching filters</p>
-            </div>
+                {/* Total Transactions */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Transactions</span>
+                    <span className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                      <Activity className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                      {Number(summary.total_count || 0).toLocaleString("en-IN")}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      Total records matching filters
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Successful Txns</span>
-                <span className="rounded-lg bg-green-50 p-2 text-green-600">
-                  <CheckCircle2 className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-green-700">{summary.success_count || 0}</p>
-              <p className="mt-1 text-xs text-green-600">Success rate: {summary.success_rate || 0}%</p>
-            </div>
+                {/* Successful Txns */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Success Rate</span>
+                    <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-extrabold text-emerald-600 tracking-tight">
+                        {summary.success_rate || 0}%
+                      </p>
+                      <span className="text-xs font-medium text-emerald-700/80">
+                        ({Number(summary.success_count || 0).toLocaleString("en-IN")} txns)
+                      </span>
+                    </div>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600/70">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Successfully captured transactions
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Failed Txns</span>
-                <span className="rounded-lg bg-red-50 p-2 text-red-600">
-                  <Activity className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-red-600">{summary.failed_count || 0}</p>
-              <p className="mt-1 text-xs text-red-500">Declined or aborted attempts</p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Gross Txn Volume</span>
-                <span className="rounded-lg bg-blue-50 p-2 text-blue-600">
-                  <TrendingUp className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                ₹{Number(summary.total_transaction_volume || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">Base transactions charged</p>
-            </div>
+                {/* Failed Txns */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Failed Txns</span>
+                    <span className="rounded-xl bg-red-50 p-2.5 text-red-600">
+                      <Activity className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-red-600 tracking-tight">
+                      {Number(summary.failed_count || 0).toLocaleString("en-IN")}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-red-500/80">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
+                      Declined or aborted attempts
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Gross Volume */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Gross Txn Volume</span>
+                    <span className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                      <TrendingUp className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                      ₹{Number(summary.total_transaction_volume || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      Base transactions processed
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Commissions</span>
-                <span className="rounded-lg bg-[#00D3CD]/10 p-2 text-[#00D3CD]">
-                  <DollarSign className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-[#00D3CD]">
-                ₹{Number(summary.total_commission_revenue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">Total fees earned</p>
-            </div>
+                {/* Total Commissions */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Commissions</span>
+                    <span className="rounded-xl bg-[#00D3CD]/10 p-2.5 text-[#00D3CD]">
+                      <DollarSign className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-[#00D3CD] tracking-tight">
+                      ₹{Number(summary.total_commission_revenue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00D3CD]" />
+                      Net platform revenue earned
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total GST</span>
-                <span className="rounded-lg bg-purple-50 p-2 text-purple-600">
-                  <Activity className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-purple-700">
-                ₹{Number(summary.total_gst_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">18% GST collected on fees</p>
-            </div>
+                {/* Total GST */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total GST (18%)</span>
+                    <span className="rounded-xl bg-purple-50 p-2.5 text-purple-600">
+                      <Activity className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-purple-700 tracking-tight">
+                      ₹{Number(summary.total_gst_collected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-purple-600/70">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />
+                      GST collected on fee charges
+                    </p>
+                  </div>
+                </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Net Merchant Payout</span>
-                <span className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
-                  <CheckCircle2 className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold text-emerald-700">
-                ₹{Number(summary.total_net_payout || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">Disbursed to merchants</p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Filters Card ─────────────────────────────────────────────────────── */}
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-[#00D3CD]" />
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-700">Filter Reports</span>
+                {/* Net Merchant Payout */}
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Net Merchant Payout</span>
+                    <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-extrabold text-emerald-700 tracking-tight">
+                      ₹{Number(summary.total_net_payout || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600/70">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Disbursed net settlement
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="text-xs font-medium text-gray-500 hover:text-[#00D3CD]"
-          >
-            Reset Filters
-          </button>
-        </div>
+          {/* ── Filters Card ─────────────────────────────────────────────────────── */}
+          <div className="w-full rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="rounded-lg bg-[#00D3CD]/10 p-1.5 text-[#00D3CD]">
+                  <Filter className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-900">Filter Reports</h3>
+                  <p className="text-[11px] text-gray-500">Filter by domain, date range, status, or search term</p>
+                </div>
+              </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {/* Domain / Partner Filter */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600">Partner Domain / Company</label>
-            <select
-              value={selectedDomain}
-              onChange={(e) => {
-                setSelectedDomain(e.target.value);
-                setPage(1);
-              }}
-              className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-            >
-              <option value="">All Domains & Companies</option>
-              {domainOptions.map((opt) => (
-                <option key={opt.company_id} value={opt.domain_name !== "-" ? opt.domain_name : opt.company_id}>
-                  {opt.domain_name !== "-" ? `${opt.domain_name} (${opt.company_name})` : opt.company_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date Range: From */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600">From Date</label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setPage(1);
-              }}
-              className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-            />
-          </div>
-
-          {/* Date Range: To */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600">To Date</label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setPage(1);
-              }}
-              className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-            />
-          </div>
-
-          {/* Status or Payment Method */}
-          {activeTab === "transactions" ? (
-            <div>
-              <label className="block text-xs font-medium text-gray-600">Status</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value);
-                  setPage(1);
-                }}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-              >
-                <option value="">All Statuses</option>
-                <option value="completed">Completed / Success</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-xs font-medium text-gray-600">Payment Mode</label>
-              <select
-                value={selectedPaymentMethod}
-                onChange={(e) => {
-                  setSelectedPaymentMethod(e.target.value);
-                  setPage(1);
-                }}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-              >
-                <option value="">All Modes</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI</option>
-                <option value="netbanking">Net Banking</option>
-              </select>
-            </div>
-          )}
-
-          {/* Search Box */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600">Keyword Search</label>
-            <form onSubmit={handleSearchSubmit} className="mt-1 flex gap-1">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Txn ID, RRN, Merchant..."
-                className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-800 shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-              />
-              <button
-                type="submit"
-                className="rounded-lg bg-[#00D3CD] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#00bdb7]"
-                title="Search"
-              >
-                <Search className="h-3.5 w-3.5" />
-              </button>
-              {committedSearch && (
+              {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
                 <button
                   type="button"
-                  onClick={handleSearchClear}
-                  className="rounded-lg border border-gray-300 bg-gray-100 px-2 text-xs text-gray-600 hover:bg-gray-200"
+                  onClick={handleResetFilters}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
                 >
-                  ✕
+                  <span>Reset All Filters</span>
+                  <span className="text-[10px] text-red-400">✕</span>
                 </button>
               )}
-            </form>
-          </div>
-        </div>
-      </div>
+            </div>
 
-      {/* ── Data Table & Pagination ──────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#00D3CD]" />
-              <p className="text-xs text-gray-500">Loading {activeTab} data...</p>
+            <div className="w-full grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+              {/* Domain / Partner Filter */}
+              <div className="lg:col-span-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Partner Domain / Company</label>
+                <select
+                  value={selectedDomain}
+                  onChange={(e) => {
+                    setSelectedDomain(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                >
+                  <option value="">All Domains & Companies</option>
+                  {domainOptions.map((opt) => (
+                    <option key={opt.company_id} value={opt.domain_name !== "-" ? opt.domain_name : opt.company_id}>
+                      {opt.domain_name !== "-" ? `${opt.domain_name} (${opt.company_name})` : opt.company_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Range: From */}
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                />
+              </div>
+
+              {/* Date Range: To */}
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                />
+              </div>
+
+              {/* Status or Payment Method */}
+              <div className="lg:col-span-2">
+                {activeTab === "transactions" ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={selectedStatus}
+                      onChange={(e) => {
+                        setSelectedStatus(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="completed">Completed / Authorized</option>
+                      <option value="pending">Pending</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Mode</label>
+                    <select
+                      value={selectedPaymentMethod}
+                      onChange={(e) => {
+                        setSelectedPaymentMethod(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                    >
+                      <option value="">All Modes</option>
+                      <option value="card">Card</option>
+                      <option value="upi">UPI</option>
+                      <option value="netbanking">Net Banking</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Search Box - Takes remaining 3 columns */}
+              <div className="lg:col-span-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Keyword Search</label>
+                <form onSubmit={handleSearchSubmit} className="flex gap-1.5 w-full">
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Txn ID, RRN, Merchant..."
+                    className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all placeholder:text-gray-400 focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+                  />
+                  <button
+                    type="submit"
+                    className="flex shrink-0 items-center justify-center rounded-xl bg-[#00D3CD] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#00bdb7] transition-all"
+                    title="Search"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                  {committedSearch && (
+                    <button
+                      type="button"
+                      onClick={handleSearchClear}
+                      className="flex shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-100 px-2.5 text-xs text-gray-600 hover:bg-gray-200 transition-all"
+                      title="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </form>
+              </div>
             </div>
           </div>
-        ) : currentData.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
-            <div className="rounded-full bg-gray-100 p-3 text-gray-400">
-              <Filter className="h-6 w-6" />
+
+      {/* ── Data Table & Pagination Card ────────────────────────────────────── */}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        {/* Desktop / Tablet Table View */}
+        <div className="hidden md:block overflow-x-auto">
+          {isLoading ? (
+            <div className="flex h-72 flex-col items-center justify-center gap-3">
+              <div className="h-9 w-9 animate-spin rounded-full border-4 border-gray-200 border-t-[#00D3CD]" />
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-800">
+                  Loading {activeTab === "transactions" ? "Transactions" : "Commissions"}
+                </p>
+                <p className="text-xs text-gray-400">Fetching records from server...</p>
+              </div>
             </div>
-            <h3 className="mt-3 text-sm font-semibold text-gray-900">No records found</h3>
-            <p className="mt-1 text-xs text-gray-500 max-w-sm">
-              No {activeTab} match the chosen filters or domain. Try clearing filters or picking a different date range.
-            </p>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="mt-4 rounded-lg bg-[#00D3CD] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#00bdb7]"
-            >
-              Reset Filters
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+          ) : currentData.length === 0 ? (
+            <div className="min-w-full">
+              {/* Clean Table Skeleton with Header intact */}
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-gray-50/80 border-b border-gray-100">
+                  <tr>
+                    {(activeTab === "transactions" ? transactionColumns : commissionColumns).map((col, idx) => (
+                      <th
+                        key={idx}
+                        className="px-4 py-3.5 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {col.header || col.Header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td
+                      colSpan={(activeTab === "transactions" ? transactionColumns : commissionColumns).length}
+                      className="py-16 text-center"
+                    >
+                      <div className="mx-auto flex max-w-sm flex-col items-center justify-center">
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00D3CD]">
+                          <Inbox className="h-7 w-7" />
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-900">
+                          No {activeTab === "transactions" ? "Transactions" : "Commissions"} Found
+                        </h4>
+                        <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+                          {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
+                            ? "No records matched your selected filters or search keyword. Try clearing or expanding your date range."
+                            : `There are currently no recorded ${activeTab === "transactions" ? "transactions" : "commissions"} in the system.`}
+                        </p>
+                        {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
+                          <button
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#00D3CD] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#00bdb7] transition-all"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            <span>Reset Filters</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
             <Table
               columns={activeTab === "transactions" ? transactionColumns : commissionColumns}
               data={currentData}
+              containerClassName="min-w-full overflow-x-auto"
+              headerClassName="bg-gray-50/80 border-b border-gray-100"
+              headerCellClassName="px-4 py-3.5 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+              bodyCellClassName="px-4 py-3.5 whitespace-nowrap text-xs text-gray-800 border-b border-gray-50"
             />
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Mobile View (< md) */}
+        <div className="block md:hidden">
+          {isLoading ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#00D3CD]" />
+              <p className="text-xs text-gray-500">Loading {activeTab} data...</p>
+            </div>
+          ) : currentData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00D3CD]">
+                <Inbox className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold text-gray-900">
+                No {activeTab === "transactions" ? "Transactions" : "Commissions"}
+              </h4>
+              <p className="mt-1 text-xs text-gray-500 max-w-xs">
+                {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
+                  ? "No results match your active filters."
+                  : "No data available."}
+              </p>
+              {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#00D3CD] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#00bdb7]"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Reset Filters</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {currentData.map((row, idx) => {
+                const rowKey = row.id || row.order_id || row.txn_id || row.razorpay_transaction_id || idx;
+                const status = (row.status || "").toLowerCase();
+                const statusBadge =
+                  status === "completed" || status === "success" || status === "captured"
+                    ? "bg-green-50 text-green-700 ring-1 ring-green-600/20"
+                    : status === "pending" || status === "created"
+                    ? "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20"
+                    : status === "failed"
+                    ? "bg-red-50 text-red-700 ring-1 ring-red-600/20"
+                    : "bg-gray-100 text-gray-700 ring-1 ring-gray-400/20";
+
+                return (
+                  <div key={rowKey} className="p-4 space-y-3 bg-white hover:bg-gray-50/60 transition-colors">
+                    {/* Card Header: Identifier / Service & Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-gray-900 truncate">
+                            {activeTab === "transactions"
+                              ? (row.txn_id || row.order_id || "N/A")
+                              : (row.razorpay_transaction_id || "Commission")}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 truncate mt-0.5 font-medium">
+                          {row.merchant?.name || row.merchant_name || row.company?.company_name || row.company?.domain_name || "Merchant"}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusBadge}`}>
+                        {status || "N/A"}
+                      </span>
+                    </div>
+
+                    {/* Card Body: Details Grid */}
+                    <div className="grid grid-cols-2 gap-2.5 text-xs bg-gray-50/70 p-3 rounded-xl border border-gray-100">
+                      {activeTab === "transactions" ? (
+                        <>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Amount</span>
+                            <span className="font-bold text-gray-900 text-sm">
+                              ₹{Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Domain</span>
+                            <span className="font-semibold text-gray-700 truncate block">
+                              {row.company?.domain_name || "-"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Payment Mode</span>
+                            <span className="font-semibold text-gray-700 uppercase">
+                              {row.payment_method || "N/A"} {row.card_type ? `(${row.card_type})` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">POS TID</span>
+                            <span className="font-mono text-gray-700 font-medium">
+                              {row.pos_machine?.tid_number || "-"}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Commission</span>
+                            <span className="font-bold text-[#00D3CD] text-sm">
+                              ₹{Number(row.charge_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Txn Volume</span>
+                            <span className="font-bold text-gray-800">
+                              ₹{Number(row.transaction_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">GST ({row.gst_percent || 18}%)</span>
+                            <span className="font-semibold text-purple-600">
+                              ₹{Number(row.gst_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Net Payout</span>
+                            <span className="font-bold text-emerald-600">
+                              ₹{Number(row.net_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Card Footer: Metadata / Timestamps */}
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                      <span className="truncate max-w-[200px]">
+                        RRN: <span className="font-mono text-gray-700 font-medium">{row.rr_number || "—"}</span>
+                      </span>
+                      <span className="shrink-0 text-gray-400 font-medium">
+                        {(row.created_at || row.createdAt)
+                          ? new Date(row.created_at || row.createdAt).toLocaleString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* ── Table Footer & Pagination ────────────────────────────────────────── */}
         {!isLoading && currentData.length > 0 && (
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 sm:flex-row">
-            <span className="text-xs text-gray-600">
-              Showing page <span className="font-semibold">{page}</span> of{" "}
-              <span className="font-semibold">{totalPages}</span> ({totalRecords} records)
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3.5 sm:flex-row">
+            <span className="text-xs text-gray-500 font-medium">
+              Showing page <span className="font-bold text-gray-800">{page}</span> of{" "}
+              <span className="font-bold text-gray-800">{totalPages}</span> ({Number(totalRecords).toLocaleString("en-IN")} total records)
             </span>
 
             <div className="flex items-center gap-2">
@@ -1014,7 +1263,7 @@ export default function SuperAdminReports({ currentUser }) {
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Previous
               </button>
@@ -1022,7 +1271,7 @@ export default function SuperAdminReports({ currentUser }) {
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next
               </button>
@@ -1032,7 +1281,6 @@ export default function SuperAdminReports({ currentUser }) {
       </div>
         </>
       )}
-    </div>
     </div>
   );
 }
