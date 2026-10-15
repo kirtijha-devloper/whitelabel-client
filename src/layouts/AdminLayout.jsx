@@ -129,7 +129,10 @@ const ServiceWiseReports = lazy(
 const SuperAdminReports = lazy(() => import("../Pages/Superadmin/SuperAdminReports"));
 
 const AdminList = lazy(() => import("../Pages/AdminList"));
-const SuperAdminsettlement= lazy(()=> import("../Pages/Superadmin/SuperAdminsettlement"))
+const SuperAdminsettlement = lazy(() => import("../Pages/Superadmin/SuperAdminsettlement"));
+const AdminSpecificRateManagement = lazy(
+  () => import("../Pages/Superadmin/AdminSpecificRateManagement")
+);
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -338,6 +341,50 @@ export default function AdminLayout() {
                 element={
                   isSuperAdminViewer ? (
                     <AdminProfile currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="admin/:adminId/rates"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="admin/:adminId/rates/:category"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/super-admin/admin/:adminId/rates"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/super-admin/admin/:adminId/rates/:category"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
                   ) : (
                     <Navigate to="/login" replace />
                   )

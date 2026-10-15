@@ -2071,9 +2071,9 @@ export const deletePosTransactionCharge = async (id) => {
   }
 };
 
-export const listBbpsChargeRules = async () => {
+export const listBbpsChargeRules = async (params = {}) => {
   try {
-    const res = await axios.get(`${BASE_URL}/bbps-cc/charge-rules`, getAuthHeaders());
+    const res = await axios.get(`${BASE_URL}/bbps-cc/charge-rules`, { ...getAuthHeaders(), params });
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Failed to fetch BBPS CC bill payment charge rules');
@@ -2596,3 +2596,50 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
   }
 };
 
+// ── Super Admin Admin-Specific Rate Management Helpers ───────────────────────
+export const fetchPlatformDefaultPosRules = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/pos-charge-rules/list?scope=admin_default&limit=200`, getAuthHeaders());
+    return res.data?.data || [];
+  } catch (error) {
+    console.error('Failed to fetch platform default POS rules:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch platform default POS rules');
+  }
+};
+
+export const fetchAdminPosRules = async (adminId) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/pos-charge-rules/list?user_id=${adminId}&limit=200`, getAuthHeaders());
+    return res.data?.data || [];
+  } catch (error) {
+    console.error(`Failed to fetch POS rules for admin ${adminId}:`, error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admin POS rules');
+  }
+};
+
+export const createAdminPosRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/pos-charge-rules`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to create admin POS rule');
+  }
+};
+
+export const updateAdminPosRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/pos-charge-rules/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to update admin POS rule');
+  }
+};
+
+export const deleteAdminPosRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/pos-charge-rules/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete admin POS rule');
+  }
+};
