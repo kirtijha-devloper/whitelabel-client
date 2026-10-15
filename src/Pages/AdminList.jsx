@@ -520,8 +520,6 @@ const AdminList = ({
     const companyData = {
 
       id:
-        row.company?.id ||
-        row.company_id ||
         row.id,
 
       company_id:

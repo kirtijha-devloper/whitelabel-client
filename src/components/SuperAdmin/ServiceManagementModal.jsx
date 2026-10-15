@@ -5,12 +5,6 @@ import { getAdminServices } from "../../api/superAdminApi";
 import ConfirmationModal from "../Common/ConfirmationModal";
 
 const FALLBACK_SERVICES = [
-  { key: "pos", label: "POS", category: "POS & Hardware" },
-  { key: "pg", label: "Payment Gateway", category: "Payment Gateway" },
-  { key: "qr", label: "QR Payments", category: "Digital QR" },
-  { key: "soundbox", label: "Soundbox", category: "Digital QR" },
-  { key: "dmt", label: "DMT & Payouts", category: "Payout & Banking" },
-  { key: "billpayments", label: "Bill Payments", category: "Bill Payments" },
 ];
 
 // Stable empty reference — prevents useQuery's `= {}` default from creating a
@@ -154,23 +148,6 @@ const ServiceManagementModal = ({
             </button>
           </div>
 
-          {/* CATEGORY TABS */}
-          <div className="px-6 py-2.5 border-b border-gray-100 flex items-center gap-1 overflow-x-auto bg-white">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedCategory === cat
-                    ? "bg-[#00D3CD] text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {cat === "all" ? "All Services" : cat}
-              </button>
-            ))}
-          </div>
 
           {/* SERVICES LIST */}
           <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
