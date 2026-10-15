@@ -1,406 +1,409 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  CreditCard, CheckCircle, XCircle, History,
-  Eye, EyeOff, FileText, MoreHorizontal, Wallet, MessageSquareWarning, Settings,
-  ChevronRight, ChevronDown, Megaphone, Star, HandCoins, BookText, ReceiptIndianRupee, FileBarChart,
+  CreditCard,
+  CheckCircle2,
+  XCircle,
+  History,
+  Wallet,
+  TrendingUp,
+  Smartphone,
+  ChevronRight,
+  BookText,
+  ReceiptIndianRupee,
+  FileBarChart,
+  HandCoins,
+  Settings,
+  ArrowRight,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
+import DashboardChartLauncher from "../../components/DashboardChartLauncher";
 
 const MerchantDashboard = ({ dashboardData, currentUser }) => {
-  const data = dashboardData?.data ?? dashboardData ?? {};
-  const {
-    pos_machines = {},
-    pos_transactions = {},
-    ccBillPaymentTXN = 0,
-    ccBillPaymentSuccess = 0,
-    ccBillPaymentFailed = 0,
-    today_total_payout,
-  } = data;
+  const navigate = useNavigate();
+  const data = (dashboardData && typeof dashboardData === "object" && "data" in dashboardData ? dashboardData.data : dashboardData) || {};
+  const pos_machines = data?.pos_machines || {};
+  const pos_transactions = data?.pos_transactions || {};
+  const ccBillPaymentTXN = data?.ccBillPaymentTXN ?? 0;
+  const ccBillPaymentSuccess = data?.ccBillPaymentSuccess ?? 0;
+  const ccBillPaymentFailed = data?.ccBillPaymentFailed ?? 0;
+  const today_total_payout = data?.today_total_payout ?? 0;
 
-  const [showCCDetails, setShowCCDetails] = useState(false);
-  const [showUpdates, setShowUpdates] = useState(window.innerWidth > 768);
-  const [showMoreActions, setShowMoreActions] = useState(false);
+  const posMachineCount = pos_machines?.count ?? pos_machines?.total ?? 0;
+  const posTotal = pos_transactions?.total ?? 0;
+  const posSuccess = pos_transactions?.success ?? 0;
+  const posFail = pos_transactions?.fail ?? 0;
+
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
 
-  const ccPaymentCards = [
-    { label: "CC Bill Payment TXN", value: ccBillPaymentTXN, featured: true },
-    { label: "CC Bill Payment Success", value: ccBillPaymentSuccess },
-    { label: "CC Bill Payment Failed", value: ccBillPaymentFailed },
+  const toNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const formatAmount = (value) =>
+    toNumber(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const formatCount = (value) => toNumber(value).toLocaleString("en-IN");
+
+  // Summary Metrics Cards (Responsive 2-col on mobile, 4-col on desktop)
+  const summaryCards = [
+    {
+      title: "POS Machines",
+      value: formatCount(posMachineCount),
+      isCurrency: false,
+      subtitle: "Active terminal assigned",
+      icon: Smartphone,
+      iconBox: "bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20",
+      cardClass: "bg-white border-gray-100 hover:border-[#00D3CD]/40",
+      isHero: false,
+    },
+    {
+      title: "Today's Transactions",
+      value: `₹${formatAmount(posTotal)}`,
+      isCurrency: true,
+      subtitle: "Total transaction volume today",
+      icon: TrendingUp,
+      iconBox: "bg-white/20 text-white",
+      cardClass: "bg-gradient-to-br from-[#00D3CD] to-[#00b8b3] text-white shadow-sm border-[#00D3CD]/30",
+      isHero: true,
+    },
+    {
+      title: "Successful",
+      value: `₹${formatAmount(posSuccess)}`,
+      isCurrency: true,
+      subtitle: "Completed & captured volume",
+      badge: "Settled",
+      badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+      iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+      cardClass: "bg-white border-gray-100 hover:border-emerald-200",
+      isHero: false,
+    },
+    {
+      title: "Failed",
+      value: `₹${formatAmount(posFail)}`,
+      isCurrency: true,
+      subtitle: "Declined or rejected requests",
+      badge: "Failed",
+      badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+      icon: XCircle,
+      iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
+      cardClass: "bg-white border-gray-100 hover:border-rose-200",
+      isHero: false,
+    },
   ];
 
-  const latestUpdates = [
-    { text: "System maintenance scheduled for next week...", time: "2h ago", icon: <Megaphone className="h-4 w-4 text-[#00D3CD]" /> },
-    { text: "New features coming soon...", time: "1d ago", icon: <Star className="h-4 w-4 text-[#00D3CD]" /> },
+  // Quick Action Services (One-tap navigation on all screens)
+  const quickServices = [
+    {
+      label: "CC Bill Pay",
+      to: "/merchant/cc-bill-pay",
+      icon: CreditCard,
+      disabled: !serviceFlags.cc_bill_pay,
+    },
+    {
+      label: "BA CC Bill",
+      to: "/merchant/ba-cc-bill-pay",
+      icon: CreditCard,
+      disabled: !serviceFlags.ba_cc_bill_pay,
+    },
+    {
+      label: "Payout Hub",
+      to: "/merchant/payout-hub",
+      icon: HandCoins,
+      disabled: false,
+    },
+    {
+      label: "Ledger",
+      to: "/merchant/ledger",
+      icon: BookText,
+      disabled: false,
+    },
+    {
+      label: "Charges",
+      to: "/merchant/charges",
+      icon: ReceiptIndianRupee,
+      disabled: false,
+    },
+    {
+      label: "Reports",
+      to: "/merchant/reports",
+      icon: FileBarChart,
+      disabled: false,
+    },
+    {
+      label: "Settings",
+      to: "/merchant/setting",
+      icon: Settings,
+      disabled: false,
+    },
+  ];
+
+  // CC Payment Breakdown Cards
+  const ccPaymentCards = [
+    {
+      label: "Today CC Billpayment TXN",
+      value: ccBillPaymentTXN,
+      subtitle: "Total credit card payments initiated",
+      icon: CreditCard,
+      iconBox: "bg-sky-50 text-sky-600 border border-sky-100",
+    },
+    {
+      label: "Today CC Success",
+      value: ccBillPaymentSuccess,
+      subtitle: "Successfully captured without biller errors",
+      badge: "Success",
+      badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+      iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+    },
+    {
+      label: "Today CC Failed",
+      value: ccBillPaymentFailed,
+      subtitle: "Declined or rejected bill requests",
+      badge: "Failed",
+      badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+      icon: XCircle,
+      iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
+    },
   ];
 
   return (
-    <div>
-
-      {/* ══════════════════════════════
-          MOBILE ONLY  (hidden on md+)
-      ══════════════════════════════ */}
-      <div className="md:hidden space-y-3">
-
-        {/* Quick Overview */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">Quick Overview</h2>
-
-          </div>
-          <div className="grid grid-cols-2 gap-2 font-medium" label="center ">
-            <MobileOverviewCard
-              title="POS Machines"
-              value={pos_machines.count || 0}
-              icon={<CreditCard className="h-8 w-8 text-indigo-400" />}
-            />
-            <MobileOverviewCard
-              title="Today's Transactions"
-              value={pos_transactions.total || 0}
-              icon={<FileText className="h-8 w-8 text-purple-400" />}
-            />
-            <MobileOverviewCard
-              title="Successful"
-              value={pos_transactions.success || 0}
-              icon={<CheckCircle className="h-8 w-8 text-green-500" />}
-              valueColor="text-green-600"
-            />
-            <MobileOverviewCard
-              title="Failed"
-              value={pos_transactions.fail || 0}
-              icon={<XCircle className="h-8 w-8 text-red-400" />}
-              valueColor="text-red-500"
-            />
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="rounded-2xl bg-white p-2 shadow-sm border border-gray-100">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
-            <button
-              type="button"
-              onClick={() => setShowMoreActions((prev) => !prev)}
-              className="p-2 rounded-full hover:bg-gray-100"
-              aria-label={showMoreActions ? "Hide more actions" : "Show more actions"}
+    <div className="space-y-5 sm:space-y-6">
+      {/* ================= SECTION 1: TOP SUMMARY STATS ================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {summaryCards.map((card, idx) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={idx}
+              className={`group flex min-h-[125px] sm:min-h-[145px] flex-col justify-between rounded-2xl p-3.5 sm:p-5 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${card.cardClass}`}
             >
-              <ChevronDown
-                className={`h-5 w-5 text-gray-500 transition-transform ${showMoreActions ? "rotate-180" : ""
-                  }`}
-              />
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2" label="center">
-            <QuickAction
-              to="/merchant/cc-bill-pay"
-              label="CC Bill Pay"
-              icon={<CreditCard className="h-6 w-6 text-[#00D3CD]" />}
-              disabled={!serviceFlags.cc_bill_pay}
-            />
-            <QuickAction
-              to="/merchant/ba-cc-bill-pay"
-              label="BA CC Bill"
-              icon={<CreditCard className="h-6 w-6 text-[#00D3CD]" />}
-              disabled={!serviceFlags.ba_cc_bill_pay}
-            />
-            {/*
-            <QuickAction
-              onClick={() => setShowCCDetails((p) => !p)}
-              label="CC Details"
-              icon={<FileText className="h-6 w-6 text-[#00D3CD]" />}
-            /> */}
-            <QuickAction
-              to={"/merchant/vimo-payout"}
-              onClick={() => { }}
-              label="Payout-V"
-              icon={<HandCoins className="h-6 w-6 text-[#00D3CD]" />}
-              disabled={!serviceFlags.vimo_payout}
-            />
-          </div>
-
-          {showMoreActions && (
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3" label="center">
-              <QuickAction
-                to={"/merchant/ledger"}
-                onClick={() => { }}
-                label="Ledger"
-                icon={<BookText className="h-6 w-6 text-[#00D3CD]" />}
-              />
-              <QuickAction
-                to={"/merchant/charges"}
-                onClick={() => { }}
-                label="Charges"
-                icon={<ReceiptIndianRupee className="h-6 w-6 text-[#00D3CD]" />}
-              />
-
-              <QuickAction
-                to={"/merchant/reports"}
-                onClick={() => { }}
-                label="Reports"
-                icon={<FileBarChart className="h-6 w-6 text-[#00D3CD]" />}
-              />
-
-              <QuickAction
-                to={"/merchant/branchx-payout"}
-                onClick={() => { }}
-                label="Payout-X"
-                icon={<HandCoins className="h-6 w-6 text-[#00D3CD]" />}
-                disabled={!serviceFlags.branchx_payout}
-              />
-              <QuickAction
-                to={"/merchant/sevenpay-payout"}
-                onClick={() => { }}
-                label="Payout-S"
-                icon={<HandCoins className="h-6 w-6 text-[#00D3CD]" />}
-                disabled={!serviceFlags.sevenpay_payout}
-              />
-              <QuickAction
-                to={"/merchant/mx-payout"}
-                onClick={() => { }}
-                label="Payout-M-X"
-                icon={<HandCoins className="h-6 w-6 text-[#00D3CD]" />}
-                disabled={!serviceFlags.mx_payout}
-              />
-              <QuickAction
-                to={"/merchant/ndia5-payout"}
-                onClick={() => { }}
-                label="Payout-N"
-                icon={<HandCoins className="h-6 w-6 text-[#00D3CD]" />}
-                disabled={!serviceFlags.ndia5_payout}
-              />
-              {/* <QuickAction
-                to={"/merchant/complaint-box"}
-                onClick={() => { }}
-                label="Complaint Box"
-                icon={<MessageSquareWarning className="h-6 w-6 text-[#00D3CD]" />}
-              /> */}
-              <QuickAction
-                to={"/merchant/setting"}
-                onClick={() => { }}
-                label="Settings"
-                icon={<Settings className="h-6 w-6 text-[#00D3CD]" />}
-              />
-
-            </div>
-          )}
-
-          {/* CC Details panel */}
-          {showCCDetails && (
-            <div className="mt-4 rounded-xl border border-[#00D3CD]/15 bg-[#00D3CD]/5 p-3" style={{ fontFamily: "Inter, sans-serif" }}>
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">CC Bill Details</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {ccPaymentCards.map((item, i) => (
-                  <div key={i} className="rounded-xl bg-white p-3 shadow-sm" style={{ fontFamily: "Inter, sans-serif" }}>
-                    <p className="text-xs leading-4 text-gray-500">{item.label}</p>
-                    <p className="mt-1 text-base font-semibold text-gray-900">₹{item.value}</p>
+              <div className="flex items-start justify-between gap-2 sm:gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p
+                      className={`text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate ${
+                        card.isHero ? "text-white/90" : "text-gray-500"
+                      }`}
+                    >
+                      {card.title}
+                    </p>
+                    {card.badge && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${card.badgeClass}`}
+                      >
+                        {card.badge}
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Today's Payout */}
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#00D3CD]/10">
-                <Wallet className="h-5 w-5 text-[#00D3CD]" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Today's Payout</p>
-                <p className="text-xl font-bold text-gray-900">₹{today_total_payout || 0}</p>
-              </div>
-            </div>
-            {/* <button className="flex items-center gap-1 rounded-xl bg-[#00D3CD]/10 px-3 py-2 text-xs font-medium text-[#00D3CD]">
-              View History <ChevronRight className="h-3 w-3" />
-            </button> */}
-          </div>
-        </div>
-
-      </div>
-
-      {/* ══════════════════════════════
-          DESKTOP ONLY  (hidden on mobile)
-      ══════════════════════════════ */}
-      <div className="hidden md:block">
-
-        {/* Top Summary Cards */}
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-6 lg:grid-cols-4">
-          <SummaryCard
-            title="POS Machines"
-            value={pos_machines.count || 0}
-            icon={<CreditCard className="w-6 h-6 text-[#00D3CD]" />}
-            borderColor="border-[#00D3CD]"
-            bgColor="bg-[#00D3CD]/10"
-          />
-          <SummaryCard
-            title="Today's Transactions"
-            value={pos_transactions.total || 0}
-            icon={<CreditCard className="w-6 h-6 text-[#00D3CD]" />}
-            borderColor="border-[#00D3CD]"
-            bgColor="bg-[#00D3CD]/10"
-          />
-          <SummaryCard
-            title="Successful Transactions"
-            value={pos_transactions.success || 0}
-            icon={<CheckCircle className="w-6 h-6 text-green-500" />}
-            borderColor="border-green-500"
-            bgColor="bg-green-50"
-          />
-          <SummaryCard
-            title="Failed Transactions"
-            value={pos_transactions.fail || 0}
-            icon={<XCircle className="w-6 h-6 text-red-500" />}
-            borderColor="border-red-500"
-            bgColor="bg-red-50"
-          />
-        </div>
-
-        <div className="flex flex-col gap-4 md:flex-row md:items-start">
-          <div className="flex-1 md:w-3/4">
-            <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:mb-6 sm:p-5 md:p-6">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Link
-                  to="/merchant/cc-bill-pay"
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#00D3CD] px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#00b8b3]"
-                >
-                  CC Bill Pay
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setShowCCDetails((prev) => !prev)}
-                  className={`col-span-2 inline-flex min-h-[44px] items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors sm:col-span-1 ${showCCDetails
-                    ? "bg-[#00D3CD] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  <h3
+                    className={`mt-1.5 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight truncate ${
+                      card.isHero ? "text-white" : "text-gray-900"
                     }`}
-                >
-                  CC Details
-                </button>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5 md:mt-6 md:grid-cols-3">
-                {ccPaymentCards.map((item, index) => (
-                  <div
-                    key={index}
-                    className={`rounded-xl bg-slate-50 p-4 ${item.featured ? "col-span-2 md:col-span-1" : ""}`}
                   >
-                    <p className="text-sm leading-5 text-gray-500">{item.label}</p>
-                    <p className="mt-2 text-xl font-semibold text-gray-900">₹{item.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {showCCDetails && (
-                <div className="mt-4 rounded-xl border border-[#00D3CD]/15 bg-[#00D3CD]/5 p-4 md:p-6">
-                  <h3 className="mb-2 text-base font-semibold text-gray-900 sm:mb-3 sm:text-lg">
-                    Add New CC Card
+                    {card.value}
                   </h3>
-                  <p className="text-gray-500">Form will be implemented here...</p>
                 </div>
-              )}
-            </div>
 
-            {/* Payout Box */}
-            <div className="mb-4 sm:mb-6">
-              <div className="flex-1 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Today's Payout</p>
-                    <p className="mt-1 text-3xl font-bold text-gray-900">₹{today_total_payout || 0}</p>
-                  </div>
-                  <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00D3CD]/10 px-4 py-2.5 text-sm font-medium text-[#00D3CD] transition-colors hover:bg-[#00D3CD]/20 sm:w-auto">
-                    <History className="w-4 h-4" />
-                    View History
-                  </button>
+                <div
+                  className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${card.iconBox}`}
+                >
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
               </div>
+
+              <p
+                className={`mt-2 sm:mt-3 text-[11px] sm:text-xs truncate ${
+                  card.isHero
+                    ? "text-white/80"
+                    : card.badge === "Settled"
+                    ? "text-emerald-600 font-medium"
+                    : card.badge === "Failed"
+                    ? "text-rose-600 font-medium"
+                    : "text-gray-400"
+                }`}
+              >
+                {card.subtitle}
+              </p>
             </div>
+          );
+        })}
+      </div>
+
+      {/* ================= SECTION 2: QUICK ACTIONS STRIP ================= */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 sm:p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-[#00a8a3]" />
+            Quick Services
+          </p>
+          <span className="text-[11px] font-medium text-gray-400 hidden sm:inline-block">
+            One-tap service shortcuts
+          </span>
+        </div>
+
+        <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-7 gap-2 sm:gap-2.5">
+          {quickServices.map((service, index) => {
+            const Icon = service.icon;
+            const content = (
+              <div
+                className={`group flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 sm:p-2.5 text-center transition-all duration-150 ${
+                  service.disabled
+                    ? "opacity-40 cursor-not-allowed bg-gray-50"
+                    : "bg-gray-50/80 hover:bg-[#00D3CD]/10 hover:text-[#008b87] active:scale-95 cursor-pointer"
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl transition-colors ${
+                    service.disabled
+                      ? "bg-gray-200 text-gray-400"
+                      : "bg-[#00D3CD]/10 text-[#00a8a3] group-hover:bg-[#00D3CD] group-hover:text-white"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-700 truncate w-full group-hover:text-[#008b87]">
+                  {service.label}
+                </span>
+              </div>
+            );
+
+            if (service.disabled) {
+              return (
+                <div key={index} title="Service is temporarily unavailable">
+                  {content}
+                </div>
+              );
+            }
+
+            return (
+              <Link key={index} to={service.to}>
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SECTION 3: CREDIT CARD BILL PAYMENTS ================= */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-[#00a8a3]" />
+              Credit Card Bill Payments
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Process instant credit card bill payments and track daily settlement statuses
+            </p>
           </div>
 
-          {/* Latest Updates */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 md:w-[320px] md:p-6 lg:w-[340px]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Latest Updates</h2>
-                <p className="text-xs text-gray-500">Stay on top of what changed recently</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowUpdates((prev) => !prev)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-gray-600 transition-colors hover:bg-slate-200"
-                aria-label={showUpdates ? "Hide updates" : "Show updates"}
-              >
-                {showUpdates ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            {showUpdates ? (
-              <div className="space-y-3">
-                {latestUpdates.map((item, index) => (
-                  <div key={index} className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm leading-6 text-gray-700">{item.text}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-gray-200 bg-slate-50 px-4 py-5 text-sm text-gray-500">
-                Updates are hidden. Tap the eye button to view them again.
-              </div>
-            )}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/merchant/cc-bill-pay"
+              className="inline-flex h-9 sm:h-10 items-center justify-center rounded-xl bg-gradient-to-r from-[#00D3CD] to-[#00b8b3] px-3.5 sm:px-4 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 active:scale-[0.98]"
+            >
+              CC Bill Pay
+            </Link>
+            <Link
+              to="/merchant/ba-cc-bill-pay"
+              className="inline-flex h-9 sm:h-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-3.5 sm:px-4 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]"
+            >
+              BA CC Bill
+            </Link>
           </div>
         </div>
 
+        <div className="mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+          {ccPaymentCards.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={index}
+                className="group flex min-h-[115px] sm:min-h-[130px] flex-col justify-between rounded-xl bg-gray-50/70 p-3.5 sm:p-4 border border-gray-100 transition-all duration-200 hover:bg-white hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 truncate">
+                        {item.label}
+                      </p>
+                      {item.badge && (
+                        <span
+                          className={`px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${item.badgeClass}`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-extrabold tracking-tight text-gray-900 truncate">
+                      ₹{formatAmount(item.value)}
+                    </h4>
+                  </div>
+
+                  <div
+                    className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${item.iconBox}`}
+                  >
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                </div>
+
+                <p className="mt-2 sm:mt-3 text-[11px] sm:text-xs text-gray-400 truncate">
+                  {item.subtitle}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SECTION 4: TODAY'S TOTAL PAYOUT ================= */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 lg:p-7 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20">
+            <Wallet className="h-6 w-6 sm:h-7 sm:w-7" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Today's Total Payout
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] sm:text-[10px] font-bold">
+                Wallet Settled
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 mt-0.5 sm:mt-1">
+              ₹{formatAmount(today_total_payout)}
+            </p>
+            <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1">
+              Total settled volume credited to your settlement account today.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <DashboardChartLauncher
+            label="View 5-Day Charts"
+            buttonClassName="inline-flex h-10 sm:h-11 items-center gap-2 px-4 sm:px-5 rounded-xl border border-gray-200 bg-white text-gray-800 text-xs sm:text-sm font-semibold shadow-sm hover:bg-gray-50 hover:border-gray-300 transition active:scale-[0.98]"
+          />
+          <button
+            onClick={() => navigate("/merchant/total-payouts")}
+            className="inline-flex h-10 sm:h-11 items-center gap-2 px-4 sm:px-5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs sm:text-sm font-semibold shadow-sm transition active:scale-[0.98]"
+          >
+            <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+            Payout History
+          </button>
+        </div>
       </div>
     </div>
   );
-};
-
-
-
-const SummaryCard = ({ title, value, icon, borderColor, bgColor }) => (
-  <div className={`rounded-2xl border border-gray-100 border-l-4 bg-white p-4 shadow-sm sm:p-5 ${borderColor}`}>
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm leading-5 text-gray-500">{title}</p>
-        <p className="mt-1 text-2xl font-semibold text-gray-900">₹{value}</p>
-      </div>
-      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${bgColor}`}>{icon}</div>
-    </div>
-  </div>
-);
-
-const MobileOverviewCard = ({ title, value, icon, valueColor = "text-gray-900" }) => (
-  <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-3 shadow-sm border border-gray-100">
-    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50">{icon}</div>
-    <p className="text-center text-[10px] leading-3 text-gray-500">{title}</p>
-    <p className={`text-xl font-bold ${valueColor}`}>{value}</p>
-  </div>
-);
-
-const QuickAction = ({ icon, label, to, onClick, disabled = false }) => {
-  const inner = (
-    <div
-      className={`relative flex flex-col items-center gap-1.5 rounded-2xl px-1 py-1 ${disabled ? "opacity-45" : ""
-        }`}
-    >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00D3CD]/10">{icon}</div>
-      <span className="text-[10px] font-medium text-gray-600">{label}</span>
-    </div>
-  );
-  if (disabled) {
-    return (
-      <button
-        type="button"
-        disabled
-        title="Service is temporarily unavailable"
-        className="cursor-not-allowed"
-      >
-        {inner}
-      </button>
-    );
-  }
-  if (to) return <Link to={to}>{inner}</Link>;
-  return <button type="button" onClick={onClick}>{inner}</button>;
 };
 
 export default MerchantDashboard;
