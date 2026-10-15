@@ -1139,7 +1139,7 @@ const RazorpayNotification = ({ currentUser }) => {
             <label htmlFor="include_unlinked" className="text-sm text-gray-700">Include Unlinked</label>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {isSuperAdmin && (
+            {/* {isSuperAdmin && (
               <>
                 <button
                   type="button"
@@ -1170,7 +1170,7 @@ const RazorpayNotification = ({ currentUser }) => {
                   Telering Upload
                 </button>
               </>
-            )}
+            )} */}
             <button
               type="submit"
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"

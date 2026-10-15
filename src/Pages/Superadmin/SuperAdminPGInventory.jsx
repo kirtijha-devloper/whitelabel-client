@@ -181,14 +181,14 @@ const SuperAdminPGInventory = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
           >
-            <FaPlus className="w-4 h-4" /> Add PG MID
+            <FaPlus className="w-4 h-4" /> Add PG MIDs
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* STATS OVERVIEW */}
@@ -203,16 +203,16 @@ const SuperAdminPGInventory = () => {
             {pgList.filter((p) => p.status === "active").length}
           </p>
         </div>
-        <div className="rounded-2xl bg-blue-600 text-white p-5 min-h-[145px]">
-          <p className="text-sm font-semibold">Unallocated MIDs</p>
-          <p className="text-3xl font-bold mt-2">
-            {pgList.filter((p) => p.status === "unallocated").length}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-red-500 text-white p-5 min-h-[145px]">
-          <p className="text-sm font-semibold">Sandbox / Testing</p>
+        <div className="rounded-2xl bg-blue-500 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Assigned</p>
           <p className="text-3xl font-bold mt-2">
             {pgList.filter((p) => p.status === "sandbox").length}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-red-600 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Unassigned</p>
+          <p className="text-3xl font-bold mt-2">
+            {pgList.filter((p) => p.status === "unallocated").length}
           </p>
         </div>
       </div>

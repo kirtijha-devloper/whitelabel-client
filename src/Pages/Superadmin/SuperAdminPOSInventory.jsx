@@ -485,7 +485,7 @@ const SuperAdminPOSInventory = () => {
           </div>
 
           {/* TOTAL MACHINES */}
-          <div className="rounded-2xl bg-blue-600 text-white p-5 min-h-[145px]">
+          <div className="rounded-2xl bg-green-500 text-white p-5 min-h-[145px]">
             <p className="text-sm font-semibold">
               Total Machines
             </p>
@@ -500,7 +500,7 @@ const SuperAdminPOSInventory = () => {
           </div>
 
           {/* ACTIVE */}
-          <div className="rounded-2xl bg-green-500 text-white p-5 min-h-[145px]">
+          <div className="rounded-2xl bg-blue-500 text-white p-5 min-h-[145px]">
             <p className="text-sm font-semibold">
               Total Active
             </p>

@@ -190,14 +190,14 @@ const SuperAdminQRInventory = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
           >
             <FaPlus className="w-4 h-4" /> Add QR Stock
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* STATS OVERVIEW */}
@@ -212,16 +212,16 @@ const SuperAdminQRInventory = () => {
             {qrList.filter((q) => q.status === "active").length}
           </p>
         </div>
-        <div className="rounded-2xl bg-blue-600 text-white p-5 min-h-[145px]">
+        <div className="rounded-2xl bg-blue-500 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Assigned Stock</p>
+          <p className="text-3xl font-bold mt-2">
+            {qrList.filter((q) => q.type.includes("Soundbox")).length}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-red-500 text-white p-5 min-h-[145px]">
           <p className="text-sm font-semibold">Unassigned Stock</p>
           <p className="text-3xl font-bold mt-2">
             {qrList.filter((q) => q.status === "unassigned").length}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-cyan-600 text-white p-5 min-h-[145px]">
-          <p className="text-sm font-semibold">Voice Soundboxes</p>
-          <p className="text-3xl font-bold mt-2">
-            {qrList.filter((q) => q.type.includes("Soundbox")).length}
           </p>
         </div>
       </div>
