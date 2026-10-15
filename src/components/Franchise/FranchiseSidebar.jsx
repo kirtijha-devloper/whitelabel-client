@@ -7,12 +7,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
+import { getCompanyLogoUrl } from "../../utils/userAccess";
 
 const FranchiseSidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const currentPath = location.pathname + location.search
@@ -108,7 +110,20 @@ const FranchiseSidebar = ({ currentUser }) => {
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          {!isCollapsed && <Link to={"/franchise/dashboard"} className="text-xl font-bold text-pink-500"><img src={AbheePayLogo} width={150}/></Link>}
+          {!isCollapsed && (
+            <Link to="/franchise/dashboard" className="flex items-center">
+              <img
+                src={companyLogoUrl || AbheePayLogo}
+                alt={currentUser?.company?.company_name || "Company Logo"}
+                width={150}
+                className="max-h-12 w-auto object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = AbheePayLogo;
+                }}
+              />
+            </Link>
+          )}
           <button
             onClick={toggleSidebar}
             className="hidden lg:block p-1 rounded-lg hover:bg-gray-800 text-gray-400"

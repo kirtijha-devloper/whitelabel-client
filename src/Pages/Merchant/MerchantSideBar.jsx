@@ -16,12 +16,14 @@ import AbheePayLogo from '../../assets/FORMAT-PNG.png';
 import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
+import { getCompanyLogoUrl } from "../../utils/userAccess";
 
 const MerchantSideBar = ({ currentUser }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
   const currentFullPath = location.pathname + location.search;
   const isActivePath = (path) => {
     if (path.includes("?")) {
@@ -98,7 +100,20 @@ const MerchantSideBar = ({ currentUser }) => {
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          {!isCollapsed && <Link to={"/merchant/dashboard"} className="text-xl font-bold text-pink-500"><img src={AbheePayLogo} width={150}/></Link>}
+          {!isCollapsed && (
+            <Link to="/merchant/dashboard" className="flex items-center">
+              <img
+                src={companyLogoUrl || AbheePayLogo}
+                alt={currentUser?.company?.company_name || "Company Logo"}
+                width={150}
+                className="max-h-12 w-auto object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = AbheePayLogo;
+                }}
+              />
+            </Link>
+          )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="hidden lg:block p-1 rounded-lg hover:bg-gray-800 text-gray-400"
