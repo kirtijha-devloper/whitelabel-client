@@ -644,7 +644,10 @@ export default function AdminLayout() {
               />
               <Route
                 path="pos-machine-list"
-                element={guardRoute(isAdminViewer, <PosMachineList />)}
+                element={guardRoute(
+                  isAdminViewer || canViewStockPos,
+                  <PosMachineList currentUser={currentUser} />,
+                )}
               />
               <Route
                 path="create-merchant"

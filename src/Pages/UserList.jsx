@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import ConfirmationModal from "../components/Common/ConfirmationModal";
@@ -7,7 +7,7 @@ import { saveAs } from "file-saver";
 import { AllUsers, searchUsers } from "../api/FranchiseApi";
 import { getAssignedPosMachines } from "../api/posMachine";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Ban, ChevronDown, Eye, Loader2, Lock, LogIn, MoreVertical, SquarePen, Wallet } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -510,12 +510,17 @@ const UserList = ({
     },
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roleFromQuery = searchParams.get("role") || "";
+  const normalizedQueryRole = roleFromQuery === "franchise" ? "franchaise" : roleFromQuery;
+  const initialRole = lockedRole || normalizedQueryRole || "";
+
   // Query for all users (default list)
   const [allUsersParams, setAllUsersParams] = useState({
     page: 1,
     limit: 10,
     status: "",
-    role: lockedRole,
+    role: initialRole,
   });
 
   // Separate page state for search results
@@ -572,11 +577,26 @@ const UserList = ({
   }, [currentUser?.id, currentUser?.role, allUsersResponse]);
 
   useEffect(() => {
-    if (!lockedRole) return;
+    if (lockedRole) {
+      setAllUsersParams((prev) =>
+        prev.role === lockedRole ? prev : { ...prev, role: lockedRole, page: 1 }
+      );
+      return;
+    }
+    const targetRole = roleFromQuery === "franchise" ? "franchaise" : (roleFromQuery || "");
     setAllUsersParams((prev) =>
-      prev.role === lockedRole ? prev : { ...prev, role: lockedRole, page: 1 }
+      prev.role === targetRole ? prev : { ...prev, role: targetRole, page: 1 }
     );
-  }, [lockedRole]);
+  }, [roleFromQuery, lockedRole]);
+
+  const displayTitle = useMemo(() => {
+    if (lockedRole) return title;
+    const currentRole = allUsersParams.role || normalizedQueryRole;
+    if (currentRole === "merchant") return "Merchant List";
+    if (currentRole === "franchaise" || currentRole === "franchise") return "Franchise List";
+    if (currentRole === "super_franchise") return "Super Franchise List";
+    return title;
+  }, [allUsersParams.role, normalizedQueryRole, lockedRole, title]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -2070,7 +2090,7 @@ const UserList = ({
   return (
     <div className="bg-gray-100 min-h-screen">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{displayTitle}</h2>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm px-1 py-6 md:p-6">
@@ -2230,7 +2250,21 @@ const UserList = ({
                 <label className="block text-xs font-medium text-gray-500">Role</label>
                 <select
                   value={allUsersParams.role}
-                  onChange={(e) => handleAllUsersFilterChange("role", e.target.value)}
+                  onChange={(e) => {
+                    const newRole = e.target.value;
+                    handleAllUsersFilterChange("role", newRole);
+                    if (!lockedRole) {
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        if (newRole) {
+                          next.set("role", newRole);
+                        } else {
+                          next.delete("role");
+                        }
+                        return next;
+                      });
+                    }
+                  }}
                   className="mt-1 block w-full rounded-md border-gray-200 bg-white py-1.5 px-2 text-sm text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="">All</option>
@@ -2238,8 +2272,10 @@ const UserList = ({
                     <>
                       <option value="admin">Admin</option>
                       <option value="employee">Employee</option>
-                      <option value="super_franchise">Super Franchise</option>
                     </>
+                  )}
+                  {(normalizedCurrentUserRole === "admin" || normalizedCurrentUserRole === "employee") && (
+                    <option value="super_franchise">Super Franchise</option>
                   )}
                   {normalizedCurrentUserRole !== "franchise" && (
                     <>
