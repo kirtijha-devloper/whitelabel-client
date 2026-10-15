@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X, Wallet, ArrowDownRight, ArrowUpRight, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { adminWalletCredit, adminWalletDebit } from "../../api/WalletApi";
+import { superAdminWalletCredit, superAdminWalletDebit } from "../../api/WalletApi";
 
 const QUICK_AMOUNTS = [500, 1000, 5000, 10000, 50000];
 
@@ -45,8 +45,8 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
 
       const res =
         action === "debit"
-          ? await adminWalletDebit(payload)
-          : await adminWalletCredit(payload);
+          ? await superAdminWalletDebit(payload)
+          : await superAdminWalletCredit(payload);
 
       toast.success(
         res?.message ||
@@ -155,9 +155,10 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
                 ₹
               </span>
               <input
-                type="number"
-                step="any"
-                min="1"
+                type="text"
+                maxLength={8}
+                inputMode="decimal"
+                pattern="^\d+(\.\d{1,2})?$"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter adjustment amount"
