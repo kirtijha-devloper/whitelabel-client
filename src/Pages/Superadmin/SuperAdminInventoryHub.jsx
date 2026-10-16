@@ -81,37 +81,6 @@ const SuperAdminInventoryHub = () => {
     },
   ];
 
-  const recentStockEvents = [
-    {
-      type: "POS",
-      action: "50 New POS Machines Added",
-      detail: "Batch #POS-2026-08 (Pax A920) added to AGRO-AXIS Stock",
-      time: "10 minutes ago",
-      badgeClass: "bg-emerald-100 text-emerald-800",
-    },
-    {
-      type: "QR",
-      action: "200 QR Standees Dispatched",
-      detail: "Assigned to Admin (Global Pay Solutions)",
-      time: "1 hour ago",
-      badgeClass: "bg-purple-100 text-purple-800",
-    },
-    {
-      type: "PG",
-      action: "New Cashfree PG MID Activated",
-      detail: "MID #CF-883921 assigned to Prime Merchants Pool",
-      time: "3 hours ago",
-      badgeClass: "bg-blue-100 text-blue-800",
-    },
-    {
-      type: "POS",
-      action: "12 Machines Return Initiated",
-      detail: "Returned due to screen sensor defect",
-      time: "Yesterday",
-      badgeClass: "bg-amber-100 text-amber-800",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-8">
       {/* PAGE HEADER */}
@@ -139,69 +108,6 @@ const SuperAdminInventoryHub = () => {
           </span>
         </div>
       </div>
-
-      {/* TOP OVERVIEW STAT CARDS */}
-      {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-              Total Hardware Devices
-            </p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">18,270</p>
-            <span className="inline-block mt-2 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-              +12% this month
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center text-[#00D3CD]">
-            <FaLayerGroup className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-              Available / Unassigned
-            </p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">3,800</p>
-            <span className="inline-block mt-2 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-              Ready for dispatch
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
-            <FaCheckCircle className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-              Active Deployments
-            </p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">14,180</p>
-            <span className="inline-block mt-2 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">
-              In field operation
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
-            <FaExchangeAlt className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-              Maintenance / Issues
-            </p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">290</p>
-            <span className="inline-block mt-2 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
-              Requires attention
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500">
-            <FaExclamationTriangle className="w-6 h-6" />
-          </div>
-        </div>
-      </div> */}
 
       {/* MAIN INVENTORY HUB CARDS SECTION */}
       <div>

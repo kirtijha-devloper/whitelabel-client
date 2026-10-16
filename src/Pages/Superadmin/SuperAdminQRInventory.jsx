@@ -24,74 +24,9 @@ const SuperAdminQRInventory = () => {
 
   // Mock QR Stock Data
   const [qrList, setQrList] = useState([
-    {
-      id: "qr-1001",
-      qr_code: "QR-ABHEE-9011",
-      type: "Acrylic Standee",
-      vpa_id: "abheepay.mmerchant01@hdfcbank",
-      partner_bank: "HDFC Bank",
-      assigned_to: "Admin Alpha (Global Pay)",
-      status: "active",
-      created_at: "2026-09-10",
-    },
-    {
-      id: "qr-1002",
-      qr_code: "QR-ABHEE-9012",
-      type: "4G Soundbox",
-      vpa_id: "abheepay.soundbox02@icici",
-      partner_bank: "ICICI Bank",
-      assigned_to: "Super Franchise West",
-      status: "active",
-      created_at: "2026-09-12",
-    },
-    {
-      id: "qr-1003",
-      qr_code: "QR-ABHEE-9013",
-      type: "Acrylic Standee",
-      vpa_id: "unassigned.qr03@abheepay",
-      partner_bank: "Axis Bank",
-      assigned_to: "Unassigned",
-      status: "unassigned",
-      created_at: "2026-09-15",
-    },
-    {
-      id: "qr-1004",
-      qr_code: "QR-ABHEE-9014",
-      type: "NFC QR Card",
-      vpa_id: "abheepay.card04@yesbank",
-      partner_bank: "Yes Bank",
-      assigned_to: "Merchant Food Hub",
-      status: "active",
-      created_at: "2026-09-18",
-    },
-    {
-      id: "qr-1005",
-      qr_code: "QR-ABHEE-9015",
-      type: "4G Soundbox",
-      vpa_id: "unassigned.soundbox05@abheepay",
-      partner_bank: "HDFC Bank",
-      assigned_to: "Unassigned",
-      status: "unassigned",
-      created_at: "2026-09-20",
-    },
-    {
-      id: "qr-1006",
-      qr_code: "QR-ABHEE-9016",
-      type: "Sticker",
-      vpa_id: "damaged.qr06@abheepay",
-      partner_bank: "ICICI Bank",
-      assigned_to: "Returned - Print Fault",
-      status: "damaged",
-      created_at: "2026-09-22",
-    },
   ]);
 
   const [formData, setFormData] = useState({
-    qr_code: "",
-    vpa_id: "",
-    type: "Acrylic Standee",
-    partner_bank: "HDFC Bank",
-    status: "unassigned",
   });
 
   const handleAddSubmit = (e) => {
