@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Wallet, ArrowDownRight, ArrowUpRight, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { superAdminWalletCredit, superAdminWalletDebit } from "../../api/WalletApi";
+import ConfirmationModal from "../Common/ConfirmationModal";
 
 const QUICK_AMOUNTS = [500, 1000, 5000, 10000, 50000];
 
@@ -10,6 +11,7 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   if (!isOpen || !admin) return null;
 
@@ -18,7 +20,13 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
   const isValidAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
   const isDebitExceeding = action === "debit" && isValidAmount && parsedAmount > currentBalance;
 
-  const handleSubmit = async (e) => {
+  const handleClose = () => {
+    if (submitting) return;
+    setIsConfirmOpen(false);
+    onClose();
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!isValidAmount) {
@@ -33,6 +41,11 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
       return;
     }
 
+    // Open confirmation pop-up first
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
     try {
       setSubmitting(true);
       const idempotencyKey = `admin-wallet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -55,6 +68,7 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
 
       setAmount("");
       setReason("");
+      setIsConfirmOpen(false);
       if (typeof onSuccess === "function") {
         onSuccess();
       }
@@ -68,7 +82,8 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4">
+    <>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* HEADER */}
         <div className="flex items-start justify-between border-b border-gray-100 bg-gray-50/80 px-6 py-4">
@@ -86,7 +101,7 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={submitting}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
@@ -169,7 +184,17 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
                     : "border-gray-300 focus:border-[#00D3CD] focus:ring-[#00D3CD]/20"
                 }`}
               />
-            </div>
+              </div>
+
+            {/* AMOUNT BALANCE PREVIEW */}
+            {isValidAmount && !isDebitExceeding && (
+              <div className="mt-2 rounded-xl bg-gray-50 border border-gray-200 px-3.5 py-2 flex items-center justify-between text-xs">
+                <span className="text-gray-500 font-medium">New Wallet Balance:</span>
+                <span className={`font-bold ${action === "credit" ? "text-emerald-600" : "text-rose-600"}`}>
+                  ₹{(action === "credit" ? currentBalance + parsedAmount : currentBalance - parsedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
 
             {isDebitExceeding && (
               <p className="mt-1 text-xs text-rose-600">
@@ -210,7 +235,7 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
           <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-gray-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
               className="rounded-xl border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
             >
@@ -226,22 +251,35 @@ const AdminWalletModal = ({ isOpen, onClose, admin, onSuccess }) => {
                   : "bg-rose-600 hover:bg-rose-700"
               }`}
             >
-              {submitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} />
-                  {action === "credit" ? "Credit Funds" : "Debit Funds"}
-                </>
-              )}
+              <CheckCircle2 size={14} />
+              {action === "credit" ? "Credit Funds" : "Debit Funds"}
             </button>
           </div>
         </form>
       </div>
     </div>
+
+    {/* CONFIRMATION POPUP */}
+    <ConfirmationModal
+      isOpen={isConfirmOpen}
+      onClose={() => !submitting && setIsConfirmOpen(false)}
+      onConfirm={handleConfirmSubmit}
+      title={action === "credit" ? "Confirm Wallet Credit" : "Confirm Wallet Debit"}
+      message={
+        action === "credit"
+          ? `Are you sure you want to CREDIT ₹${parsedAmount.toLocaleString("en-IN")} to ${admin.name || "Admin"}'s wallet? New wallet balance will be ₹${(currentBalance + parsedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}.`
+          : `Are you sure you want to DEBIT ₹${parsedAmount.toLocaleString("en-IN")} from ${admin.name || "Admin"}'s wallet? Remaining wallet balance will be ₹${(currentBalance - parsedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}.`
+      }
+      confirmText={
+        action === "credit"
+          ? `Yes, Credit ₹${parsedAmount.toLocaleString("en-IN")}`
+          : `Yes, Debit ₹${parsedAmount.toLocaleString("en-IN")}`
+      }
+      cancelText="Cancel"
+      variant={action === "credit" ? "success" : "danger"}
+      isLoading={submitting}
+    />
+  </>
   );
 };
 
