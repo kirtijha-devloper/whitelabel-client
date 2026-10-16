@@ -10,6 +10,8 @@ import {
   FaExclamationTriangle,
   FaEye,
   FaBox,
+  FaArrowLeft,
+  FaMobileAlt,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { getSuperAdminPosInventory } from "../../api/superAdminApi";
@@ -386,14 +388,30 @@ const SuperAdminPOSInventory = () => {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
 
-        {/* HEADER */}
+        {/* BREADCRUMB & HEADER */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
 
-          {/* TITLE */}
+          {/* TITLE & BREADCRUMB */}
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              POS Machine  Inventory
-            </h1>
+            <button
+              onClick={() => navigate("/super-admin/inventory")}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-cyan-600 mb-2 transition-colors"
+            >
+              <FaArrowLeft className="w-3 h-3" /> Back to Inventory Overview
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-cyan-50 text-cyan-600 rounded-xl">
+                <FaMobileAlt className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  POS Machine Inventory
+                </h1>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Manage physical POS swipe machines, terminal IDs, merchant allocations, and deployment status.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* ACTION BUTTONS */}
