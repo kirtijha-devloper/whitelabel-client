@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  getSuperFranchises,
+  getSuperFranchiseRates,
+  updateSuperFranchiseRate,
+  getAllSuperFranchiseRates,
   getFranchises,
   getFranchiseRates,
   updateFranchiseRate,
@@ -29,7 +33,7 @@ import {
   createPosRental,
   updatePosRental,
 } from '../api/rateSettingsApi';
-import { FranchiseAllUsers, MerchantAllUsers } from '../api/FranchiseApi';
+import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, searchUsers } from '../api/FranchiseApi';
 import {
   Loader2,
   Plus,
@@ -103,17 +107,20 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   }, [initialTab, isSuperAdmin]);
 
   useEffect(() => {
-    if (isSuperAdmin && ['specific', 'unassigned', 'payout'].includes(activeTab)) {
+    if (isSuperAdmin && ['super_franchise', 'specific', 'unassigned', 'payout'].includes(activeTab)) {
       setActiveTab('default');
       setViewMode('detail');
     }
   }, [isSuperAdmin, activeTab]);
 
+  const [superFranchises, setSuperFranchises] = useState([]);
   const [franchises, setFranchises] = useState([]);
   const [unassignedMerchants, setUnassignedMerchants] = useState([]);
+  const [selectedSuperFranchiseId, setSelectedSuperFranchiseId] = useState('');
   const [selectedFranchiseId, setSelectedFranchiseId] = useState('');
   const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [rates, setRates] = useState([]);
+  const [superFranchiseMatrixData, setSuperFranchiseMatrixData] = useState({}); // { superFranchiseId: [rates] }
   const [matrixData, setMatrixData] = useState({}); // { franchiseId: [rates] }
   const [unassignedMerchantMatrixData, setUnassignedMerchantMatrixData] = useState({}); // { merchantId: [rates] }
   const [defaultRatesAttributes, setDefaultRatesAttributes] = useState([]); // structure of columns
@@ -349,6 +356,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   }, [selectedPayoutUserId]);
 
   useEffect(() => {
+    if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+      fetchSuperFranchiseRates(selectedSuperFranchiseId);
+    }
+  }, [activeTab, selectedSuperFranchiseId]);
+
+  useEffect(() => {
     const timeoutId = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim());
     }, 300);
@@ -358,7 +371,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   useEffect(() => {
     const canUseRemoteSearch =
-      viewMode === 'matrix' && (activeTab === 'specific' || activeTab === 'unassigned');
+      viewMode === 'matrix' && (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned');
 
     if (!canUseRemoteSearch || !debouncedSearchTerm) {
       setMatrixSearchResults([]);
@@ -374,7 +387,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setMatrixSearchError('');
 
       try {
-        const role = activeTab === 'specific' ? 'franchaise' : 'merchant';
+        const role = activeTab === 'super_franchise'
+          ? 'super_franchise'
+          : activeTab === 'specific'
+            ? 'franchaise'
+            : 'merchant';
         const response = await searchUsers({
           q: debouncedSearchTerm,
           status: 'active',
@@ -430,16 +447,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [franchisesData, defaults, unassignedMerchantsData] = await Promise.all([
+      const [superFranchisesData, franchisesData, defaults, unassignedMerchantsData] = await Promise.all([
+        getSuperFranchises(),
         getFranchises(),
         getFranchiseRates('default'),
         getUnassignedMerchants(),
       ]);
 
+      setSuperFranchises(superFranchisesData);
       setFranchises(franchisesData);
       setUnassignedMerchants(unassignedMerchantsData);
 
-      const [matrix, unassignedMerchantMatrix] = await Promise.all([
+      const [sfMatrix, matrix, unassignedMerchantMatrix] = await Promise.all([
+        getAllSuperFranchiseRates(superFranchisesData),
         getAllFranchiseRates(franchisesData),
         getAllMerchantRates(unassignedMerchantsData),
       ]);
@@ -447,10 +467,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setDefaultRatesAttributes(
         buildColumnStructure(
           defaults,
+          ...Object.values(sfMatrix),
           ...Object.values(matrix),
           ...Object.values(unassignedMerchantMatrix)
         )
       );
+      setSuperFranchiseMatrixData(sfMatrix);
       setMatrixData(matrix);
       setUnassignedMerchantMatrixData(unassignedMerchantMatrix);
 
@@ -461,6 +483,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       toast.error('Failed to load initial data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSuperFranchiseRates = async (sfId) => {
+    setLoadingRates(true);
+    try {
+      const data = await getSuperFranchiseRates(sfId);
+      setRates(data);
+    } catch (error) {
+      console.error('Failed to load super franchise rates', error);
+      toast.error('Failed to load rates');
+    } finally {
+      setLoadingRates(false);
     }
   };
 
@@ -870,6 +905,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
 
+    if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+      await fetchSuperFranchiseRates(selectedSuperFranchiseId);
+      await fetchInitialData();
+      return;
+    }
+
     if (activeTab === 'specific' && selectedFranchiseId) {
       await fetchFranchiseRates(selectedFranchiseId);
       await fetchInitialData();
@@ -882,8 +923,33 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
   };
 
+  const handleEditSuperFranchiseDetail = (sfId) => {
+    setSelectedSuperFranchiseId(sfId);
+    setSelectedFranchiseId('');
+    setSelectedMerchantId('');
+    setDetailReadOnly(false);
+    setEditingId(null);
+    setEditValue('');
+    setEditGstValue('');
+    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+    setViewMode('detail');
+  };
+
+  const handleViewSuperFranchiseDetail = (sfId) => {
+    setSelectedSuperFranchiseId(sfId);
+    setSelectedFranchiseId('');
+    setSelectedMerchantId('');
+    setDetailReadOnly(true);
+    setEditingId(null);
+    setEditValue('');
+    setEditGstValue('');
+    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+    setViewMode('detail');
+  };
+
   const handleEditFranchiseDetail = (franchiseId) => {
     setSelectedFranchiseId(franchiseId);
+    setSelectedSuperFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(false);
     setEditingId(null);
@@ -895,6 +961,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleEditMerchantDetail = (merchantId) => {
     setSelectedMerchantId(merchantId);
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setDetailReadOnly(false);
     setEditingId(null);
@@ -906,6 +973,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleViewFranchiseDetail = (franchiseId) => {
     setSelectedFranchiseId(franchiseId);
+    setSelectedSuperFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(true);
     setEditingId(null);
@@ -917,6 +985,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleViewMerchantDetail = (merchantId) => {
     setSelectedMerchantId(merchantId);
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setDetailReadOnly(true);
     setEditingId(null);
@@ -927,6 +996,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleBackToMatrix = () => {
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(false);
@@ -956,6 +1026,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       toast.error('Unauthorized: Super Admin can only configure default/admin-level rates.');
       return;
     }
+    if (!isSuperAdmin && activeTab === 'default') {
+      toast.error('Admins cannot modify Super Admin default rates. Please configure downstream rates.');
+      return;
+    }
     if (editValue === '') {
       toast.error('Please enter a valid rate.');
       return;
@@ -978,6 +1052,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       let updatedRate;
       if (activeTab === 'default') {
         updatedRate = await updateFranchiseRate('default', rate, updates);
+      } else if (activeTab === 'super_franchise') {
+        updatedRate = await updateSuperFranchiseRate(selectedSuperFranchiseId, rate, updates);
       } else if (activeTab === 'specific') {
         updatedRate = await updateFranchiseRate(selectedFranchiseId, rate, updates);
       } else {
@@ -1162,7 +1238,13 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         company_name: posTxnEditForm.companyName || null
       };
       if (activeTab === 'default') {
+        if (!isSuperAdmin) {
+          toast.error('Admins cannot modify Super Admin default rates.');
+          return;
+        }
         await updateFranchiseRate('default', posTxnEditRate, updates);
+      } else if (activeTab === 'super_franchise') {
+        await updateSuperFranchiseRate(selectedSuperFranchiseId, posTxnEditRate, updates);
       } else if (activeTab === 'specific') {
         await updateFranchiseRate(selectedFranchiseId, posTxnEditRate, updates);
       } else {
@@ -1183,21 +1265,36 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const renderMatrix = () => {
     if (loading) return <div className="flex justify-center p-8"><Loader /></div>;
+    const isSuperFranchiseTab = activeTab === 'super_franchise';
     const isUnassignedTab = activeTab === 'unassigned';
     const showMatrixRateColumns = !isPosTxnMode;
-    const baseEntities = isUnassignedTab ? unassignedMerchants : franchises;
-    const matrixSource = isUnassignedTab ? unassignedMerchantMatrixData : matrixData;
-    const entityLabel = isUnassignedTab ? 'Merchant' : 'Franchise';
+    const baseEntities = isSuperFranchiseTab
+      ? superFranchises
+      : isUnassignedTab
+        ? unassignedMerchants
+        : franchises;
+    const matrixSource = isSuperFranchiseTab
+      ? superFranchiseMatrixData
+      : isUnassignedTab
+        ? unassignedMerchantMatrixData
+        : matrixData;
+    const entityLabel = isSuperFranchiseTab
+      ? 'Super Franchise'
+      : isUnassignedTab
+        ? 'Merchant'
+        : 'Franchise';
     const matrixAttributes = buildColumnStructure(
       defaultRatesAttributes.filter((rate) => rate.source_scope === 'admin'),
       ...Object.values(matrixSource)
     );
-    const searchPlaceholder = isUnassignedTab
-      ? 'Search Merchant by Name, ID, or Phone...'
-      : 'Search Franchise by Name, ID, or Phone...';
+    const searchPlaceholder = isSuperFranchiseTab
+      ? 'Search Super Franchise by Name, ID, or Phone...'
+      : isUnassignedTab
+        ? 'Search Merchant by Name, ID, or Phone...'
+        : 'Search Franchise by Name, ID, or Phone...';
     const shouldUseRemoteSearch =
       viewMode === 'matrix' &&
-      (activeTab === 'specific' || activeTab === 'unassigned') &&
+      (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned') &&
       searchTerm.trim().length > 0;
     const remoteSearchPending = shouldUseRemoteSearch && (
       matrixSearchLoading || debouncedSearchTerm !== searchTerm.trim()
@@ -1221,12 +1318,14 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const emptyStateMessage = matrixSearchError
       ? matrixSearchError
       : remoteSearchPending
-        ? `Searching ${isUnassignedTab ? 'merchants' : 'franchises'}...`
+        ? `Searching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'}...`
         : shouldUseRemoteSearch
-          ? `No matching ${isUnassignedTab ? 'merchants' : 'franchises'} found.`
-          : isUnassignedTab
-            ? 'No unassigned merchants found.'
-            : 'No franchises found.';
+          ? `No matching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'} found.`
+          : isSuperFranchiseTab
+            ? 'No super franchises found.'
+            : isUnassignedTab
+              ? 'No unassigned merchants found.'
+              : 'No franchises found.';
 
     const totalFilteredEntities = filteredEntities.length;
     const totalMatrixPages = Math.max(1, Math.ceil(totalFilteredEntities / matrixRowsPerPage));
@@ -1286,13 +1385,21 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
                     <button
-                      onClick={() => isUnassignedTab ? handleViewMerchantDetail(entity.id) : handleViewFranchiseDetail(entity.id)}
+                      onClick={() => {
+                        if (isSuperFranchiseTab) handleViewSuperFranchiseDetail(entity.id);
+                        else if (isUnassignedTab) handleViewMerchantDetail(entity.id);
+                        else handleViewFranchiseDetail(entity.id);
+                      }}
                       className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
                     >
                       View
                     </button>
                     <button
-                      onClick={() => isUnassignedTab ? handleEditMerchantDetail(entity.id) : handleEditFranchiseDetail(entity.id)}
+                      onClick={() => {
+                        if (isSuperFranchiseTab) handleEditSuperFranchiseDetail(entity.id);
+                        else if (isUnassignedTab) handleEditMerchantDetail(entity.id);
+                        else handleEditFranchiseDetail(entity.id);
+                      }}
                       className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
                     >
                       Edit
@@ -1391,13 +1498,21 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium sticky right-0 bg-white z-10 border-l border-gray-100 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                       <div className="flex items-center justify-center gap-3">
                         <button
-                          onClick={() => isUnassignedTab ? handleViewMerchantDetail(entity.id) : handleViewFranchiseDetail(entity.id)}
+                          onClick={() => {
+                            if (isSuperFranchiseTab) handleViewSuperFranchiseDetail(entity.id);
+                            else if (isUnassignedTab) handleViewMerchantDetail(entity.id);
+                            else handleViewFranchiseDetail(entity.id);
+                          }}
                           className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
                         >
                           View
                         </button>
                         <button
-                          onClick={() => isUnassignedTab ? handleEditMerchantDetail(entity.id) : handleEditFranchiseDetail(entity.id)}
+                          onClick={() => {
+                            if (isSuperFranchiseTab) handleEditSuperFranchiseDetail(entity.id);
+                            else if (isUnassignedTab) handleEditMerchantDetail(entity.id);
+                            else handleEditFranchiseDetail(entity.id);
+                          }}
                           className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
                         >
                           Edit
@@ -1464,6 +1579,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     super_admin_default: { label: 'Platform Default', color: 'bg-indigo-100 text-indigo-800' },
     super_admin_admin: { label: 'SuperAdmin→Admin', color: 'bg-indigo-100 text-indigo-800' },
     admin_default: { label: 'Global Default', color: 'bg-blue-100 text-blue-800' },
+    admin_super_franchise: { label: 'Admin→SuperFranchise', color: 'bg-emerald-100 text-emerald-800' },
     admin_franchise: { label: 'Admin→Franchise', color: 'bg-purple-100 text-purple-800' },
     admin_merchant: { label: 'Admin→Merchant', color: 'bg-orange-100 text-orange-800' },
     franchise_default: { label: 'Franchise Default', color: 'bg-green-100 text-green-800' },
@@ -1481,11 +1597,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const renderDetailTable = () => {
-    const isReadOnlyDetail = detailReadOnly && activeTab !== 'default';
+    const isReadOnlyDetail = (detailReadOnly && activeTab !== 'default') || (!isSuperAdmin && activeTab === 'default');
     const shouldShowSpecificSettlementFilter =
       isPosTxnMode &&
       viewMode === 'detail' &&
-      (activeTab === 'specific' || activeTab === 'unassigned');
+      (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned');
     const filteredRates = shouldShowSpecificSettlementFilter
       ? rates.filter((rate) =>
         specificSettlementFilter === 'all'
@@ -1519,7 +1635,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             </div>
           </div>
         )}
-        {activeTab === 'default' && (
+        {activeTab === 'default' && !isSuperAdmin && (
+          <div className="mx-4 mt-4 p-3.5 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2.5 text-blue-900 text-sm">
+            <Info className="w-5 h-5 flex-shrink-0 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-semibold text-blue-950">Inherited from Super Admin (Read-Only)</p>
+              <p className="text-xs text-blue-800 mt-0.5">
+                These are global platform default POS rates set by Super Admin. Admins inherit these defaults and cannot alter them directly. To configure custom rates for your downstream users, switch to the <strong>Super Franchise Specific Rates</strong>, <strong>Franchise Specific Rates</strong>, or <strong>Merchants Under Admin Rates</strong> tabs.
+              </p>
+            </div>
+          </div>
+        )}
+        {activeTab === 'default' && isSuperAdmin && (
           <div className="flex justify-stretch md:justify-end p-4 pb-0">
             <button
               onClick={openCreateRateModal}
@@ -1603,9 +1730,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                       <p className="text-gray-500 text-xs">
                         {activeTab === 'default'
                           ? 'Default Base Rate (%)'
-                          : activeTab === 'specific'
-                            ? 'Franchise Base Rate (%)'
-                            : 'Merchant Base Rate (%)'}
+                          : activeTab === 'super_franchise'
+                            ? 'Super Franchise Base Rate (%)'
+                            : activeTab === 'specific'
+                              ? 'Franchise Base Rate (%)'
+                              : 'Merchant Base Rate (%)'}
                       </p>
                       {!isPosTxnMode && editingId === rate.id ? (
                         <>
@@ -1724,9 +1853,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {activeTab === 'default'
                         ? 'Default Base Rate (%)'
-                        : activeTab === 'specific'
-                          ? 'Franchise Base Rate (%)'
-                          : 'Merchant Base Rate (%)'}
+                        : activeTab === 'super_franchise'
+                          ? 'Super Franchise Base Rate (%)'
+                          : activeTab === 'specific'
+                            ? 'Franchise Base Rate (%)'
+                            : 'Merchant Base Rate (%)'}
                     </th>
                     {!isReadOnlyDetail && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -2545,62 +2676,94 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 setDetailReadOnly(false);
                 setSearchTerm('');
                 setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                setSelectedSuperFranchiseId('');
                 setSelectedFranchiseId('');
                 setSelectedMerchantId('');
               }}
             >
-              Default POS Rates (Global for Every User)
+              {isSuperAdmin ? 'Default POS Rates (Global for Every User)' : 'Default POS Rates (Inherited)'}
             </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('specific');
-                setViewMode('matrix');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                setSelectedMerchantId('');
-              }}
-            >
-              Franchise Specific Rates
-            </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('unassigned');
-                setViewMode('matrix');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                setSelectedFranchiseId('');
-              }}
-            >
-              Merchants Under Admin Rates
-            </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'cc_bill' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('cc_bill');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSelectedFranchiseId('');
-                setSelectedMerchantId('');
-              }}
-            >
-              CC Bill Pay Charges
-            </button>
-            <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => {
-                setActiveTab('payout');
-                setDetailReadOnly(false);
-                setSearchTerm('');
-                setSelectedFranchiseId('');
-                setSelectedMerchantId('');
-              }}
-            >
-              Payout Rates
-            </button>
+            {!isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'super_franchise' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('super_franchise');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Super Franchise Specific Rates
+              </button>
+            )}
+            {!isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('specific');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Franchise Specific Rates
+              </button>
+            )}
+            {!isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('unassigned');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Merchants Under Admin Rates
+              </button>
+            )}
+            {!isPosTxnMode && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'cc_bill' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('cc_bill');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                CC Bill Pay Charges
+              </button>
+            )}
+            {!isPosTxnMode && !isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('payout');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Payout Rates
+              </button>
+            )}
             {!isPosTxnMode && (
               <button
                 className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'rental' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
@@ -2608,6 +2771,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                   setActiveTab('rental');
                   setDetailReadOnly(false);
                   setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
                   setSelectedFranchiseId('');
                   setSelectedMerchantId('');
                 }}
@@ -2620,14 +2784,38 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
           {/* Content */}
           <div className="p-0">
             {activeTab === 'default' && renderDetailTable()}
+            {activeTab === 'super_franchise' && viewMode === 'matrix' && renderMatrix()}
+            {activeTab === 'super_franchise' && viewMode === 'detail' && (
+              <div>
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="font-semibold text-blue-800">Super Franchise: </span>
+                    <span className="ml-2 text-blue-900">{superFranchises.find(sf => sf.id === Number(selectedSuperFranchiseId))?.name || 'Unknown'}</span>
+                  </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
+                </div>
+                {renderDetailTable()}
+              </div>
+            )}
             {activeTab === 'specific' && viewMode === 'matrix' && renderMatrix()}
             {activeTab === 'specific' && viewMode === 'detail' && (
               <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center">
                     <span className="font-semibold text-blue-800">Franchise: </span>
                     <span className="ml-2 text-blue-900">{franchises.find(f => f.id === Number(selectedFranchiseId))?.name || 'Unknown'}</span>
                   </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
                 </div>
                 {renderDetailTable()}
               </div>
@@ -2635,11 +2823,17 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             {activeTab === 'unassigned' && viewMode === 'matrix' && renderMatrix()}
             {activeTab === 'unassigned' && viewMode === 'detail' && (
               <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center">
                     <span className="font-semibold text-blue-800">Merchant: </span>
                     <span className="ml-2 text-blue-900">{unassignedMerchants.find((m) => m.id === Number(selectedMerchantId))?.name || 'Unknown'}</span>
                   </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
                 </div>
                 {renderDetailTable()}
               </div>

@@ -27,20 +27,28 @@ import {
 } from "../api/rateSettingsApi";
 import PayoutRateSettings from "./PayoutRateSettings";
 
+const normalizeTab = (tab, isSuperAdmin = false) => {
+  if (!tab) return "pos_rental";
+  let normalized = tab;
+  if (tab === "rental") normalized = "pos_rental";
+  else if (tab === "cc_bill" || tab === "cc-bill") normalized = "bbps_cc";
+  else if (tab === "txn") normalized = "pos_txn";
+
+  if (isSuperAdmin && (normalized === "pos_txn" || normalized === "txn")) {
+    return "pos_rental";
+  }
+  return normalized;
+};
+
 const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmin = false }) => {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const effectiveInitialTab = isSuperAdmin && initialTab === "pos_txn"
-    ? "pos_rental"
-    : initialTab;
+  const effectiveInitialTab = normalizeTab(initialTab, isSuperAdmin);
   const [activeTab, setActiveTab] = useState(effectiveInitialTab); // pos_rental | pos_txn | payout | bbps_cc
 
   useEffect(() => {
     if (initialTab) {
-      const tabToSet = isSuperAdmin && initialTab === "pos_txn"
-        ? "pos_rental"
-        : initialTab;
-      setActiveTab(tabToSet);
+      setActiveTab(normalizeTab(initialTab, isSuperAdmin));
     }
   }, [initialTab, isSuperAdmin]);
 
@@ -1357,7 +1365,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
             </div>
           </div>
         )}
-        {activeTab === "payout" && <PayoutRateSettings />}
+        {activeTab === "payout" && <PayoutRateSettings isSuperAdmin={isSuperAdmin} />}
       </div>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar theme="light" />
     </div>

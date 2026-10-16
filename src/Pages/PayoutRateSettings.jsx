@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Loader from '../components/Loader';
 import { Loader2, Plus, UserCheck, Layers, Building2, User, Search, X, CheckCircle2 } from 'lucide-react';
-import { MerchantAllUsers, FranchiseAllUsers } from '../api/FranchiseApi';
+import { MerchantAllUsers, FranchiseAllUsers, SuperFranchiseAllUsers } from '../api/FranchiseApi';
 import { toast } from 'react-toastify';
 import {
   createPayoutCharge,
@@ -16,17 +16,23 @@ import {
   deleteUserPayoutCharge,
 } from '../api/rateSettingsApi';
 
-const PayoutRateSettings = () => {
+const PayoutRateSettings = ({ isSuperAdmin = false }) => {
   const queryClient = useQueryClient();
   const [activeSubTab, setActiveSubTab] = useState('user_override'); // 'user_override' | 'global_default'
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState('ALL'); // 'ALL' | 'Franchise' | 'Merchant'
+  const [userRoleFilter, setUserRoleFilter] = useState('ALL'); // 'ALL' | 'Super Franchise' | 'Franchise' | 'Merchant'
   const [searchInputVal, setSearchInputVal] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
 
   // Modal Popup visibility toggle states
   const [showUserForm, setShowUserForm] = useState(false);
   const [showGlobalForm, setShowGlobalForm] = useState(false);
+
+  // ── Super Franchise List Query ────────────────────────────────────────────
+  const { data: superFranchisesData } = useQuery({
+    queryKey: ['super_franchises', 'active'],
+    queryFn: () => SuperFranchiseAllUsers({ page: 1, limit: 1000 }),
+  });
 
   // ── Franchise List Query ──────────────────────────────────────────────────
   const { data: franchisesData } = useQuery({
@@ -40,8 +46,16 @@ const PayoutRateSettings = () => {
     queryFn: () => MerchantAllUsers({ page: 1, limit: 1000 }),
   });
 
-  // Combine Franchises and Merchants into unified user list — deduplicate by ID
+  // Combine Super Franchises, Franchises and Merchants into unified user list — deduplicate by ID
   const allTargetUsers = useMemo(() => {
+    const superFranchisesList = (
+      Array.isArray(superFranchisesData)
+        ? superFranchisesData
+        : Array.isArray(superFranchisesData?.data)
+        ? superFranchisesData.data
+        : []
+    ).map((sf) => ({ ...sf, userType: 'Super Franchise' }));
+
     const franchisesList = (
       Array.isArray(franchisesData)
         ? franchisesData
@@ -58,14 +72,14 @@ const PayoutRateSettings = () => {
         : []
     ).map((m) => ({ ...m, userType: 'Merchant' }));
 
-    // Deduplicate: if an ID already appeared (e.g. via Franchise list), skip the duplicate
+    // Deduplicate: if an ID already appeared, skip the duplicate
     const seen = new Set();
-    return [...franchisesList, ...merchantsList].filter((u) => {
+    return [...superFranchisesList, ...franchisesList, ...merchantsList].filter((u) => {
       if (seen.has(u.id)) return false;
       seen.add(u.id);
       return true;
     });
-  }, [franchisesData, merchantsData]);
+  }, [superFranchisesData, franchisesData, merchantsData]);
 
   const filteredTargetUsers = useMemo(() => {
     let list = allTargetUsers;
@@ -354,6 +368,17 @@ const PayoutRateSettings = () => {
                 </label>
 
                 <div className="flex flex-col sm:flex-row gap-2 max-w-2xl items-center">
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                    className="w-full sm:w-44 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
+                  >
+                    <option value="ALL">All Roles</option>
+                    <option value="Super Franchise">Super Franchise</option>
+                    <option value="Franchise">Franchise</option>
+                    <option value="Merchant">Merchant</option>
+                  </select>
+
                   <div className="relative flex-1 w-full">
                     <input
                       type="text"
@@ -412,6 +437,9 @@ const PayoutRateSettings = () => {
                         <span className="font-bold text-emerald-950 text-sm md:text-base">
                           {selectedUserObj.name || selectedUserObj.username}
                         </span>
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-100 text-emerald-800">
+                          {selectedUserObj.userType}
+                        </span>
                       </div>
                       <p className="text-xs text-emerald-800 mt-0.5">
                         {selectedUserObj.username ? selectedUserObj.username : `ID: #${selectedUserObj.id}`} | {selectedUserObj.email || 'N/A'} | {selectedUserObj.phone || selectedUserObj.mobile || 'N/A'}
@@ -441,7 +469,12 @@ const PayoutRateSettings = () => {
                         >
                           <div className="flex items-center gap-2">
                             <div>
-                              <span className="font-semibold text-gray-900 text-sm">{u.name || u.username}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-gray-900 text-sm">{u.name || u.username}</span>
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800">
+                                  {u.userType}
+                                </span>
+                              </div>
                               <span className="text-xs text-gray-500 block">
                                 {u.username ? u.username : `ID: #${u.id}`} | {u.email || u.phone || u.mobile || 'No contact info'}
                               </span>
@@ -638,9 +671,16 @@ const PayoutRateSettings = () => {
                           <tr key={rule.id} className="hover:bg-gray-50/50">
                             <td className="p-3 font-medium text-gray-900">
                               <div>
-                                <span className="font-medium">
-                                  {matchedUser?.name || rule.user?.name || matchedUser?.username || rule.user?.username || `User #${rule.user_id}`}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">
+                                    {matchedUser?.name || rule.user?.name || matchedUser?.username || rule.user?.username || `User #${rule.user_id}`}
+                                  </span>
+                                  {roleLabel && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800">
+                                      {roleLabel}
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="block text-xs text-gray-400">
                                   {matchedUser?.username || rule.user?.username || `ID: ${rule.user_id}`}
                                 </span>
@@ -710,16 +750,29 @@ const PayoutRateSettings = () => {
         {/* ── GLOBAL DEFAULT SLABS TAB ──────────────────────────────────────── */}
         {activeSubTab === 'global_default' && (
           <div className="pt-6 space-y-6">
+            {!isSuperAdmin && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+                <div className="p-1 rounded-full bg-blue-100 text-blue-700 font-bold text-xs mt-0.5">ℹ</div>
+                <div>
+                  <h4 className="text-sm font-bold text-blue-900">Inherited Super Admin Payout Slabs (Read-Only)</h4>
+                  <p className="text-xs text-blue-800 mt-0.5">
+                    These are default global payout charge slabs set by the platform Super Admin. Admins cannot alter these global rules. To configure custom rates for your downstream users, use the <strong>User Override Rates</strong> tab.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Header with [+] Add Global Rule button */}
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border">
               <h3 className="text-base font-bold text-gray-900">Global Default Payout Charge Slabs</h3>
-              <button
-                type="button"
-                onClick={openNewGlobalForm}
-                className="rounded-md bg-[#00D3CD] hover:bg-[#00b8b3] px-4 py-2 text-sm font-semibold text-white transition shadow-sm flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4 font-bold" /> Add Global Rule
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={openNewGlobalForm}
+                  className="rounded-md bg-[#00D3CD] hover:bg-[#00b8b3] px-4 py-2 text-sm font-semibold text-white transition shadow-sm flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4 font-bold" /> Add Global Rule
+                </button>
+              )}
             </div>
 
             {/* ── MODAL POPUP: ADD / EDIT GLOBAL RULE ────────────────────────── */}
@@ -870,7 +923,7 @@ const PayoutRateSettings = () => {
                         <th className="p-3">Rate Type</th>
                         <th className="p-3">Status</th>
                         <th className="p-3">Description</th>
-                        <th className="p-3 text-right">Actions</th>
+                        {isSuperAdmin && <th className="p-3 text-right">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -894,35 +947,37 @@ const PayoutRateSettings = () => {
                             </span>
                           </td>
                           <td className="p-3 text-xs text-gray-500">{rule.description || '—'}</td>
-                          <td className="p-3 text-right space-x-2">
-                            <button
-                              onClick={() => {
-                                setGlobalEditingId(rule.id);
-                                setGlobalForm({
-                                  from_amount: String(rule.from_amount),
-                                  to_amount: String(rule.to_amount),
-                                  rate: String(rule.rate),
-                                  rate_type: rule.rate_type,
-                                  is_active: rule.is_active,
-                                  description: rule.description || '',
-                                });
-                                setShowGlobalForm(true); // Open modal popup on Edit
-                              }}
-                              className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded hover:bg-blue-100"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this global rule?')) {
-                                  deleteGlobalMutation.mutate(rule.id);
-                                }
-                              }}
-                              className="text-xs px-3 py-1.5 bg-red-50 text-red-700 font-semibold rounded hover:bg-red-100"
-                            >
-                              Delete
-                            </button>
-                          </td>
+                          {isSuperAdmin && (
+                            <td className="p-3 text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setGlobalEditingId(rule.id);
+                                  setGlobalForm({
+                                    from_amount: String(rule.from_amount),
+                                    to_amount: String(rule.to_amount),
+                                    rate: String(rule.rate),
+                                    rate_type: rule.rate_type,
+                                    is_active: rule.is_active,
+                                    description: rule.description || '',
+                                  });
+                                  setShowGlobalForm(true); // Open modal popup on Edit
+                                }}
+                                className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded hover:bg-blue-100"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('Are you sure you want to delete this global rule?')) {
+                                    deleteGlobalMutation.mutate(rule.id);
+                                  }
+                                }}
+                                className="text-xs px-3 py-1.5 bg-red-50 text-red-700 font-semibold rounded hover:bg-red-100"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

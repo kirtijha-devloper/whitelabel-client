@@ -20,6 +20,7 @@ import { fetchMyAdminApplicableCharges } from "../api/rateSettingsApi";
 
 const CATEGORIES = [
   { id: "pos", label: "POS Rate", icon: CreditCard, description: "Card, UPI & Terminal transaction charges" },
+  { id: "rental", label: "POS Rental", icon: Building2, description: "Monthly terminal rental charges" },
   { id: "pay", label: "Pay Rate", icon: ArrowUpRight, description: "Payout & Banking transfer slab rates" },
   { id: "cc-bill", label: "CC Bill Rate", icon: ShieldCheck, description: "BBPS Credit card bill payment charges" },
 ];
@@ -74,6 +75,11 @@ export default function MyCharges() {
     return Array.isArray(list) ? list : [];
   }, [responseData]);
 
+  const rentalRates = useMemo(() => {
+    const list = responseData.rental || responseData.categories?.rental || [];
+    return Array.isArray(list) ? list : [];
+  }, [responseData]);
+
   const payRates = useMemo(() => {
     const list = responseData.payout || responseData.pay || responseData.categories?.payout || [];
     return Array.isArray(list) ? list : [];
@@ -87,10 +93,11 @@ export default function MyCharges() {
   // Active rate list
   const activeRateList = useMemo(() => {
     if (activeTab === "pos") return posRates;
+    if (activeTab === "rental") return rentalRates;
     if (activeTab === "pay") return payRates;
     if (activeTab === "cc-bill") return ccBillRates;
     return [];
-  }, [activeTab, posRates, payRates, ccBillRates]);
+  }, [activeTab, posRates, rentalRates, payRates, ccBillRates]);
 
   // Filtered rows for currently active category
   const filteredRows = useMemo(() => {
@@ -123,10 +130,11 @@ export default function MyCharges() {
   const counts = useMemo(
     () => ({
       pos: posRates.length,
+      rental: rentalRates.length,
       pay: payRates.length,
       ccBill: ccBillRates.length,
     }),
-    [posRates, payRates, ccBillRates],
+    [posRates, rentalRates, payRates, ccBillRates],
   );
 
   const activeCategoryMeta = CATEGORIES.find((c) => c.id === activeTab);
@@ -179,7 +187,7 @@ export default function MyCharges() {
         </div>
 
         {/* Category Navigation Tabs */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const count = counts[cat.id === "cc-bill" ? "ccBill" : cat.id] || 0;
@@ -455,12 +463,72 @@ export default function MyCharges() {
                             {isOverride ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
                                 <Sparkles className="h-3 w-3 text-violet-600" />
-                                Admin Override
+                                {row.source_label || row.rate_source || "Admin Override"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                                 <CheckCircle2 className="h-3 w-3 text-slate-400" />
-                                Inherited Default
+                                {row.source_label || row.rate_source || "Inherited Default"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              {activeTab === "rental" && (
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th scope="col" className="px-5 py-3.5">Service</th>
+                      <th scope="col" className="px-4 py-3.5">Rental Period</th>
+                      <th scope="col" className="px-4 py-3.5">Monthly Rental Charge</th>
+                      <th scope="col" className="px-4 py-3.5">Status</th>
+                      <th scope="col" className="px-5 py-3.5 text-right">Rate Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => {
+                      const isOverride = Boolean(row.is_override);
+
+                      return (
+                        <tr
+                          key={`rental-${row.id}`}
+                          className="transition hover:bg-slate-50/60"
+                        >
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                                POS
+                              </span>
+                              <span>{row.service_name || "POS Terminal Monthly Rental"}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-slate-700 font-medium">
+                            {row.billing_period || "30 Days (Monthly)"}
+                          </td>
+                          <td className="px-4 py-4 font-bold text-slate-900 text-sm">
+                            <span className="text-[#008782]">{formatCurrency(row.amount)}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                              Active
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            {isOverride ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
+                                <Sparkles className="h-3 w-3 text-violet-600" />
+                                {row.source_label || row.rate_source || "Admin Override"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                                {row.source_label || row.rate_source || "Inherited Default"}
                               </span>
                             )}
                           </td>
@@ -546,12 +614,12 @@ export default function MyCharges() {
                             {isOverride ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
                                 <Sparkles className="h-3 w-3 text-violet-600" />
-                                Admin Override
+                                {row.source_label || row.rate_source || "Admin Override"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                                 <CheckCircle2 className="h-3 w-3 text-slate-400" />
-                                Inherited Default
+                                {row.source_label || row.rate_source || "Inherited Default"}
                               </span>
                             )}
                           </td>
@@ -637,12 +705,12 @@ export default function MyCharges() {
                             {isOverride ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
                                 <Sparkles className="h-3 w-3 text-violet-600" />
-                                Admin Override
+                                {row.source_label || row.rate_source || "Admin Override"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                                 <CheckCircle2 className="h-3 w-3 text-slate-400" />
-                                Inherited Default
+                                {row.source_label || row.rate_source || "Inherited Default"}
                               </span>
                             )}
                           </td>
