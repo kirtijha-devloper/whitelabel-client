@@ -57,7 +57,9 @@ const AdminServiceManagement = () => {
   const servicesList = useMemo(() => {
     if (!rawSettingsData || typeof rawSettingsData !== "object") return [];
 
-    return Object.entries(rawSettingsData).map(([key, config]) => {
+    return Object.entries(rawSettingsData)
+      .filter(([key]) => key !== "mx_payout")
+      .map(([key, config]) => {
       const isObject = typeof config === "object" && config !== null;
       return {
         key,

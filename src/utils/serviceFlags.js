@@ -49,13 +49,6 @@ export const INITIAL_SERVICE_CONFIG = [
     target_roles: ["admin", "franchise", "merchant", "super_franchise"],
   },
   {
-    key: "mx_payout",
-    label: "Payout MX",
-    category: "Payout & Banking",
-    description: "Enable or disable the Payout MX flow for merchant and franchise users.",
-    target_roles: ["admin", "franchise", "merchant", "super_franchise"],
-  },
-  {
     key: "pos_inventory",
     label: "POS Machine Hardware",
     category: "POS & Hardware",
@@ -115,7 +108,7 @@ export const getServiceStatusMap = () => {
   const registered = getRegisteredServices();
   const defaults = {};
   registered.forEach((item) => {
-    defaults[item.key] = item.key === "ndia5_payout" || item.key === "mx_payout" ? false : true;
+    defaults[item.key] = item.key === "ndia5_payout" ? false : true;
   });
 
   try {
@@ -202,7 +195,7 @@ export const isGlobalServiceEnabled = (serviceKey, fallback = true) => {
 };
 
 export const SERVICE_FLAG_DEFAULTS = INITIAL_SERVICE_CONFIG.reduce((acc, item) => {
-  acc[item.key] = item.key === "mx_payout" || item.key === "ndia5_payout" ? false : true;
+  acc[item.key] = item.key === "ndia5_payout" ? false : true;
   return acc;
 }, {});
 

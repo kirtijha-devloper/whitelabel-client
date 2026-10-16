@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FaSlidersH,
   FaPlus,
@@ -61,7 +61,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
 
   // Query Services directly from PostgreSQL
   const {
-    data: services = [],
+    data: rawServices = [],
     isLoading,
     isFetching,
     refetch,
@@ -70,6 +70,12 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
     queryFn: getSuperAdminServices,
     staleTime: 30 * 1000,
   });
+
+  const services = useMemo(() => {
+    return (rawServices || []).filter(
+      (s) => (s?.key || s?.service_key) !== "mx_payout"
+    );
+  }, [rawServices]);
 
   // Toggle Mutation
   const toggleMutation = useMutation({

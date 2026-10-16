@@ -37,7 +37,9 @@ const ServiceManagementModal = ({
 
   // Extract available services from the admin-specific map or fallback
   const availableServices = useMemo(() => {
-    const list = Object.values(adminServicesMap || {});
+    const list = Object.values(adminServicesMap || {}).filter(
+      (s) => (s?.key || s?.service_key) !== "mx_payout"
+    );
     if (list.length > 0) {
       return list.map((s) => ({
         key: s.key || s.service_key,
@@ -46,7 +48,7 @@ const ServiceManagementModal = ({
         is_globally_disabled: Boolean(s.is_super_admin_disabled),
       }));
     }
-    return FALLBACK_SERVICES.map((s) => ({
+    return FALLBACK_SERVICES.filter((s) => s.key !== "mx_payout").map((s) => ({
       ...s,
       is_globally_disabled: false,
     }));
