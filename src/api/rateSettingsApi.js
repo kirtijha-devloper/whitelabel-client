@@ -2643,3 +2643,121 @@ export const deleteAdminPosRule = async (id) => {
     throw new Error(error.response?.data?.message || 'Failed to delete admin POS rule');
   }
 };
+
+// ── Admin Applicable Charges & User Overrides ───────────────────────────────
+export const fetchMyAdminApplicableCharges = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/service-charge/my-applicable-charges`, getAuthHeaders());
+    const data = res.data?.data || res.data || {};
+    const pos = Array.isArray(data.pos) ? data.pos : [];
+    const pay = Array.isArray(data.payout) ? data.payout : (Array.isArray(data.pay) ? data.pay : []);
+    const ccBill = Array.isArray(data.cc_bill) ? data.cc_bill : (Array.isArray(data.ccBill) ? data.ccBill : []);
+
+    return {
+      ...res.data,
+      data: {
+        ...data,
+        pos,
+        payout: pay,
+        pay,
+        cc_bill: ccBill,
+        ccBill,
+        ccBillRate: { configuredRates: ccBill },
+        payRate: { configuredRates: pay },
+      },
+      ccBillRate: { configuredRates: ccBill },
+      payRate: { configuredRates: pay },
+    };
+  } catch (error) {
+    console.error('Failed to fetch admin applicable charges:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admin applicable charges');
+  }
+};
+
+export const fetchApplicableCcBillRulesForUser = async (userId) => {
+  try {
+    const res = await listBbpsChargeRules({ user_id: userId });
+    const rules = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    return {
+      success: true,
+      data: {
+        userRules: rules,
+        rules,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to fetch applicable CC rules for user ${userId}:`, error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch user CC bill rules');
+  }
+};
+
+export const fetchApplicableUserPayoutCharges = async (userId) => {
+  try {
+    const [userRes, applicableRes] = await Promise.all([
+      getUserPayoutChargesByUser(userId).catch(() => ({ data: [] })),
+      fetchMyAdminApplicableCharges().catch(() => null),
+    ]);
+
+    const userRules = Array.isArray(userRes?.data) ? userRes.data : [];
+    const baselineRules = applicableRes?.data?.payout || applicableRes?.data?.pay || [];
+
+    const userMap = new Map();
+    userRules.forEach((ur) => {
+      const key = `${parseFloat(ur.from_amount || 0).toFixed(2)}-${parseFloat(ur.to_amount || 0).toFixed(2)}`;
+      userMap.set(key, ur);
+    });
+
+    const matchedUserIds = new Set();
+    const comparison = [];
+
+    baselineRules.forEach((br) => {
+      const key = `${parseFloat(br.from_amount || 0).toFixed(2)}-${parseFloat(br.to_amount || 0).toFixed(2)}`;
+      const ur = userMap.get(key) || null;
+      if (ur) {
+        matchedUserIds.add(ur.id);
+      }
+      const activeRule = ur || br;
+      const rateType = activeRule.rate_type || 'flat';
+      const effectiveRate = rateType === 'flat' ? `₹${activeRule.rate}` : `${activeRule.rate}%`;
+
+      comparison.push({
+        from_amount: br.from_amount,
+        to_amount: br.to_amount,
+        baselineRule: br,
+        userRule: ur,
+        effectiveRate,
+        source: ur ? 'User Override' : 'Super Admin Baseline',
+        hasOverride: Boolean(ur),
+      });
+    });
+
+    userRules.forEach((ur) => {
+      if (!matchedUserIds.has(ur.id)) {
+        const rateType = ur.rate_type || 'flat';
+        comparison.push({
+          from_amount: ur.from_amount,
+          to_amount: ur.to_amount,
+          baselineRule: null,
+          userRule: ur,
+          effectiveRate: rateType === 'flat' ? `₹${ur.rate}` : `${ur.rate}%`,
+          source: 'User Override',
+          hasOverride: true,
+        });
+      }
+    });
+
+    comparison.sort((a, b) => Number(a.from_amount) - Number(b.from_amount));
+
+    return {
+      success: true,
+      data: {
+        comparison,
+        userRules,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to fetch applicable user payout charges for user ${userId}:`, error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch user payout charges');
+  }
+};
+
