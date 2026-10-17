@@ -539,16 +539,33 @@ export default function PosSetting({ currentUser }) {
   const scopedUsersList = useMemo(() => {
     if (isSuperFranchise) {
       const currentSfId = Number(currentUser?.id);
-      // Directly show the Franchises belonging to this Super Franchise
+      // Directly show the Franchises belonging to this Super Franchise, plus any direct Merchants
       return rawUsersList.filter((u) => {
         const uRole = normalizeUserRole(u.role);
-        if (uRole !== "franchise") return false;
+        if (
+          uRole === "admin" ||
+          uRole === "superadmin" ||
+          uRole === "subadmin" ||
+          uRole === "employee" ||
+          uRole === "staff"
+        ) {
+          return false;
+        }
         const sfId =
           u?.super_franchise_id ??
           u?.superFranchiseId ??
           u?.super_franchise_details?.id ??
           null;
-        return Number(sfId) === currentSfId || String(u.super_franchise_id) === String(currentUser?.id);
+        const belongsToCurrentSf = Number(sfId) === currentSfId || String(u.super_franchise_id) === String(currentUser?.id);
+
+        if (uRole === "franchise") {
+          return belongsToCurrentSf;
+        }
+        if (uRole === "merchant" || uRole === "user") {
+          const parentFranchiseId = getParentFranchiseId(u);
+          return !parentFranchiseId && belongsToCurrentSf;
+        }
+        return false;
       });
     }
 
@@ -687,10 +704,13 @@ export default function PosSetting({ currentUser }) {
   }, [scopedUsersList, searchTerm, settlementFilter, roleFilter, franchiseMerchantsMap, superFranchiseChildrenMap]);
 
   const toggleFranchiseExpand = (franchiseId) => {
-    setExpandedFranchiseMap((prev) => ({
-      ...prev,
-      [franchiseId]: !prev[franchiseId],
-    }));
+    setExpandedFranchiseMap((prev) => {
+      const current = prev[franchiseId] !== undefined ? prev[franchiseId] : isSuperFranchise ? true : false;
+      return {
+        ...prev,
+        [franchiseId]: !current,
+      };
+    });
   };
 
   const handleLimitInputChange = (customerId, value) => {
@@ -1644,7 +1664,15 @@ export default function PosSetting({ currentUser }) {
         : [];
     const hasChildUsers = childUsers.length > 0;
     const canExpand = (isAdmin || isSuperFranchise || (isEmployee && canViewSettlement)) && (isSuperFranchiseRole || isFranchiseRole) && hasChildUsers;
-    const isExpanded = Boolean(canExpand && (expandedFranchiseMap[user.id] || (searchTerm && childUsers.length > 0)));
+    const isExpanded = Boolean(
+      canExpand && (
+        (expandedFranchiseMap[user.id] !== undefined
+          ? expandedFranchiseMap[user.id]
+          : isSuperFranchise
+            ? true
+            : false) || (searchTerm && childUsers.length > 0)
+      )
+    );
 
     const childRoleLabel = isSuperFranchiseRole ? "Franchises" : "Merchants";
     const childSingularLabel = isSuperFranchiseRole ? "Franchise" : "Merchant";
