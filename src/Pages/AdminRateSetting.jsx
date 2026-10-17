@@ -41,6 +41,8 @@ import {
   createAdminPosRule,
   updateAdminPosRule,
   deleteAdminPosRule,
+  mapRuleToAdminFormat,
+  buildAdminEffectiveRules,
   fetchSuperAdminRentalRates,
   createSuperAdminRentalRate,
   updateSuperAdminRentalRate,
@@ -480,20 +482,31 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         const admMatrix = {};
         const adminUsers = [];
         adminRows.forEach((item) => {
-          const adm = item.admin;
+          const adm = item?.admin;
           if (adm?.id) {
             adminUsers.push(adm);
             admMatrix[adm.id] = (item.overrides || []).map((r) =>
-              mapRuleToFranchiseFormat(r, {
-                adminRule: r,
+              mapRuleToAdminFormat(r, {
+                adminId: adm.id,
                 isInherited: false,
               })
             );
           }
         });
+
+        if (adminUsers.length === 0) {
+          const fallbackAdmins = await getAdminList({ limit: 1000 }).catch(() => ({ data: [] }));
+          const list = fallbackAdmins?.data || fallbackAdmins?.users || (Array.isArray(fallbackAdmins) ? fallbackAdmins : []);
+          list.forEach((adm) => {
+            if (adm?.id) {
+              adminUsers.push(adm);
+              admMatrix[adm.id] = [];
+            }
+          });
+        }
+
         const mappedDefaults = (defaultRules || []).map((r) =>
-          mapRuleToFranchiseFormat(r, {
-            adminRule: r,
+          mapRuleToAdminFormat(r, {
             isInherited: false,
           })
         );
@@ -1026,8 +1039,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         if (id === 'default') {
           const defaultRules = await fetchPlatformDefaultPosRules();
           const mapped = (defaultRules || []).map((rule) =>
-            mapRuleToFranchiseFormat(rule, {
-              adminRule: rule,
+            mapRuleToAdminFormat(rule, {
               isInherited: false,
             })
           );
@@ -1037,7 +1049,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             fetchAdminPosRules(id),
             fetchPlatformDefaultPosRules(),
           ]);
-          const mapped = buildFranchiseEffectiveRules(defaultRules, adminOverrides, id);
+          const mapped = buildAdminEffectiveRules(defaultRules, adminOverrides, id);
           setRates(mapped);
         }
         return;

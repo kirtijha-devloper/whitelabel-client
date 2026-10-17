@@ -560,6 +560,38 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
 });
 
+export const mapRuleToAdminFormat = (rule, options = {}) => ({
+  id: rule.id,
+  rule_id: rule.id,
+  adminId: options.adminId ?? rule.user_id ?? null,
+  user_id: options.adminId ?? rule.user_id ?? null,
+  method: fromApiPaymentMode(rule.payment_mode),
+  network: fromApiCardBrand(rule.card_brand),
+  card_type: fromApiCardType(rule.card_type),
+  sub_type: rule.sub_type || 'Consumer',
+  card_classification: fromApiCardClassification(rule.card_classification),
+  gst_required: Boolean(rule.gst_required),
+  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
+  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  merchant_rate: toFiniteNumber(rule.charge_percent, 0),
+  admin_rate: toFiniteNumber(rule.charge_percent, 0),
+  platform_default_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_percent, 0)
+    : toFiniteNumber(rule.charge_percent, 0),
+  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
+  settlement_type: rule.settlement_type || null,
+  company_name: rule.company_name || null,
+  min_amount: toFiniteNumber(rule.min_amount, 0),
+  max_amount: toNullableNumber(rule.max_amount),
+  isInherited: Boolean(options.isInherited),
+  default_rule_id: options.baseRule?.id ?? null,
+  base_rule: options.baseRule || null,
+  original_rule: rule,
+  rule_key: makeRuleKey(rule),
+  source_scope: getRuleScope(rule),
+  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+});
+
 const mapRuleToMerchantFormat = (rule, options = {}) => ({
   id: rule.id,
   rule_id: rule.id,
@@ -769,6 +801,33 @@ const buildFranchiseEffectiveRules = (adminRules, franchiseRules, franchiseId) =
         adminRule: adminRule || effectiveRule,
         baseRule: adminRule,
         isInherited: !franchiseRule
+      });
+    })
+    .filter(Boolean)
+    .sort(sortMappedRates);
+};
+
+export const buildAdminEffectiveRules = (defaultRules, adminRules, adminId) => {
+  const resolvedAdminId = toNullableNumber(adminId) ?? adminId ?? null;
+  const defaultByKey = new Map((defaultRules || []).map((rule) => [makeRuleKey(rule), rule]));
+  const adminByKey = new Map((adminRules || []).map((rule) => [makeRuleKey(rule), rule]));
+  const keys = new Set([...defaultByKey.keys(), ...adminByKey.keys()]);
+
+  return [...keys]
+    .map((key) => {
+      const defaultRule = defaultByKey.get(key) || null;
+      const adminRule = adminByKey.get(key) || null;
+      const effectiveRule = adminRule || defaultRule;
+
+      if (!effectiveRule) {
+        return null;
+      }
+
+      return mapRuleToAdminFormat(effectiveRule, {
+        adminId: resolvedAdminId,
+        defaultRule: defaultRule || effectiveRule,
+        baseRule: defaultRule,
+        isInherited: !adminRule,
       });
     })
     .filter(Boolean)
