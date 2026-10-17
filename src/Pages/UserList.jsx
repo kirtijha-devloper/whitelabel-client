@@ -517,12 +517,15 @@ const UserList = ({
   const normalizedQueryRole = roleFromQuery === "franchise" ? "franchaise" : roleFromQuery;
   const initialRole = lockedRole || normalizedQueryRole || "";
 
+  const adminIdParam = isAdmin && currentUser?.id ? currentUser.id : undefined;
+
   // Query for all users (default list)
   const [allUsersParams, setAllUsersParams] = useState({
     page: 1,
     limit: 10,
     status: "",
     role: initialRole,
+    ...(adminIdParam ? { admin_id: adminIdParam } : {}),
   });
 
   // Separate page state for search results
@@ -546,12 +549,13 @@ const UserList = ({
     isLoading: searchLoading,
     error: searchError,
   } = useQuery({
-    queryKey: ["userSearch", committedSearch, allUsersParams.status, allUsersParams.role, searchPage, searchPageSize],
+    queryKey: ["userSearch", committedSearch, allUsersParams.status, allUsersParams.role, searchPage, searchPageSize, adminIdParam],
     queryFn: () =>
       searchUsers({
         q: committedSearch,
         status: allUsersParams.status,
         role: allUsersParams.role,
+        ...(adminIdParam ? { admin_id: adminIdParam } : {}),
         limit: searchPageSize,
         offset: (searchPage - 1) * searchPageSize,
       }),
@@ -559,8 +563,29 @@ const UserList = ({
     staleTime: 30 * 1000,
   });
 
-  const allUsers = allUsersResponse ? extractUsersArray(allUsersResponse) : [];
-  const searchUsers_ = searchResponse ? (Array.isArray(searchResponse?.data) ? searchResponse.data : extractUsersArray(searchResponse)) : [];
+  // Strict Admin Isolation Guard: Ensure only this Admin's downline is displayed
+  const filterByAdminOwnership = (users) => {
+    if (!isAdmin || !currentUser?.id) return users;
+    const currentAdminId = Number(currentUser.id);
+    return users.filter((u) => {
+      // Exclude other admin accounts
+      const uRole = normalizeUserRole(u.role);
+      if (uRole === 'admin' && Number(u.id) !== currentAdminId) {
+        return false;
+      }
+      // If user has admin_id, ensure it belongs to this admin
+      const uAdminId = u.admin_id ?? u.adminId;
+      if (uAdminId !== undefined && uAdminId !== null) {
+        return Number(uAdminId) === currentAdminId;
+      }
+      return true;
+    });
+  };
+
+  const allUsersRaw = allUsersResponse ? extractUsersArray(allUsersResponse) : [];
+  const searchUsersRaw = searchResponse ? (Array.isArray(searchResponse?.data) ? searchResponse.data : extractUsersArray(searchResponse)) : [];
+  const allUsers = filterByAdminOwnership(allUsersRaw);
+  const searchUsers_ = filterByAdminOwnership(searchUsersRaw);
 
   useEffect(() => {
     if (typeof allUsersResponse === "undefined") {
@@ -2045,18 +2070,21 @@ const UserList = ({
           q: committedSearch,
           status: allUsersParams.status,
           role: allUsersParams.role,
+          ...(adminIdParam ? { admin_id: adminIdParam } : {}),
           limit: total > 0 ? total : 1000,
           page: 1,
         });
-        exportUsers = Array.isArray(response?.data) ? response.data : extractUsersArray(response);
+        const raw = Array.isArray(response?.data) ? response.data : extractUsersArray(response);
+        exportUsers = filterByAdminOwnership(raw);
       } else {
         const total = Number(allUsersResponse?.pagination?.total ?? allUsers.length ?? 0);
         const response = await AllUsers({
           ...allUsersParams,
+          ...(adminIdParam ? { admin_id: adminIdParam } : {}),
           page: 1,
           limit: total > 0 ? total : 1000,
         });
-        exportUsers = extractUsersArray(response);
+        exportUsers = filterByAdminOwnership(extractUsersArray(response));
       }
 
       if (!Array.isArray(exportUsers) || exportUsers.length === 0) {

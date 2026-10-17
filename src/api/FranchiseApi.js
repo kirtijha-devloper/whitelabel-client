@@ -131,7 +131,7 @@ export const AllUsers = async (params = {}) => {
         const token = getAuthToken();
         if (!token) throw new Error("Unauthorized User");
 
-        const { page, limit, status, role, search } = params;
+        const { page, limit, status, role, search, admin_id, ...rest } = params;
         let url = '/user';
         const query = [];
         if (page) query.push(`page=${encodeURIComponent(page)}`);
@@ -139,6 +139,12 @@ export const AllUsers = async (params = {}) => {
         if (status) query.push(`status=${encodeURIComponent(status)}`);
         if (role) query.push(`role=${encodeURIComponent(role)}`);
         if (search) query.push(`search=${encodeURIComponent(search)}`);
+        if (admin_id) query.push(`admin_id=${encodeURIComponent(admin_id)}`);
+        Object.entries(rest).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') {
+                query.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+            }
+        });
         if (query.length) url += `?${query.join('&')}`;
 
         const response = await api.get(url, {
@@ -159,6 +165,7 @@ export const searchUsers = async ({
     limit = 10,
     offset,
     page,
+    admin_id,
 } = {}) => {
     try {
         const token = getAuthToken();
@@ -168,6 +175,7 @@ export const searchUsers = async ({
         if (q) params.append('q', q);
         if (status) params.append('status', status);
         if (role) params.append('role', role);
+        if (admin_id) params.append('admin_id', String(admin_id));
         params.append('limit', String(limit));
         if (typeof page !== 'undefined') {
             params.append('page', String(page));
