@@ -345,7 +345,6 @@ const USER_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill",
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
-  mx_payout: "Payout MX",
   pos_inventory: "POS Machine",
   qr_inventory: "QR & Soundbox",
   pg_inventory: "PG Routing",
@@ -359,7 +358,6 @@ const MASTER_SERVICE_CONTROLS = [
   { key: "cc_bill_pay", label: "CC Bill" },
   { key: "ba_cc_bill_pay", label: "BA CC Bill" },
   { key: "cc_bill_3", label: "CC Bill 3" },
-  { key: "mx_payout", label: "Payout MX" },
   { key: "user_daily_limit", label: "User Daily Limit" },
   { key: "pos_t0_settlement", label: "POS T0/T1 Settlement & Limit" },
 ];
