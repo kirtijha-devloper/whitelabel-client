@@ -14,6 +14,7 @@ import {
   Layers,
   Clock,
   UserPlus,
+  RefreshCw,
 } from "lucide-react";
 import { FaHistory } from "react-icons/fa";
 import DashboardChartLauncher from "../components/DashboardChartLauncher";
@@ -21,12 +22,18 @@ import { useQuery } from "@tanstack/react-query";
 import Loader from "../components/Loader";
 import { getDashboard } from "../api/DashboardAndHeader";
 
-export default function SuperFranchiseDashboard({ dashboardData: propDashboardData }) {
+export default function SuperFranchiseDashboard({ dashboardData: propDashboardData, currentUser }) {
   const navigate = useNavigate();
-  const { data: dashboardQueryData, isLoading } = useQuery({
+  const {
+    data: dashboardQueryData,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ["superFranchiseDashboard"],
     queryFn: () => getDashboard(),
     initialData: propDashboardData,
+    refetchInterval: 30000,
   });
 
   if (isLoading && !propDashboardData) {
@@ -179,6 +186,17 @@ export default function SuperFranchiseDashboard({ dashboardData: propDashboardDa
               {todayFormatted}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex h-11 items-center gap-2 px-4 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm hover:bg-gray-50 transition active:scale-[0.98] disabled:opacity-50"
+            title="Refresh real-time data"
+          >
+            <RefreshCw className={`h-4 w-4 text-[#00a8a3] ${isFetching ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
 
           <DashboardChartLauncher
             label="Analytics"

@@ -115,15 +115,15 @@ export default function SuperFranchiseLayout() {
         <UserCreationProvider>
           <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader /></div>}>
             <Routes>
-              <Route path="dashboard" element={<SuperFranchiseDashboard dashboardData={dashboard} />} />
+              <Route path="dashboard" element={<SuperFranchiseDashboard dashboardData={dashboard} currentUser={currentUser} />} />
               <Route path="create-user" element={<AddUser currentUser={currentUser} />} />
               <Route path="create-user/details/:id" element={<CreateUserDetail currentUser={currentUser} />} />
               <Route path="create-user/pos/:id" element={<CreateUserPosDetails currentUser={currentUser} />} />
               <Route path="create-user/charge-set/:id" element={<CreateChargeSet currentUser={currentUser} />} />
               <Route path="user/:id" element={<UserDetails currentUser={currentUser} />} />
-              <Route path="franchise-list" element={<UserList currentUser={currentUser} roleFilter="franchise" />} />
-              <Route path="list" element={<UserList currentUser={currentUser} />} />
-              <Route path="merchant-list" element={<MerchantList />} />
+              <Route path="franchise-list" element={<UserList currentUser={currentUser} roleFilter="franchise" title="Franchise List" />} />
+              <Route path="list" element={<UserList currentUser={currentUser} roleFilter="merchant" title="Merchant List" />} />
+              <Route path="merchant-list" element={<UserList currentUser={currentUser} roleFilter="merchant" title="Merchant List" />} />
 
               <Route
                 path='vimo-payout'

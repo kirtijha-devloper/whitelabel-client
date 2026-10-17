@@ -373,9 +373,11 @@ const getServiceStatusSummary = (user = {}) => {
 const UserList = ({
   currentUser,
   title = "All Users",
-  lockedRole = "",
+  lockedRole: propLockedRole = "",
+  roleFilter = "",
   listMode = "all",
 }) => {
+  const lockedRole = propLockedRole || roleFilter || "";
   const [searchInputValue, setSearchInputValue] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const [impersonatingUser, setImpersonatingUser] = useState(null);
