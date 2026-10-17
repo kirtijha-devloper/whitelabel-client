@@ -202,7 +202,9 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
     const classf = String(r.card_classification || "ANY").trim().toUpperCase();
     const st = String(r.settlement_type || "ANY").trim().toLowerCase();
     const comp = String(r.company_name || "ANY").trim().toUpperCase();
-    return `${mode}|${brand}|${type}|${classf}|${st}|${comp}`;
+    const minAmt = Number(r.min_amount ?? 0).toFixed(2);
+    const maxAmt = r.max_amount !== null && r.max_amount !== undefined && r.max_amount !== "Unlimited" ? Number(r.max_amount).toFixed(2) : "MAX";
+    return `${mode}|${brand}|${type}|${classf}|${st}|${comp}|${minAmt}|${maxAmt}`;
   };
 
   // Build unified POS comparison rows
@@ -471,6 +473,10 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
   const handleOpenEditPos = (row) => {
     setSelectedRuleToEdit(row);
     const rule = row.adminRule || row.defaultRule;
+    const maxAmt =
+      rule.max_amount !== null && rule.max_amount !== undefined && rule.max_amount !== "Unlimited"
+        ? String(rule.max_amount)
+        : "";
     setPosForm({
       payment_mode: rule.payment_mode || "CARD",
       card_type: rule.card_type || "CREDIT",
@@ -478,9 +484,9 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
       card_classification: rule.card_classification || "ANY",
       settlement_type: rule.settlement_type || "today_settlement",
       min_amount: String(rule.min_amount ?? 0),
-      max_amount: rule.max_amount !== null && rule.max_amount !== undefined ? String(rule.max_amount) : "100000",
-      charge_percent: String(row.adminRate !== null ? row.adminRate : row.defaultRate ?? ""),
-      charge_flat: String(row.adminFlat !== null ? row.adminFlat : row.defaultFlat ?? "0"),
+      max_amount: maxAmt,
+      charge_percent: String(row.adminRate !== null ? row.adminRate : (row.defaultRate ?? "")),
+      charge_flat: String(row.adminFlat !== null ? row.adminFlat : (row.defaultFlat ?? "0")),
       gst_required: row.adminRule ? row.adminRule.gst_required : (row.defaultRule?.gst_required ?? true),
       gst_percent: String(row.adminGst !== null ? row.adminGst : (row.defaultGst ?? "18")),
       company_name: rule.company_name || "ANY",
@@ -511,8 +517,8 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
         card_classification: "ANY",
         settlement_type: "today_settlement",
         min_amount: "0",
-        max_amount: "100000",
-        charge_percent: "1.25",
+        max_amount: "",
+        charge_percent: "",
         charge_flat: "0",
         gst_required: true,
         gst_percent: "18",
@@ -540,6 +546,41 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
   // ── Save POS Rule Mutation ───────────────────────────────────────────────────
   const savePosMutation = useMutation({
     mutationFn: async ({ isNew, row, form }) => {
+      const parsedMin =
+        form.min_amount !== "" && form.min_amount !== null && !isNaN(parseFloat(form.min_amount))
+          ? parseFloat(form.min_amount)
+          : 0;
+      const parsedMax =
+        form.max_amount !== "" &&
+        form.max_amount !== null &&
+        form.max_amount !== undefined &&
+        form.max_amount !== "Unlimited" &&
+        !isNaN(parseFloat(form.max_amount))
+          ? parseFloat(form.max_amount)
+          : null;
+      const parsedPercent =
+        form.charge_percent !== "" &&
+        form.charge_percent !== null &&
+        form.charge_percent !== undefined &&
+        !isNaN(parseFloat(form.charge_percent))
+          ? parseFloat(form.charge_percent)
+          : 0;
+      const parsedFlat =
+        form.charge_flat !== "" &&
+        form.charge_flat !== null &&
+        form.charge_flat !== undefined &&
+        !isNaN(parseFloat(form.charge_flat))
+          ? parseFloat(form.charge_flat)
+          : 0;
+
+      if (parsedPercent < 0 || parsedPercent > 100) {
+        throw new Error("Charge percentage must be a number between 0 and 100.");
+      }
+
+      if (parsedMax !== null && parsedMin > parsedMax) {
+        throw new Error("Slab Min Amount cannot be greater than Slab Max Amount.");
+      }
+
       const payload = {
         user_id: parseInt(adminId, 10),
         payment_mode: form.payment_mode,
@@ -547,19 +588,15 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
         card_brand: form.card_brand,
         card_classification: form.card_classification,
         settlement_type: form.settlement_type,
-        min_amount: parseFloat(form.min_amount) || 0,
-        max_amount: form.max_amount ? parseFloat(form.max_amount) : null,
-        charge_percent: parseFloat(form.charge_percent),
-        charge_flat: parseFloat(form.charge_flat) || 0,
+        min_amount: parsedMin,
+        max_amount: parsedMax,
+        charge_percent: parsedPercent,
+        charge_flat: parsedFlat,
         gst_required: Boolean(form.gst_required),
         gst_percent: form.gst_required ? parseFloat(form.gst_percent) || 0 : 0,
         company_name: form.company_name || null,
         is_active: Boolean(form.is_active),
       };
-
-      if (isNaN(payload.charge_percent) || payload.charge_percent < 0 || payload.charge_percent > 100) {
-        throw new Error("Charge percentage must be a number between 0 and 100.");
-      }
 
       if (row?.adminRule?.id) {
         return updateAdminPosRule(row.adminRule.id, payload);
@@ -1597,21 +1634,53 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                     </div>
                   </div>
 
+                  {/* SLAB AMOUNT RANGE */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Admin Charge Rate (%) <span className="text-red-500">*</span>
+                        Slab Min Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={posForm.min_amount}
+                        onChange={(e) => setPosForm({ ...posForm, min_amount: e.target.value })}
+                        className="w-full rounded-xl border border-gray-300 p-2 text-sm font-mono focus:ring-1 focus:ring-[#00D3CD]"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Slab Max Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={posForm.max_amount}
+                        onChange={(e) => setPosForm({ ...posForm, max_amount: e.target.value })}
+                        className="w-full rounded-xl border border-gray-300 p-2 text-sm font-mono focus:ring-1 focus:ring-[#00D3CD]"
+                        placeholder="Leave blank for max"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Admin Charge Rate (%) <span className="text-gray-400 font-normal">(Optional)</span>
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
                         max="100"
-                        required
                         value={posForm.charge_percent}
                         onChange={(e) => setPosForm({ ...posForm, charge_percent: e.target.value })}
                         className="w-full rounded-xl border border-gray-300 p-2 text-sm font-semibold text-emerald-700 focus:ring-2 focus:ring-[#00D3CD]"
-                        placeholder="e.g. 1.25"
+                        placeholder="e.g. 1.25 (optional)"
                       />
                     </div>
 
