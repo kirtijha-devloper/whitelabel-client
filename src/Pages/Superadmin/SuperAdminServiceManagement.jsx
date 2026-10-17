@@ -157,9 +157,31 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
   });
 
   const services = useMemo(() => {
-    return (rawServices || []).filter(
-      (s) => (s?.key || s?.service_key) !== "mx_payout"
-    );
+    return (rawServices || [])
+      .filter((s) => (s?.key || s?.service_key) !== "mx_payout")
+      .map((s) => {
+        const key = s?.key || s?.service_key || "";
+        const canonical = CANONICAL_SERVICE_META[key] || {};
+        const resolvedCategory = normalizeCategory(s?.category, key);
+        const resolvedLabel = s?.label || canonical.label || key;
+        const resolvedDesc = s?.description || canonical.description || "";
+        const isEnabled =
+          s?.is_enabled !== undefined
+            ? s.is_enabled
+            : s?.enabled !== undefined
+            ? s.enabled
+            : true;
+
+        return {
+          ...s,
+          key,
+          service_key: key,
+          label: resolvedLabel,
+          category: resolvedCategory,
+          description: resolvedDesc,
+          is_enabled: isEnabled,
+        };
+      });
   }, [rawServices]);
 
   // Toggle Mutation
@@ -172,6 +194,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
       );
       queryClient.invalidateQueries({ queryKey: ["superAdminServices"] });
       queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["adminServices"] });
       queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       if (typeof window !== "undefined") {
         window.dispatchEvent(
@@ -195,6 +218,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
       setEditingService(null);
       queryClient.invalidateQueries({ queryKey: ["superAdminServices"] });
       queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["adminServices"] });
       queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       setFormData({
         key: "",
@@ -660,37 +684,35 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
             ))}
           </div>
 
-          {/* View Mode Toggle (Grouped vs Flat Grid) */}
-          {selectedCategory === "all" && (
-            <div className="inline-flex p-0.5 bg-gray-100 rounded-lg text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setViewMode("grouped")}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${
-                  viewMode === "grouped"
-                    ? "bg-white text-[#00D3CD] shadow-sm font-bold"
-                    : "text-gray-500 hover:text-gray-800"
-                }`}
-                title="Group by Category"
-              >
-                <FaThList className="w-3 h-3" />
-                <span>Sections</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("grid")}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${
-                  viewMode === "grid"
-                    ? "bg-white text-[#00D3CD] shadow-sm font-bold"
-                    : "text-gray-500 hover:text-gray-800"
-                }`}
-                title="Flat Grid View"
-              >
-                <FaThLarge className="w-3 h-3" />
-                <span>Grid</span>
-              </button>
-            </div>
-          )}
+          {/* View Mode Toggle (Sections vs Flat Grid) */}
+          <div className="inline-flex p-0.5 bg-gray-100 rounded-lg text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setViewMode("grouped")}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${
+                viewMode === "grouped"
+                  ? "bg-white text-[#00D3CD] shadow-sm font-bold"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+              title="Group by Category"
+            >
+              <FaThList className="w-3 h-3" />
+              <span>Sections</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md transition-all ${
+                viewMode === "grid"
+                  ? "bg-white text-[#00D3CD] shadow-sm font-bold"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+              title="Flat Grid View"
+            >
+              <FaThLarge className="w-3 h-3" />
+              <span>Grid</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -719,7 +741,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
             Reset Filters
           </button>
         </div>
-      ) : selectedCategory === "all" && viewMode === "grouped" ? (
+      ) : viewMode === "grouped" ? (
         /* ── Grouped Sections View (Payout, CC Bill, Payin) ── */
         <div className="space-y-6">
           {groupedServices.map((group) => {
