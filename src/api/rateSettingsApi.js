@@ -2822,27 +2822,79 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
 // ── Super Admin Admin-Specific Rate Management Helpers ───────────────────────
 export const fetchPlatformDefaultPosRules = async () => {
   try {
-    const res = await axios.get(`${BASE_URL}/pos-charge-rules/list?scope=admin_default&limit=200`, getAuthHeaders());
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/defaults?limit=200`, getAuthHeaders());
     return res.data?.data || [];
   } catch (error) {
     console.error('Failed to fetch platform default POS rules:', error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch platform default POS rules');
+    // Fallback to legacy endpoint if super-admin route is unavailable
+    try {
+      const fallback = await axios.get(`${BASE_URL}/pos-charge-rules/list?scope=admin_default&limit=200`, getAuthHeaders());
+      return fallback.data?.data || [];
+    } catch {
+      throw new Error(error.response?.data?.message || 'Failed to fetch platform default POS rules');
+    }
+  }
+};
+
+export const createPlatformDefaultPosRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/pos/defaults`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to create platform default POS rule');
+  }
+};
+
+export const updatePlatformDefaultPosRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/pos/defaults/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to update platform default POS rule');
+  }
+};
+
+export const deletePlatformDefaultPosRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/pos/defaults/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete platform default POS rule');
+  }
+};
+
+export const fetchSuperAdminAdminsPosMatrix = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/admins`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    console.error('Failed to fetch super admin admins POS matrix:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admins rate matrix');
   }
 };
 
 export const fetchAdminPosRules = async (adminId) => {
   try {
-    const res = await axios.get(`${BASE_URL}/pos-charge-rules/list?user_id=${adminId}&limit=200`, getAuthHeaders());
-    return res.data?.data || [];
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/admin/${adminId}`, getAuthHeaders());
+    return res.data?.overrides || res.data?.data || [];
   } catch (error) {
     console.error(`Failed to fetch POS rules for admin ${adminId}:`, error);
-    throw new Error(error.response?.data?.message || 'Failed to fetch admin POS rules');
+    try {
+      const fallback = await axios.get(`${BASE_URL}/pos-charge-rules/list?user_id=${adminId}&limit=200`, getAuthHeaders());
+      return fallback.data?.data || [];
+    } catch {
+      throw new Error(error.response?.data?.message || 'Failed to fetch admin POS rules');
+    }
   }
 };
 
 export const createAdminPosRule = async (payload) => {
   try {
-    const res = await axios.post(`${BASE_URL}/pos-charge-rules`, payload, getAuthHeaders());
+    const adminId = payload.user_id;
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/pos/admin/${adminId}`, payload, getAuthHeaders());
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to create admin POS rule');
@@ -2851,7 +2903,7 @@ export const createAdminPosRule = async (payload) => {
 
 export const updateAdminPosRule = async (id, payload) => {
   try {
-    const res = await axios.put(`${BASE_URL}/pos-charge-rules/${id}`, payload, getAuthHeaders());
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/pos/admin/rule/${id}`, payload, getAuthHeaders());
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to update admin POS rule');
@@ -2860,10 +2912,150 @@ export const updateAdminPosRule = async (id, payload) => {
 
 export const deleteAdminPosRule = async (id) => {
   try {
-    const res = await axios.delete(`${BASE_URL}/pos-charge-rules/${id}`, getAuthHeaders());
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/pos/admin/rule/${id}`, getAuthHeaders());
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Failed to delete admin POS rule');
+  }
+};
+
+export const fetchSuperAdminRentalRates = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/rental`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch rental rates');
+  }
+};
+
+export const createSuperAdminRentalRate = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/rental`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create rental rate');
+  }
+};
+
+export const updateSuperAdminRentalRate = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/rental/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update rental rate');
+  }
+};
+
+export const deleteSuperAdminRentalRate = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/rental/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete rental rate');
+  }
+};
+
+export const fetchSuperAdminCcBillRules = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/cc-bill`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch CC bill rules');
+  }
+};
+
+export const createSuperAdminCcBillRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/cc-bill`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create CC bill rule');
+  }
+};
+
+export const updateSuperAdminCcBillRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/cc-bill/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update CC bill rule');
+  }
+};
+
+export const deleteSuperAdminCcBillRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/cc-bill/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete CC bill rule');
+  }
+};
+
+export const fetchSuperAdminPayoutRules = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/payout`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch payout rules');
+  }
+};
+
+export const createSuperAdminPayoutRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/payout`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create payout rule');
+  }
+};
+
+export const updateSuperAdminPayoutRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/payout/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update payout rule');
+  }
+};
+
+export const deleteSuperAdminPayoutRule = async (id, params = {}) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/payout/${id}`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete payout rule');
+  }
+};
+
+export const getSuperAdminGlobalPosRate = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/global-rate`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch global POS rate');
+  }
+};
+
+export const updateSuperAdminGlobalPosRate = async (percentFee) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/global-rate`, {
+      percent_fee: Number(percentFee),
+    }, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update global POS rate');
   }
 };
 

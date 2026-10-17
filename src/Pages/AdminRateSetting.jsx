@@ -32,7 +32,31 @@ import {
   listPosRentals,
   createPosRental,
   updatePosRental,
+  createPlatformDefaultPosRule,
+  updatePlatformDefaultPosRule,
+  deletePlatformDefaultPosRule,
+  fetchPlatformDefaultPosRules,
+  fetchSuperAdminAdminsPosMatrix,
+  fetchAdminPosRules,
+  createAdminPosRule,
+  updateAdminPosRule,
+  deleteAdminPosRule,
+  fetchSuperAdminRentalRates,
+  createSuperAdminRentalRate,
+  updateSuperAdminRentalRate,
+  deleteSuperAdminRentalRate,
+  fetchSuperAdminCcBillRules,
+  createSuperAdminCcBillRule,
+  updateSuperAdminCcBillRule,
+  deleteSuperAdminCcBillRule,
+  fetchSuperAdminPayoutRules,
+  createSuperAdminPayoutRule,
+  updateSuperAdminPayoutRule,
+  deleteSuperAdminPayoutRule,
+  getSuperAdminGlobalPosRate,
+  updateSuperAdminGlobalPosRate,
 } from '../api/rateSettingsApi';
+import { getAdminList } from '../api/superAdminApi';
 import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, searchUsers } from '../api/FranchiseApi';
 import {
   Loader2,
@@ -107,7 +131,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   }, [initialTab, isSuperAdmin]);
 
   useEffect(() => {
-    if (isSuperAdmin && ['super_franchise', 'specific', 'unassigned', 'payout'].includes(activeTab)) {
+    if (isSuperAdmin && ['super_franchise', 'unassigned'].includes(activeTab)) {
       setActiveTab('default');
       setViewMode('detail');
     }
@@ -447,6 +471,48 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      if (isSuperAdmin) {
+        const [adminsRes, defaultRules] = await Promise.all([
+          fetchSuperAdminAdminsPosMatrix().catch(() => ({ data: [] })),
+          fetchPlatformDefaultPosRules().catch(() => []),
+        ]);
+        const adminRows = adminsRes?.data || [];
+        const admMatrix = {};
+        const adminUsers = [];
+        adminRows.forEach((item) => {
+          const adm = item.admin;
+          if (adm?.id) {
+            adminUsers.push(adm);
+            admMatrix[adm.id] = (item.overrides || []).map((r) =>
+              mapRuleToFranchiseFormat(r, {
+                adminRule: r,
+                isInherited: false,
+              })
+            );
+          }
+        });
+        const mappedDefaults = (defaultRules || []).map((r) =>
+          mapRuleToFranchiseFormat(r, {
+            adminRule: r,
+            isInherited: false,
+          })
+        );
+
+        setSuperFranchises([]);
+        setFranchises(adminUsers);
+        setUnassignedMerchants([]);
+        setRates(mappedDefaults);
+        setDefaultRatesAttributes(
+          buildColumnStructure(
+            mappedDefaults,
+            ...Object.values(admMatrix)
+          )
+        );
+        setMatrixData(admMatrix);
+        fetchGlobalRate();
+        return;
+      }
+
       const [superFranchisesData, franchisesData, defaults, unassignedMerchantsData] = await Promise.all([
         getSuperFranchises(),
         getFranchises(),
@@ -502,9 +568,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchGlobalRate = async () => {
     setLoadingGlobal(true);
     try {
-      const data = await getGlobalPOSRate();
-      if (data) {
-        setGlobalRate(data.percent_fee);
+      const data = isSuperAdmin ? await getSuperAdminGlobalPosRate() : await getGlobalPOSRate();
+      const val = data?.data?.percent_fee ?? data?.percent_fee ?? (typeof data === 'number' ? data : null);
+      if (val !== null && val !== undefined) {
+        setGlobalRate(val);
       }
     } catch (error) {
       console.error("Failed to load global rate", error);
@@ -520,9 +587,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
     setLoadingGlobal(true);
     try {
-      const res = await updateGlobalPOSRate(globalRateInput);
+      const res = isSuperAdmin
+        ? await updateSuperAdminGlobalPosRate(globalRateInput)
+        : await updateGlobalPOSRate(globalRateInput);
       toast.success("Global Fallback Rate updated successfully!");
-      setGlobalRate(res.record ? res.record.percent_fee : globalRateInput);
+      const updatedVal = res?.data?.percent_fee ?? res?.record?.percent_fee ?? globalRateInput;
+      setGlobalRate(updatedVal);
       setIsEditingGlobal(false);
       setGlobalRateInput('');
     } catch (error) {
@@ -536,6 +606,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchCcData = async () => {
     setLoadingCcRules(true);
     try {
+      if (isSuperAdmin) {
+        const [rulesRes, adminsRes] = await Promise.all([
+          fetchSuperAdminCcBillRules(),
+          getAdminList({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        ]);
+        const rules = rulesRes?.data || [];
+        setAdminCcBaseline(rules.filter((r) => !r.user_id));
+        setCompanyDefaultCcRules(rules);
+        const adminUsers = (adminsRes?.data || []).map((m) => ({ ...m, userType: 'Admin' }));
+        setCcUsers(adminUsers);
+        return;
+      }
+
       const [applicableChargesRes, defaultRulesRes, merchantsRes, franchisesRes] = await Promise.all([
         fetchMyAdminApplicableCharges().catch(() => null),
         listBbpsChargeRules({ user_id: 'default' }).catch(() => ({ data: [] })),
@@ -620,6 +703,20 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         user_id: ccModalMode === 'user_override' ? selectedCcUserId : null,
       };
 
+      if (isSuperAdmin) {
+        if (editingCcRule?.id) {
+          await updateSuperAdminCcBillRule(editingCcRule.id, payload);
+          toast.success('CC Bill rule updated successfully');
+        } else {
+          await createSuperAdminCcBillRule(payload);
+          toast.success(ccModalMode === 'user_override' ? 'Admin override created successfully' : 'Default platform rate created successfully');
+        }
+        setIsCcModalOpen(false);
+        setEditingCcRule(null);
+        fetchCcData();
+        return;
+      }
+
       if (editingCcRule?.id) {
         await updateBbpsChargeRule(editingCcRule.id, payload);
         toast.success('CC Bill rule updated successfully');
@@ -646,6 +743,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const handleDeleteCcRule = async (id, isUserRule = false) => {
     if (!window.confirm('Are you sure you want to delete this rule?')) return;
     try {
+      if (isSuperAdmin) {
+        await deleteSuperAdminCcBillRule(id);
+        toast.success('CC Bill rule deleted successfully');
+        fetchCcData();
+        return;
+      }
       await deleteBbpsChargeRule(id);
       toast.success('CC Bill rule deleted successfully');
       if (isUserRule && selectedCcUserId) {
@@ -662,6 +765,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   // ── Payout Handlers ──────────────────────────────────────────────────────────
   const fetchPayoutData = async () => {
     try {
+      if (isSuperAdmin) {
+        const [rulesRes, adminsRes] = await Promise.all([
+          fetchSuperAdminPayoutRules(),
+          getAdminList({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        ]);
+        const defaults = rulesRes?.defaults || rulesRes?.data || [];
+        setAdminPayoutBaseline(defaults);
+        const adminUsers = (adminsRes?.data || []).map((a) => ({ ...a, userType: 'Admin' }));
+        setPayoutUsers(adminUsers);
+        return;
+      }
+
       const [applicableChargesRes, merchantsRes, franchisesRes] = await Promise.all([
         fetchMyAdminApplicableCharges().catch(() => null),
         MerchantAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
@@ -739,8 +854,29 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         rate: parseFloat(payoutForm.rate),
         rate_type: payoutForm.rate_type,
         is_active: payoutForm.is_active,
-        description: payoutForm.description || 'User Payout Charge',
+        description: payoutForm.description || (isSuperAdmin ? 'Admin Payout Charge' : 'User Payout Charge'),
       };
+
+      if (isSuperAdmin) {
+        if (editingPayoutRule?.id) {
+          await updateSuperAdminPayoutRule(editingPayoutRule.id, {
+            ...payload,
+            is_admin_override: Boolean(selectedPayoutUserId),
+          });
+          toast.success('Payout charge updated successfully');
+        } else {
+          await createSuperAdminPayoutRule(payload);
+          toast.success('Payout charge configured successfully');
+        }
+        setIsPayoutModalOpen(false);
+        setEditingPayoutRule(null);
+        if (selectedPayoutUserId) {
+          fetchSelectedUserPayoutRules(selectedPayoutUserId);
+        } else {
+          fetchPayoutData();
+        }
+        return;
+      }
 
       if (editingPayoutRule?.id) {
         await updateUserPayoutCharge(editingPayoutRule.id, payload);
@@ -761,8 +897,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleDeletePayoutRule = async (id) => {
-    if (!window.confirm('Reset this rate to inherit from Super Admin baseline?')) return;
+    if (!window.confirm(isSuperAdmin ? 'Reset this rate to inherit from platform baseline?' : 'Reset this rate to inherit from Super Admin baseline?')) return;
     try {
+      if (isSuperAdmin) {
+        await deleteSuperAdminPayoutRule(id, { is_admin_override: Boolean(selectedPayoutUserId) });
+        toast.success('Payout charge reset successfully');
+        if (selectedPayoutUserId) {
+          fetchSelectedUserPayoutRules(selectedPayoutUserId);
+        } else {
+          fetchPayoutData();
+        }
+        return;
+      }
       await deleteUserPayoutCharge(id);
       toast.success('Rule reset to inherited baseline successfully');
       if (selectedPayoutUserId) {
@@ -777,13 +923,13 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchRentalData = async () => {
     setLoadingRental(true);
     try {
-      const res = await listPosRentals({ limit: 100 });
+      const res = isSuperAdmin ? await fetchSuperAdminRentalRates({ limit: 100 }) : await listPosRentals({ limit: 100 });
       const rows = res?.data || (Array.isArray(res) ? res : []);
       setRentalList(rows);
       if (rows.length > 0) {
         const item = rows[0];
         setRentalForm({
-          franchise_rate: item.franchise_rate ?? '',
+          franchise_rate: item.amount ?? item.franchise_rate ?? '',
           merchant_rate: item.merchant_rate ?? '',
           is_active: item.status === 'active' || item.is_active === true,
         });
@@ -799,6 +945,24 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     e?.preventDefault();
     setIsSavingRental(true);
     try {
+      if (isSuperAdmin) {
+        const payload = {
+          amount: parseFloat(rentalForm.franchise_rate || rentalForm.amount || 0),
+          target_user_type: 'admin',
+          status: rentalForm.is_active ? 'active' : 'inactive',
+          type: 'pos',
+        };
+        if (rentalList.length > 0 && rentalList[0].id) {
+          await updateSuperAdminRentalRate(rentalList[0].id, payload);
+          toast.success('Rental rates updated successfully');
+        } else {
+          await createSuperAdminRentalRate(payload);
+          toast.success('Rental rates configured successfully');
+        }
+        fetchRentalData();
+        return;
+      }
+
       const payload = {
         franchise_rate: parseFloat(rentalForm.franchise_rate || 0),
         merchant_rate: parseFloat(rentalForm.merchant_rate || 0),
@@ -858,6 +1022,27 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchFranchiseRates = async (id, page = 1, limit = 100) => {
     setLoadingRates(true);
     try {
+      if (isSuperAdmin) {
+        if (id === 'default') {
+          const defaultRules = await fetchPlatformDefaultPosRules();
+          const mapped = (defaultRules || []).map((rule) =>
+            mapRuleToFranchiseFormat(rule, {
+              adminRule: rule,
+              isInherited: false,
+            })
+          );
+          setRates(mapped);
+        } else {
+          const [adminOverrides, defaultRules] = await Promise.all([
+            fetchAdminPosRules(id),
+            fetchPlatformDefaultPosRules(),
+          ]);
+          const mapped = buildFranchiseEffectiveRules(defaultRules, adminOverrides, id);
+          setRates(mapped);
+        }
+        return;
+      }
+
       const data = await getFranchiseRates(id, {
         paginate: id === 'default',
         page,
@@ -1110,8 +1295,44 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         base_rate: newRateForm.chargeType === 'percent' ? newRateForm.chargeValue : '0',
         company_name: newRateForm.companyName || null
       };
-      await createDefaultFranchiseRate(payload);
-      toast.success("New default rate created successfully.");
+
+      if (isSuperAdmin && activeTab === 'default') {
+        await createPlatformDefaultPosRule({
+          payment_mode: payload.method,
+          card_brand: payload.network,
+          card_type: payload.card_type,
+          card_classification: payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("New platform default rate created successfully.");
+      } else if (isSuperAdmin && activeTab === 'specific' && selectedFranchiseId) {
+        await createAdminPosRule({
+          user_id: selectedFranchiseId,
+          payment_mode: payload.method,
+          card_brand: payload.network,
+          card_type: payload.card_type,
+          card_classification: payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("Admin rate override created successfully.");
+      } else {
+        await createDefaultFranchiseRate(payload);
+        toast.success("New default rate created successfully.");
+      }
       setIsModalOpen(false);
 
       // Reset form
@@ -1120,6 +1341,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       fetchInitialData();
       if (activeTab === 'default') {
         fetchFranchiseRates('default');
+      } else if (activeTab === 'specific' && selectedFranchiseId) {
+        fetchFranchiseRates(selectedFranchiseId);
       }
     } catch (error) {
       toast.error('Failed to create rate: ' + (error.response?.data?.message || error.message));
@@ -1145,8 +1368,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const confirmDelete = async () => {
     const rate = pendingDelete?.rate;
     const tab = pendingDelete?.tab;
-    if (isSuperAdmin && tab !== 'default') {
-      toast.error('Unauthorized: Super Admin can only delete default/admin-level rates.');
+    if (isSuperAdmin && tab !== 'default' && tab !== 'specific') {
+      toast.error('Unauthorized: Super Admin can only delete default or admin-level rates.');
       setPendingDelete(null);
       return;
     }
@@ -1155,8 +1378,16 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const deleteId = rate.rule_id || rate.id;
     setIsDeleting(true);
     try {
-      await deleteDefaultPOSRate(deleteId);
-      toast.success('Rate deleted successfully');
+      if (isSuperAdmin && tab === 'default') {
+        await deletePlatformDefaultPosRule(deleteId);
+        toast.success('Platform default rate deleted successfully');
+      } else if (isSuperAdmin && tab === 'specific') {
+        await deleteAdminPosRule(deleteId);
+        toast.success('Admin rate override reset to platform default');
+      } else {
+        await deleteDefaultPOSRate(deleteId);
+        toast.success('Rate deleted successfully');
+      }
 
       if (tab === 'default') {
         await fetchFranchiseRates('default');
@@ -1212,8 +1443,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleSavePosTxnEdit = async () => {
-    if (isSuperAdmin && activeTab !== 'default') {
-      toast.error('Unauthorized: Super Admin can only edit default/admin-level rates.');
+    if (isSuperAdmin && activeTab !== 'default' && activeTab !== 'specific') {
+      toast.error('Unauthorized: Super Admin can only edit default or admin-level rates.');
       setIsPosTxnEditModalOpen(false);
       return;
     }
@@ -1235,6 +1466,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         gst_required: posTxnEditForm.gstRequired,
         gst_percent: posTxnEditForm.gstRequired ? posTxnEditForm.gstPercent : '0',
         chargePercent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
+        charge_percent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
         company_name: posTxnEditForm.companyName || null
       };
       if (activeTab === 'default') {
@@ -1242,13 +1474,28 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
           toast.error('Admins cannot modify Super Admin default rates.');
           return;
         }
-        await updateFranchiseRate('default', posTxnEditRate, updates);
+        await updatePlatformDefaultPosRule(posTxnEditRate.rule_id || posTxnEditRate.id, updates);
+        toast.success('Platform default rate updated successfully.');
+      } else if (isSuperAdmin && activeTab === 'specific') {
+        const ruleId = posTxnEditRate.rule_id || posTxnEditRate.id;
+        if (posTxnEditRate.isInherited) {
+          await createAdminPosRule({
+            ...updates,
+            user_id: selectedFranchiseId,
+          });
+        } else {
+          await updateAdminPosRule(ruleId, updates);
+        }
+        toast.success('Admin rate rule updated successfully.');
       } else if (activeTab === 'super_franchise') {
         await updateSuperFranchiseRate(selectedSuperFranchiseId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       } else if (activeTab === 'specific') {
         await updateFranchiseRate(selectedFranchiseId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       } else {
         await updateMerchantRate(selectedMerchantId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       }
       toast.success('Rule updated successfully.');
       setIsPosTxnEditModalOpen(false);
@@ -1282,7 +1529,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       ? 'Super Franchise'
       : isUnassignedTab
         ? 'Merchant'
-        : 'Franchise';
+        : isSuperAdmin
+          ? 'Admin'
+          : 'Franchise';
     const matrixAttributes = buildColumnStructure(
       defaultRatesAttributes.filter((rate) => rate.source_scope === 'admin'),
       ...Object.values(matrixSource)
@@ -1291,7 +1540,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       ? 'Search Super Franchise by Name, ID, or Phone...'
       : isUnassignedTab
         ? 'Search Merchant by Name, ID, or Phone...'
-        : 'Search Franchise by Name, ID, or Phone...';
+        : isSuperAdmin
+          ? 'Search Admin by Name, ID, or Phone...'
+          : 'Search Franchise by Name, ID, or Phone...';
     const shouldUseRemoteSearch =
       viewMode === 'matrix' &&
       (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned') &&
@@ -2700,6 +2951,23 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 Super Franchise Specific Rates
               </button>
             )}
+            {isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('specific');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Admin Specific Rates
+              </button>
+            )}
             {!isSuperAdmin && (
               <button
                 className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
@@ -2749,7 +3017,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 CC Bill Pay Charges
               </button>
             )}
-            {!isPosTxnMode && !isSuperAdmin && (
+            {!isPosTxnMode && (
               <button
                 className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
                 onClick={() => {
@@ -2807,7 +3075,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
               <div>
                 <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center">
-                    <span className="font-semibold text-blue-800">Franchise: </span>
+                    <span className="font-semibold text-blue-800">{isSuperAdmin ? 'Admin: ' : 'Franchise: '}</span>
                     <span className="ml-2 text-blue-900">{franchises.find(f => f.id === Number(selectedFranchiseId))?.name || 'Unknown'}</span>
                   </div>
                   <button
