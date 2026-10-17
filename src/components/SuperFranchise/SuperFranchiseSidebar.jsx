@@ -81,7 +81,7 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
     },
     { name: "Reports", path: "/super-franchise/reports", icon: <FaChartBar /> },
     { name: "Ledger", path: "/super-franchise/ledger", icon: <FaDatabase /> },
-    { name: "Charges", path: "/super-franchise/franchise-charges", icon: <FaMoneyBillWave /> },
+    { name: "Rate Settings", path: "/super-franchise/rate-settings", icon: <FaMoneyBillWave /> },
     { name: "Settlement", path: "/super-franchise/pos-setting", icon: <FaSlidersH /> },
     { name: "Help", path: "/super-franchise/complaint-box", icon: <FaQuestionCircle /> },
     { name: "Setting", path: "/super-franchise/setting", icon: <FaCog /> },

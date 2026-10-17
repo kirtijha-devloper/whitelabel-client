@@ -80,7 +80,7 @@ const FranchiseSidebar = ({ currentUser }) => {
     },
     { name: "Reports", path: "/franchise/reports", icon: <FaChartBar /> },
     { name: "Ledger", path: "/franchise/ledger", icon: <FaDatabase /> },
-    { name: "Charges", path: "/franchise/merchant-rates", icon: <FaMoneyBillWave /> },
+    { name: "Rate Settings", path: "/franchise/merchant-rates", icon: <FaMoneyBillWave /> },
     { name: "Settlement", path: "/franchise/pos-setting", icon: <FaSlidersH /> },
     { name: "Help", path: "/franchise/complaint-box", icon: <FaQuestionCircle /> },
     { name: "Setting", path: "/franchise/setting", icon: <FaCog /> },

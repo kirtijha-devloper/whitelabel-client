@@ -75,10 +75,13 @@ import {
   Search,
   X,
   AlertCircle,
+  Lock,
+  Sliders,
 } from 'lucide-react';
 
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
+import InheritedRatesView from '../components/RateSetting/InheritedRatesView';
 
 const INITIAL_NEW_RATE_FORM = {
   method: 'CARD',
@@ -124,6 +127,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [activeTab, setActiveTab] = useState(effectiveInitialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
   const [viewMode, setViewMode] = useState(effectiveInitialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
   const [specificSettlementFilter, setSpecificSettlementFilter] = useState(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+  const [hierarchyMode, setHierarchyMode] = useState('downline'); // 'inherited' | 'downline'
 
   useEffect(() => {
     const tabToSet = isSuperAdmin ? 'default' : initialTab;
@@ -2839,6 +2843,42 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     <div className="bg-gray-100 min-h-screen">
       <div> {/* Wider for Matrix */}
         <div className="bg-white rounded-lg shadow-sm">
+          {!isSuperAdmin && (
+            <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 rounded-t-lg">
+              <button
+                type="button"
+                onClick={() => setHierarchyMode('inherited')}
+                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                  hierarchyMode === 'inherited'
+                    ? 'border-[#00D3CD] text-[#008c87]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Lock className="h-4 w-4" />
+                <span>Inherited Rates (From Super Admin)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setHierarchyMode('downline')}
+                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                  hierarchyMode === 'downline'
+                    ? 'border-[#00D3CD] text-[#008c87]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Sliders className="h-4 w-4" />
+                <span>Set Downline Rates (For Super Franchise)</span>
+              </button>
+            </div>
+          )}
+
+          {!isSuperAdmin && hierarchyMode === 'inherited' ? (
+            <div className="p-4 md:p-6">
+              <InheritedRatesView uplineRoleName="Super Admin" currentRoleName="Admin" />
+            </div>
+          ) : (
+            <>
           {/* Header */}
           <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gray-50/50 rounded-t-lg">
             <div>
@@ -3122,6 +3162,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             {activeTab === 'rental' && renderRentalTab()}
             {activeTab === 'cc_bill' && renderCcBillTab()}
           </div>
+            </>
+          )}
         </div>
       </div>
 
