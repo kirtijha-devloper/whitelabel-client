@@ -472,8 +472,8 @@ const UserList = ({
     isFranchiseViewer || hasPermission(currentUser, "users.status.update");
   const canViewWalletAmount =
     isFranchiseViewer || isAdmin || hasPermission(currentUser, "wallet.read");
-  const canCreditWallet = isAdmin || isSuperFranchiseViewer || hasPermission(currentUser, "wallet.credit");
-  const canDebitWallet = isAdmin || isSuperFranchiseViewer || hasPermission(currentUser, "wallet.debit");
+  const canCreditWallet = !isSuperFranchiseViewer && (isAdmin || hasPermission(currentUser, "wallet.credit"));
+  const canDebitWallet = !isSuperFranchiseViewer && (isAdmin || hasPermission(currentUser, "wallet.debit"));
   const canAdjustWallet = !isEmployeeDirectory && (canCreditWallet || canDebitWallet);
   const hasWalletPermission =
     isAdmin ||
@@ -481,12 +481,12 @@ const UserList = ({
     hasAnyPermission(currentUser, ["wallet.read", "wallet.credit", "wallet.debit"]);
   const canManageSettlementShortcut =
     !isEmployeeDirectory &&
+    !isSuperFranchiseViewer &&
     hasWalletPermission &&
     (isAdmin ||
-      isSuperFranchiseViewer ||
       (hasPermission(currentUser, "users.update") &&
         hasPermission(currentUser, "users.settlement.update")));
-  const canBulkUpdateSettlementType = isAdmin || isSuperFranchiseViewer;
+  const canBulkUpdateSettlementType = isAdmin;
   const canViewAssignedPosMachines = !isEmployeeDirectory && canReadUsers;
   const canManageUserServiceSettings =
     !isEmployeeDirectory &&
