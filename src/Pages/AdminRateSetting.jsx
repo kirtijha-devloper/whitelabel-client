@@ -97,7 +97,7 @@ const INITIAL_NEW_RATE_FORM = {
   gstPercent: '18',
   companyName: '',
 };
-const DEFAULT_SPECIFIC_SETTLEMENT_FILTER = 'today_settlement';
+const DEFAULT_SPECIFIC_SETTLEMENT_FILTER = 'all';
 
 const extractSearchUsersArray = (payload) => {
   const candidates = [
@@ -148,6 +148,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [unassignedMerchants, setUnassignedMerchants] = useState([]);
   const [selectedSuperFranchiseId, setSelectedSuperFranchiseId] = useState('');
   const [selectedFranchiseId, setSelectedFranchiseId] = useState('');
+  const [selectedAdminId, setSelectedAdminId] = useState('');
   const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [rates, setRates] = useState([]);
   const [superFranchiseMatrixData, setSuperFranchiseMatrixData] = useState({}); // { superFranchiseId: [rates] }
@@ -1106,6 +1107,17 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
 
+    if(activeTab === "specific" && isSuperAdmin) {
+      const id = selectedFranchiseId;
+      const [adminOverrides, defaultRules] = await Promise.all([
+        fetchAdminPosRules(id),
+        fetchPlatformDefaultPosRules(),
+      ]);
+      const mapped = buildAdminEffectiveRules(defaultRules, adminOverrides, id);
+      setRates(mapped);
+      return;
+    }
+
     if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
       await fetchSuperFranchiseRates(selectedSuperFranchiseId);
       await fetchInitialData();
@@ -1412,7 +1424,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       } else if (tab === 'unassigned' && selectedMerchantId) {
         await fetchMerchantRates(selectedMerchantId);
       }
-      await fetchInitialData();
+      await refreshAfterUpdate();
       setEditingId(null);
       setEditValue('');
       setEditGstValue('');
@@ -1843,9 +1855,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const SCOPE_BADGES = {
-    super_admin_default: { label: 'Platform Default', color: 'bg-indigo-100 text-indigo-800' },
+    super_admin_default: { label: 'Global Default', color: 'bg-indigo-100 text-indigo-800' },
     super_admin_admin: { label: 'SuperAdmin→Admin', color: 'bg-indigo-100 text-indigo-800' },
-    admin_default: { label: 'Global Default', color: 'bg-blue-100 text-blue-800' },
+    admin_default: { label: 'Platform Default', color: 'bg-blue-100 text-blue-800' },
     admin_super_franchise: { label: 'Admin→SuperFranchise', color: 'bg-emerald-100 text-emerald-800' },
     admin_franchise: { label: 'Admin→Franchise', color: 'bg-purple-100 text-purple-800' },
     admin_merchant: { label: 'Admin→Merchant', color: 'bg-orange-100 text-orange-800' },
@@ -1895,9 +1907,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 value={specificSettlementFilter}
                 onChange={(e) => setSpecificSettlementFilter(e.target.value)}
               >
+                <option value="all">All</option>
                 <option value="today_settlement">Today Settlement</option>
                 <option value="next_day_settlement">Next Day Settlement</option>
-                <option value="all">All</option>
               </select>
             </div>
           </div>
