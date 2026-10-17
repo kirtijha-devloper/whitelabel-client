@@ -1480,15 +1480,6 @@ const StockPOSMachine = ({ currentUser }) => {
             >
               {isExporting ? "Exporting..." : "Export Excel"}
             </button>
-            {isAdminStyleStockViewer && (
-              <button
-                onClick={() => navigate('/admin/stock-pos/add-to-franchise')}
-                className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#00D3CD] text-white px-4 py-2 rounded-lg hover:bg-[#00bdb7] transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Assign To Franchise
-              </button>
-            )}
           </div>
         </div>
 
