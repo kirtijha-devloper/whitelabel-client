@@ -29,8 +29,10 @@ const formatCurrency = (val) => {
 };
 
 const formatSlabRange = (min, max) => {
-  const minStr = min !== null && min !== undefined ? formatCurrency(min) : '₹0';
-  const maxStr = max !== null && max !== undefined && Number(max) > 0 ? formatCurrency(max) : 'Unlimited';
+  const minNum = Number(min || 0);
+  const maxNum = Number(max || 0);
+  const minStr = formatCurrency(minNum);
+  const maxStr = maxNum > 0 ? formatCurrency(maxNum) : 'Unlimited';
   return `${minStr} – ${maxStr}`;
 };
 
@@ -40,6 +42,58 @@ const formatSettlement = (type) => {
   if (lower === 'today_settlement' || lower === 't0') return 'Today Settlement (T0)';
   if (lower === 'next_day_settlement' || lower === 't1') return 'Next Day (T1)';
   return String(type);
+};
+
+const getPosRateDisplay = (row) => {
+  const percent = Number(
+    row.charge_percent ??
+    row.chargePercent ??
+    row.base_rate ??
+    row.admin_rate ??
+    row.rate ??
+    0
+  );
+  const flat = Number(
+    row.charge_flat ??
+    row.chargeFlat ??
+    row.flat_fee ??
+    0
+  );
+
+  if (percent > 0 && flat > 0) {
+    return `${percent.toFixed(2)}% + ₹${flat.toFixed(2)}`;
+  }
+  if (flat > 0) {
+    return `₹${flat.toFixed(2)}`;
+  }
+  if (percent > 0) {
+    return `${percent.toFixed(2)}%`;
+  }
+  if (row.charge_value !== undefined && row.charge_value !== null && row.charge_value !== '') {
+    return row.charge_type === 'flat' ? `₹${Number(row.charge_value).toFixed(2)}` : `${Number(row.charge_value).toFixed(2)}%`;
+  }
+  if (row.amount !== undefined && row.amount !== null && row.amount !== '') {
+    return `₹${Number(row.amount).toFixed(2)}`;
+  }
+  return '0.00%';
+};
+
+const getCcBillRateDisplay = (row) => {
+  const isFlat = String(row.rate_type || 'flat').toLowerCase() === 'flat';
+  const val = Number(row.rate ?? row.charge_percent ?? row.charge_flat ?? row.amount ?? 0);
+  return isFlat ? `₹${val.toFixed(2)}` : `${val.toFixed(2)}%`;
+};
+
+const getPayoutRateDisplay = (row) => {
+  const isPercent = String(row.rate_type || '').toLowerCase() === 'percent' || String(row.rate_type || '').toLowerCase() === 'percentage';
+  const val = Number(row.rate ?? row.charge_percent ?? row.charge_flat ?? row.amount ?? 0);
+  return isPercent ? `${val.toFixed(2)}%` : `₹${val.toFixed(2)}`;
+};
+
+const getRentalAmountDisplay = (row) => {
+  const val = row.amount ?? row.monthly_rent ?? row.franchise_rate ?? row.rental_amount ?? row.merchant_rate;
+  if (val === undefined || val === null || val === '') return '—';
+  return formatCurrency(val);
 };
 
 export default function InheritedRatesView({
@@ -146,7 +200,7 @@ export default function InheritedRatesView({
                 </span>
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                These rates were configured by your upline ({uplineRoleName}) for {currentRoleName}. These represent your base cost price and cannot be modified.
+                These rates were configured by your upline ({uplineRoleName}) for {currentRoleName}. These represent your <strong>Base Cost (Buying Price)</strong> and cannot be modified.
               </p>
             </div>
           </div>
@@ -165,12 +219,17 @@ export default function InheritedRatesView({
           </button>
         </div>
 
-        {/* Notice Alert */}
-        <div className="mt-4 flex items-center gap-2 rounded-xl bg-blue-50/70 border border-blue-200/60 px-4 py-2.5 text-xs text-blue-800">
-          <Info className="h-4 w-4 shrink-0 text-blue-600" />
-          <span>
-            <strong>Margin Guideline:</strong> When setting rates for your downline in the <em>Set Downline Rates</em> tab, ensure your downline rates are equal to or higher than these inherited rates to protect your margin.
-          </span>
+        {/* Notice Alert explaining "Your Cost" */}
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-blue-50/80 border border-blue-200/70 p-3.5 text-xs text-blue-900">
+          <div className="flex items-start gap-2.5">
+            <Info className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
+            <div>
+              <span className="font-bold text-blue-950">💡 What is "Your Cost"?</span>
+              <p className="mt-0.5 text-blue-800 leading-relaxed">
+                <strong>Your Cost</strong> is the fee your upline parent charges your wallet per transaction. When setting rates for your downline in <em>Set Downline Rates</em>, ensure your downline selling rate is <strong>higher than Your Cost</strong> to earn commission (Profit Margin = Downline Rate - Your Cost).
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -275,8 +334,8 @@ export default function InheritedRatesView({
                     <th className="px-4 py-3">Card Type</th>
                     <th className="px-4 py-3">Classification</th>
                     <th className="px-4 py-3">Settlement</th>
-                    <th className="px-4 py-3">Slab Range</th>
-                    <th className="px-4 py-3">Your Cost (Fee)</th>
+                    <th className="px-4 py-3">Slab Range (Amount)</th>
+                    <th className="px-4 py-3">Your Cost (Base Fee)</th>
                     <th className="px-4 py-3">GST Applied</th>
                   </tr>
                 </thead>
@@ -288,10 +347,10 @@ export default function InheritedRatesView({
                       <td className="px-4 py-3">{row.card_type || 'ANY'}</td>
                       <td className="px-4 py-3">{row.card_classification || 'ANY'}</td>
                       <td className="px-4 py-3">{formatSettlement(row.settlement_type)}</td>
-                      <td className="px-4 py-3">{formatSlabRange(row.min_amount, row.max_amount)}</td>
+                      <td className="px-4 py-3 font-mono">{formatSlabRange(row.min_amount ?? row.from_amount, row.max_amount ?? row.to_amount)}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                          {row.charge_type === 'flat' ? `₹${row.charge_value || 0}` : `${row.charge_value || row.rate || 0}%`}
+                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300 shadow-xs">
+                          {getPosRateDisplay(row)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -312,7 +371,7 @@ export default function InheritedRatesView({
                 <thead className="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Terminal Type / Description</th>
-                    <th className="px-4 py-3">Monthly Rental (Base Cost)</th>
+                    <th className="px-4 py-3">Monthly Rental (Your Cost)</th>
                     <th className="px-4 py-3">Billing Cycle</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
@@ -324,8 +383,8 @@ export default function InheritedRatesView({
                         {row.description || row.machine_type || 'Standard POS Terminal'}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                          {formatCurrency(row.amount || row.franchise_rate || row.rental_amount || row.merchant_rate)}
+                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300 shadow-xs">
+                          {getRentalAmountDisplay(row)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600">Monthly</td>
@@ -346,8 +405,8 @@ export default function InheritedRatesView({
                 <thead className="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Service Name</th>
-                    <th className="px-4 py-3">Transaction Slab Range</th>
-                    <th className="px-4 py-3">Base Cost Fee</th>
+                    <th className="px-4 py-3">Transaction Slab Range (Amount)</th>
+                    <th className="px-4 py-3">Your Cost (Base Fee)</th>
                     <th className="px-4 py-3">Fee Type</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
@@ -356,10 +415,10 @@ export default function InheritedRatesView({
                   {filteredRows.map((row, idx) => (
                     <tr key={row.id || idx} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-4 py-3 font-semibold text-slate-900">{row.service_name || 'BBPS CC Bill Pay'}</td>
-                      <td className="px-4 py-3">{formatSlabRange(row.from_amount || row.min_amount, row.to_amount || row.max_amount)}</td>
+                      <td className="px-4 py-3 font-mono">{formatSlabRange(row.from_amount || row.min_amount, row.to_amount || row.max_amount)}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                          {row.rate_type === 'flat' ? `₹${row.rate || 0}` : `${row.rate || 0}%`}
+                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300 shadow-xs">
+                          {getCcBillRateDisplay(row)}
                         </span>
                       </td>
                       <td className="px-4 py-3 uppercase text-slate-600 font-semibold">{row.rate_type || 'flat'}</td>
@@ -380,8 +439,8 @@ export default function InheritedRatesView({
                 <thead className="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Payout Transfer Mode</th>
-                    <th className="px-4 py-3">Slab Range</th>
-                    <th className="px-4 py-3">Base Cost Fee</th>
+                    <th className="px-4 py-3">Transaction Slab Range (Amount)</th>
+                    <th className="px-4 py-3">Your Cost (Base Fee)</th>
                     <th className="px-4 py-3">Fee Type</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
@@ -390,10 +449,10 @@ export default function InheritedRatesView({
                   {filteredRows.map((row, idx) => (
                     <tr key={row.id || idx} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-4 py-3 font-semibold text-slate-900">{row.transfer_mode || row.service_name || 'IMPS / NEFT / RTGS'}</td>
-                      <td className="px-4 py-3">{formatSlabRange(row.from_amount || row.min_amount, row.to_amount || row.max_amount)}</td>
+                      <td className="px-4 py-3 font-mono">{formatSlabRange(row.from_amount || row.min_amount, row.to_amount || row.max_amount)}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                          {row.rate_type === 'percent' ? `${row.rate || 0}%` : `₹${row.rate || 0}`}
+                        <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300 shadow-xs">
+                          {getPayoutRateDisplay(row)}
                         </span>
                       </td>
                       <td className="px-4 py-3 uppercase text-slate-600 font-semibold">{row.rate_type || 'flat'}</td>

@@ -160,9 +160,9 @@ export default function SuperFranchiseLayout() {
               <Route path="reports/ba-cc-bill" element={<BillAvenueCCBillPayReports />} />
               <Route path="setting" element={<Settings currentUser={currentUser} />} />
               <Route path="pos-setting" element={<PosSetting currentUser={currentUser} />} />
-              <Route path="rate-settings" element={<SuperFranchiseRateSettings currentUser={currentUser} />} />
+              <Route path="rate-settings" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
               <Route path='complaint-box' element={<ComplaintBox currentUser={currentUser} />} />
-              <Route path="franchise-charges" element={<SuperFranchiseRateSettings currentUser={currentUser} />} />
+              <Route path="franchise-charges" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               <Route path="ledger-entries" element={<FranchiseLedger currentUser={currentUser} />} />
               <Route path="logout" element={<Logout />} />
