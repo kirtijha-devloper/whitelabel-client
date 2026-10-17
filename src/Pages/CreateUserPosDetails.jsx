@@ -6,6 +6,7 @@ import StepIndicator from "../components/StepIndicator";
 import { assignPosMachineToFranchise, getAllPosMachines } from "../api/posMachine";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Select from "react-select";
+import { normalizeUserRole } from "../utils/userAccess";
 
 const steps = ['Basic Info', 'Address & Documents', 'POS Assignment', 'ChargeSet'];
 
@@ -47,8 +48,13 @@ function CreateUserPosDetails({currentUser}) {
       queryClient.invalidateQueries({ queryKey: ["posMachines"] });
       setTimeout(() => {
         setShowSuccess(false);
-        const redirectUrl = currentUser.role === "admin" ? `/admin/create-user/charge-set/${id}` :`/franchise/create-user/charge-set/${id}`;
-        console.log(redirectUrl, 'redirecturl')
+        const normalizedRole = normalizeUserRole(currentUser?.role);
+        const redirectUrl = normalizedRole === "franchise"
+          ? `/franchise/create-user/charge-set/${id}`
+          : normalizedRole === "super_franchise"
+            ? `/super-franchise/create-user/charge-set/${id}`
+            : `/admin/create-user/charge-set/${id}`;
+        console.log(redirectUrl, 'redirecturl');
         navigate(redirectUrl);
       }, 1500);
     },

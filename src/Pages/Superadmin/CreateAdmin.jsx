@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import {
   UserPlus,
   UserCheck,
-  Users,
   Mail,
   Lock,
   User,
@@ -666,38 +665,6 @@ function CreateAdmin() {
             noValidate
           >
 
-            {/* ==========================================
-                ROLE SELECTION
-            ========================================== */}
-
-            <div className="bg-gray-50 rounded-lg p-5">
-
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
-                <Users size={16} />
-                User Role
-              </label>
-
-              <div className="flex gap-6">
-
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
-
-                  <input
-                    type="radio"
-                    name="role"
-                    value="admin"
-                    checked={true}
-                    disabled
-                    onChange={handleChange}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-
-                  <span>Admin</span>
-
-                </label>
-
-              </div>
-
-            </div>
 
 
             {/* ==========================================

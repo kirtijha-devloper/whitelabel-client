@@ -658,20 +658,6 @@ export default function AdminLayout() {
                 )}
               />
               <Route
-                path="user/:id"
-                element={guardRoute(
-                  canReadUsers,
-                  <UserDetails currentUser={currentUser} />,
-                )}
-              />
-              <Route
-                path="user/:id/edit"
-                element={guardRoute(
-                  canUpdateUsers,
-                  <AddUser currentUser={currentUser} />,
-                )}
-              />
-              <Route
                 path="merchant-list"
                 element={guardRoute(isAdminViewer, <MerchantList />)}
               />

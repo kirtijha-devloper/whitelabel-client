@@ -141,6 +141,7 @@ export default function FranchiseLayout() {
               <Route path="create-user/pos/:id" element={<CreateUserPosDetails currentUser={currentUser} />} />
               <Route path="create-user/charge-set/:id" element={<CreateChargeSet currentUser={currentUser} />} />
               <Route path="user/:id" element={<UserDetails currentUser={currentUser} />} />
+              <Route path="user/:id/edit" element={<AddUser currentUser={currentUser} />} />
               <Route path="merchant-list" element={<MerchantList />} />
               <Route path="list" element={<UserList currentUser={currentUser} />} />
               <Route path="pos-machine-list" element={<PosMachineList />} />

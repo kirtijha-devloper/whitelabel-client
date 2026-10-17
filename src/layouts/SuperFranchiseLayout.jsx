@@ -161,7 +161,6 @@ export default function SuperFranchiseLayout() {
               <Route path="setting" element={<Settings currentUser={currentUser} />} />
               <Route path="pos-setting" element={<PosSetting currentUser={currentUser} />} />
               <Route path="rate-settings" element={<SuperFranchiseRateSettings currentUser={currentUser} />} />
-              <Route path="rate-settings" element={<FranchiseRateSettings />} />
               <Route path='complaint-box' element={<ComplaintBox currentUser={currentUser} />} />
               <Route path="franchise-charges" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />

@@ -185,16 +185,16 @@ function AddUser({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMachines, setSelectedMachines] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
-  const normalizedRole = String(currentUser?.role || "").trim().toLowerCase();
+  const normalizedRole = normalizeUserRole(currentUser?.role);
   const isActualAdminUser = normalizedRole === "admin";
   const isEmployee = normalizedRole === "employee" || isEmployeeUser(currentUser);
   const isSuperAdminViewer = normalizedRole === "super_admin" || isSuperAdminUser(currentUser) || isSuperAdmin(currentUser);
   const isAdminArea = location.pathname.startsWith("/admin/");
   const isFranchiseUser = normalizedRole === "franchise" || location.pathname.startsWith("/franchise/");
-  const isSuperFranchiseUser = normalizedRole === "super_franchise" || location.pathname.startsWith("super-frenchise");
-  const canCreateSuperFranchise = !isFranchiseUser && (isActualAdminUser || isEmployee || isSuperAdminViewer);
+  const isSuperFranchiseUser = normalizedRole === "super_franchise" || location.pathname.startsWith("/super-franchise");
+  const canCreateSuperFranchise = !isFranchiseUser && !isSuperFranchiseUser && (isActualAdminUser || isEmployee || isSuperAdminViewer);
   const parsedEditUserId = Number(routeUserId);
-  const isEditMode = Boolean(routeUserId) && location.pathname.endsWith("/edit") && isAdminArea;
+  const isEditMode = Boolean(routeUserId) && location.pathname.endsWith("/edit");
   const isRoleSelectionDisabled = isFranchiseUser || isEditMode ;
   const showPosAssignment = !isEditMode;
   const hasInitializedCreateForm = useRef(false);
@@ -322,7 +322,13 @@ function AddUser({ currentUser }) {
         payload: { role: "merchant" },
       });
     }
-  }, [dispatch, isEditMode, isFranchiseUser, state.formData.role]);
+    if (isSuperFranchiseUser && !isEditMode && !['merchant', 'franchise'].includes(state.formData.role)) {
+      dispatch({
+        type: "UPDATE_FORM",
+        payload: { role: "merchant" },
+      });
+    }
+  }, [dispatch, isEditMode, isFranchiseUser, isSuperFranchiseUser, state.formData.role]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -400,7 +406,12 @@ function AddUser({ currentUser }) {
         await updateUserProfile({ id: parsedEditUserId, data: payload });
         toast.success("User updated successfully!");
         dispatch({ type: "RESET" });
-        navigate(`/admin/user/${parsedEditUserId}`);
+        const redirectUserUrl = isFranchiseUser
+          ? `/franchise/user/${parsedEditUserId}`
+          : isSuperFranchiseUser
+            ? `/super-franchise/user/${parsedEditUserId}`
+            : `/admin/user/${parsedEditUserId}`;
+        navigate(redirectUserUrl);
         return;
       }
 
