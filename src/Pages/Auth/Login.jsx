@@ -26,9 +26,9 @@ const Login = () => {
         }}
       />
 
-      <div className='absolute lg:top-10 top-4 left-4 lg:left-6 z-20'>
+      {/* <div className='absolute lg:top-10 top-4 left-4 lg:left-6 z-20'>
         <img src={logo} className="w-32 lg:w-43" alt="AbheePay Logo" />
-      </div>
+      </div> */}
 
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-8">
         <div className="bg-[#cfeded] w-full max-w-4xl rounded-xl overflow-hidden shadow-2xl">

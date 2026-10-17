@@ -808,6 +808,89 @@ export default function PosSetting({ currentUser }) {
     });
   };
 
+  // Helper to get all downstream users (franchises, employees, staff) belonging to a Super Franchise
+  const getDownstreamUsersForSuperFranchise = (sfId) => {
+    const sfIdStr = String(sfId);
+    const userMap = new Map();
+
+    const allRaw = extractUsersArray(allUsersData);
+    allRaw.forEach((u) => {
+      if (u && u.id) userMap.set(String(u.id), u);
+    });
+    rawUsersList.forEach((u) => {
+      if (u && u.id) userMap.set(String(u.id), { ...(userMap.get(String(u.id)) || {}), ...u });
+    });
+
+    const children = [];
+    userMap.forEach((u) => {
+      if (String(u.id) === sfIdStr) return;
+      const uRole = normalizeUserRole(u.role);
+      if (uRole === "admin" || uRole === "superadmin" || uRole === "super_franchise") return;
+
+      const uSfId =
+        u?.super_franchise_id ??
+        u?.superFranchiseId ??
+        u?.super_franchise_details?.id ??
+        (u?.parent_id ? String(u.parent_id) : null);
+
+      if (String(uSfId) === sfIdStr) {
+        children.push(u);
+      }
+    });
+    return children;
+  };
+
+  // Helper to calculate minimum committed limit (Downstream Allocated + Self Utilized)
+  const getMinimumCommittedLimitForUser = (targetUser) => {
+    if (!targetUser) return { minLimit: 0, allocated: 0, usedToday: 0, roleLabel: "User", details: "" };
+    const roleStr = normalizeUserRole(targetUser.role);
+    const usedToday = getUserTodayUtilized(targetUser.id, targetUser, getUserSpecificTodayT0Sum(targetUser));
+
+    if (roleStr === "super_franchise") {
+      const downstreamChildren = getDownstreamUsersForSuperFranchise(targetUser.id);
+      let allocated = 0;
+      downstreamChildren.forEach((child) => {
+        const cLimit = Number(child.t0_daily_limit);
+        if (Number.isFinite(cLimit) && cLimit > 0) {
+          allocated += cLimit;
+        }
+      });
+      return {
+        minLimit: allocated + usedToday,
+        allocated,
+        usedToday,
+        roleLabel: "Super Franchise",
+        details: allocated > 0 ? `allocated ₹${allocated.toLocaleString("en-IN")} to child franchises` : `used ₹${usedToday.toLocaleString("en-IN")} today`,
+      };
+    }
+
+    if (roleStr === "franchise") {
+      const childMerchants = franchiseMerchantsMap.get(String(targetUser.id)) || [];
+      let allocated = 0;
+      childMerchants.forEach((m) => {
+        const mLimit = Number(m.t0_daily_limit);
+        if (Number.isFinite(mLimit) && mLimit > 0) {
+          allocated += mLimit;
+        }
+      });
+      return {
+        minLimit: allocated + usedToday,
+        allocated,
+        usedToday,
+        roleLabel: "Franchise",
+        details: allocated > 0 ? `allocated ₹${allocated.toLocaleString("en-IN")} to downstream merchants` : `used ₹${usedToday.toLocaleString("en-IN")} today`,
+      };
+    }
+
+    return {
+      minLimit: usedToday,
+      allocated: 0,
+      usedToday,
+      roleLabel: "Merchant",
+      details: usedToday > 0 ? `used ₹${usedToday.toLocaleString("en-IN")} today` : "",
+    };
+  };
+
   const handleSaveCustomerLimit = (customer) => {
     const rawVal = editingLimitMap[customer.id];
     const valToSave = rawVal !== undefined ? rawVal : customer.t0_daily_limit;
@@ -836,38 +919,6 @@ export default function PosSetting({ currentUser }) {
     const roleStr = String(customer.role || "").toLowerCase();
     const isSuperFranchiseRole = roleStr === "super_franchise" || roleStr === "superfranchise";
     const isFranchiseRole = roleStr === "franchise" || roleStr === "franchaise";
-
-    // Helper to get all downstream users (franchises, employees, staff) belonging to a Super Franchise
-    const getDownstreamUsersForSuperFranchise = (sfId) => {
-      const sfIdStr = String(sfId);
-      const userMap = new Map();
-
-      const allRaw = extractUsersArray(allUsersData);
-      allRaw.forEach((u) => {
-        if (u && u.id) userMap.set(String(u.id), u);
-      });
-      rawUsersList.forEach((u) => {
-        if (u && u.id) userMap.set(String(u.id), { ...(userMap.get(String(u.id)) || {}), ...u });
-      });
-
-      const children = [];
-      userMap.forEach((u) => {
-        if (String(u.id) === sfIdStr) return;
-        const uRole = normalizeUserRole(u.role);
-        if (uRole === "admin" || uRole === "superadmin" || uRole === "super_franchise") return;
-
-        const uSfId =
-          u?.super_franchise_id ??
-          u?.superFranchiseId ??
-          u?.super_franchise_details?.id ??
-          (u?.parent_id ? String(u.parent_id) : null);
-
-        if (String(uSfId) === sfIdStr) {
-          children.push(u);
-        }
-      });
-      return children;
-    };
 
     // 0. Validate against Admin Payin Limit pool (for top-level accounts: Super Franchise, Standalone Franchise, Direct Merchant)
     if (isAdmin || isEmployee) {
@@ -1419,6 +1470,7 @@ export default function PosSetting({ currentUser }) {
 
         const matchedRows = [];
         const unmatchedRowsDetails = [];
+        const seenUserIds = new Set();
 
         rows.forEach((row, index) => {
           if (!row || typeof row !== "object") return;
@@ -1490,21 +1542,75 @@ export default function PosSetting({ currentUser }) {
             });
           }
 
-          const limitVal = rawLimitVal !== "" && !isNaN(Number(rawLimitVal)) ? Math.floor(Number(rawLimitVal)) : null;
+          if (matchedUser) {
+            if (isFranchise) {
+              const currentFranchiseId = Number(currentUser?.id);
+              const parentId = getParentFranchiseId(matchedUser);
+              const isChild =
+                parentId === currentFranchiseId ||
+                String(matchedUser.franchaise_id) === String(currentUser?.id) ||
+                String(matchedUser.franchise_id) === String(currentUser?.id);
+              if (!isChild) {
+                unmatchedRowsDetails.push({
+                  rowNum: index + 1,
+                  identifierVal: identifierVal || "N/A",
+                  rawLimitVal: rawLimitVal || "N/A",
+                  reason: "Merchant is not assigned to your franchise",
+                });
+                return;
+              }
+            } else if (isSuperFranchise) {
+              const currentSfId = Number(currentUser?.id);
+              const sfId =
+                matchedUser?.super_franchise_id ??
+                matchedUser?.superFranchiseId ??
+                matchedUser?.super_franchise_details?.id ??
+                null;
+              const isChild =
+                Number(sfId) === currentSfId ||
+                String(matchedUser.super_franchise_id) === String(currentUser?.id);
+              if (!isChild && Number(matchedUser.id) !== currentSfId) {
+                unmatchedRowsDetails.push({
+                  rowNum: index + 1,
+                  identifierVal: identifierVal || "N/A",
+                  rawLimitVal: rawLimitVal || "N/A",
+                  reason: "User is not assigned to your Super Franchise",
+                });
+                return;
+              }
+            }
+          }
+
+          const parsedLimit = rawLimitVal !== "" && !isNaN(Number(rawLimitVal)) ? Math.floor(Number(rawLimitVal)) : null;
+          const limitVal = parsedLimit !== null && parsedLimit >= 0 ? parsedLimit : null;
 
           if (matchedUser && limitVal !== null) {
+            if (seenUserIds.has(matchedUser.id)) {
+              unmatchedRowsDetails.push({
+                rowNum: index + 1,
+                identifierVal: identifierVal || "N/A",
+                rawLimitVal: `₹${limitVal.toLocaleString("en-IN")}`,
+                reason: "Duplicate entry for this user in Excel file",
+              });
+              return;
+            }
+            seenUserIds.add(matchedUser.id);
+
+            const committedInfo = getMinimumCommittedLimitForUser(matchedUser);
+
+            if (committedInfo.minLimit > 0 && limitVal < committedInfo.minLimit) {
+              unmatchedRowsDetails.push({
+                rowNum: index + 1,
+                identifierVal: identifierVal || "N/A",
+                rawLimitVal: `₹${limitVal.toLocaleString("en-IN")}`,
+                reason: `Limit cannot be set lower than ₹${committedInfo.minLimit.toLocaleString("en-IN")} as it is already allocated/utilized (${committedInfo.details})`,
+              });
+              return;
+            }
+
             const prevVal = matchedUser.t0_daily_limit;
             const previousStateStr = prevVal !== null && prevVal !== undefined && prevVal !== "" ? `₹${Number(prevVal).toLocaleString("en-IN")}` : "Unassigned (T1)";
             const newStateStr = `₹${limitVal.toLocaleString("en-IN")}`;
-
-            const customerUsedToday = getUserTodayUtilized(matchedUser.id, matchedUser, getUserSpecificTodayT0Sum(matchedUser));
-            let isWarning = false;
-            let warningMessage = "";
-
-            if (customerUsedToday > 0 && limitVal < customerUsedToday) {
-              isWarning = true;
-              warningMessage = `Below used today (₹${customerUsedToday.toLocaleString("en-IN")})`;
-            }
 
             matchedRows.push({
               matchedUser,
@@ -1512,8 +1618,8 @@ export default function PosSetting({ currentUser }) {
               limitVal,
               previousStateStr,
               newStateStr,
-              isWarning,
-              warningMessage,
+              isWarning: false,
+              warningMessage: "",
             });
           } else {
             unmatchedRowsDetails.push({
@@ -1563,6 +1669,13 @@ export default function PosSetting({ currentUser }) {
     }
 
     if (isAdmin || isEmployee) {
+      if (adminLimitsStats?.isPayinNotSet && matchedRows.some((r) => r.limitVal > 0)) {
+        toast.error(
+          "Cannot apply Excel limits! Admin has no Payin (T0) limit pool assigned by Super Admin (Not Set / ₹0). Super Admin must assign a Payin limit first."
+        );
+        return;
+      }
+
       if (adminLimitsStats?.payinLimit !== null && !adminLimitsStats?.isPayinUnlimited) {
         const adminPool = Number(adminLimitsStats?.payinLimit) || 0;
         const newLimitsMap = new Map();
@@ -1589,51 +1702,64 @@ export default function PosSetting({ currentUser }) {
     }
 
     setIsProcessingExcel(true);
-    let updatedCount = 0;
-    const updatePromises = [];
+    try {
+      let successCount = 0;
+      const errorsList = [];
 
-    matchedRows.forEach((item) => {
-      const { matchedUser, limitVal } = item;
+      for (const item of matchedRows) {
+        const { matchedUser, limitVal } = item;
+        const committedInfo = getMinimumCommittedLimitForUser(matchedUser);
+        if (committedInfo.minLimit > 0 && limitVal < committedInfo.minLimit) {
+          errorsList.push(
+            `${matchedUser.name || `User #${matchedUser.id}`}: Limit cannot be set lower than ₹${committedInfo.minLimit.toLocaleString("en-IN")} (${committedInfo.details})`
+          );
+          continue;
+        }
 
-      updatePromises.push(
-        updateCustomerT0Limit(matchedUser.id, limitVal).catch((err) => {
-          console.error(`Failed to update T0 limit for user ID ${matchedUser.id}:`, err);
-        })
-      );
+        try {
+          await updateCustomerT0Limit(matchedUser.id, limitVal);
 
-      recordLimitAuditLog({
-        performingUser: currentUser,
-        affectedUser: matchedUser,
-        previousState: item.previousStateStr,
-        newState: item.newStateStr,
-        action: "EXCEL_BULK_UPLOAD",
-        serviceKey: "user_daily_limit",
-      });
+          recordLimitAuditLog({
+            performingUser: currentUser,
+            affectedUser: matchedUser,
+            previousState: item.previousStateStr,
+            newState: item.newStateStr,
+            action: "EXCEL_BULK_UPLOAD",
+            serviceKey: "user_daily_limit",
+          });
 
-      updatedCount += 1;
-    });
+          successCount += 1;
+        } catch (err) {
+          const errMsg = err?.message || "Failed to update limit";
+          errorsList.push(`${matchedUser.name || `User #${matchedUser.id}`}: ${errMsg}`);
+        }
+      }
 
-    setExcelPreviewModal((prev) => ({ ...prev, isOpen: false }));
+      setExcelPreviewModal((prev) => ({ ...prev, isOpen: false }));
 
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
+      await queryClient.invalidateQueries({ queryKey: ["posSettings"] });
+      await queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
+      await refetchAll();
+      dispatchLimitChangeEvent({ type: "excel_upload", count: successCount });
+
+      if (errorsList.length > 0) {
+        toast.error(`Limit update failed for ${errorsList.length} user(s):\n${errorsList.join("\n")}`);
+      }
+
+      if (successCount > 0) {
+        setSuccessModal({
+          isOpen: true,
+          title: "Excel Limits Applied Successfully!",
+          message: `Updated T0 daily limits for ${successCount} user(s) as per uploaded Excel file.`,
+          userName: `${successCount} Users Updated`,
+          changeSummary: `Excel Import → ${successCount} Users`,
+        });
+      }
+    } finally {
+      setIsProcessingExcel(false);
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-
-    await queryClient.invalidateQueries({ queryKey: ["posSettings"] });
-    await queryClient.invalidateQueries({ queryKey: ["allUsersListForPosSetting"] });
-    await refetchAll();
-    dispatchLimitChangeEvent({ type: "excel_upload", count: updatedCount });
-
-    setSuccessModal({
-      isOpen: true,
-      title: "Excel Limits Applied Successfully!",
-      message: `Updated T0 daily limits for ${updatedCount} user(s) as per uploaded Excel file.`,
-      userName: `${updatedCount} Users Updated`,
-      changeSummary: `Excel Import → ${updatedCount} Users`,
-    });
-    setIsProcessingExcel(false);
   };
 
   const renderSingleUserRow = (user, index, isChildOfFranchise = false) => {
