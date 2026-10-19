@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  getSuperFranchises,
+  getSuperFranchiseRates,
+  updateSuperFranchiseRate,
+  getAllSuperFranchiseRates,
   getFranchises,
   getFranchiseRates,
   updateFranchiseRate,
@@ -14,12 +18,70 @@ import {
   updateMerchantRate,
   getAllMerchantRates,
 } from '../api/rateSettingsApi';
-import { searchUsers } from '../api/FranchiseApi';
-import RateSettings from './RateSettings';
-import PayoutRateSettings from './PayoutRateSettings';
+import {
+  fetchMyAdminApplicableCharges,
+  listBbpsChargeRules,
+  createBbpsChargeRule,
+  updateBbpsChargeRule,
+  deleteBbpsChargeRule,
+  fetchApplicableCcBillRulesForUser,
+  createUserPayoutCharge,
+  updateUserPayoutCharge,
+  deleteUserPayoutCharge,
+  fetchApplicableUserPayoutCharges,
+  listPosRentals,
+  createPosRental,
+  updatePosRental,
+  createPlatformDefaultPosRule,
+  updatePlatformDefaultPosRule,
+  deletePlatformDefaultPosRule,
+  fetchPlatformDefaultPosRules,
+  fetchSuperAdminAdminsPosMatrix,
+  fetchAdminPosRules,
+  createAdminPosRule,
+  updateAdminPosRule,
+  deleteAdminPosRule,
+  mapRuleToAdminFormat,
+  buildAdminEffectiveRules,
+  fetchSuperAdminRentalRates,
+  createSuperAdminRentalRate,
+  updateSuperAdminRentalRate,
+  deleteSuperAdminRentalRate,
+  fetchSuperAdminCcBillRules,
+  createSuperAdminCcBillRule,
+  updateSuperAdminCcBillRule,
+  deleteSuperAdminCcBillRule,
+  fetchSuperAdminPayoutRules,
+  createSuperAdminPayoutRule,
+  updateSuperAdminPayoutRule,
+  deleteSuperAdminPayoutRule,
+  getSuperAdminGlobalPosRate,
+  updateSuperAdminGlobalPosRate,
+} from '../api/rateSettingsApi';
+import { getAdminList } from '../api/superAdminApi';
+import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, searchUsers } from '../api/FranchiseApi';
+import {
+  Loader2,
+  Plus,
+  Edit2,
+  Trash2,
+  RotateCcw,
+  CheckCircle2,
+  ShieldCheck,
+  Layers,
+  Info,
+  User,
+  Building2,
+  Search,
+  X,
+  AlertCircle,
+  Lock,
+  Sliders,
+} from 'lucide-react';
 
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
+import InheritedRatesView from '../components/RateSetting/InheritedRatesView';
 
 const INITIAL_NEW_RATE_FORM = {
   method: 'CARD',
@@ -35,7 +97,7 @@ const INITIAL_NEW_RATE_FORM = {
   gstPercent: '18',
   companyName: '',
 };
-const DEFAULT_SPECIFIC_SETTLEMENT_FILTER = 'today_settlement';
+const DEFAULT_SPECIFIC_SETTLEMENT_FILTER = 'all';
 
 const extractSearchUsersArray = (payload) => {
   const candidates = [
@@ -65,6 +127,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [activeTab, setActiveTab] = useState(effectiveInitialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
   const [viewMode, setViewMode] = useState(effectiveInitialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
   const [specificSettlementFilter, setSpecificSettlementFilter] = useState(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+  const [hierarchyMode, setHierarchyMode] = useState('downline'); // 'inherited' | 'downline'
 
   useEffect(() => {
     const tabToSet = isSuperAdmin ? 'default' : initialTab;
@@ -74,17 +137,21 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   }, [initialTab, isSuperAdmin]);
 
   useEffect(() => {
-    if (isSuperAdmin && ['specific', 'unassigned', 'payout'].includes(activeTab)) {
+    if (isSuperAdmin && ['super_franchise', 'unassigned'].includes(activeTab)) {
       setActiveTab('default');
       setViewMode('detail');
     }
   }, [isSuperAdmin, activeTab]);
 
+  const [superFranchises, setSuperFranchises] = useState([]);
   const [franchises, setFranchises] = useState([]);
   const [unassignedMerchants, setUnassignedMerchants] = useState([]);
+  const [selectedSuperFranchiseId, setSelectedSuperFranchiseId] = useState('');
   const [selectedFranchiseId, setSelectedFranchiseId] = useState('');
+  const [selectedAdminId, setSelectedAdminId] = useState('');
   const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [rates, setRates] = useState([]);
+  const [superFranchiseMatrixData, setSuperFranchiseMatrixData] = useState({}); // { superFranchiseId: [rates] }
   const [matrixData, setMatrixData] = useState({}); // { franchiseId: [rates] }
   const [unassignedMerchantMatrixData, setUnassignedMerchantMatrixData] = useState({}); // { merchantId: [rates] }
   const [defaultRatesAttributes, setDefaultRatesAttributes] = useState([]); // structure of columns
@@ -126,6 +193,53 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [isEditingGlobal, setIsEditingGlobal] = useState(false);
   const [globalRateInput, setGlobalRateInput] = useState('');
   const [loadingGlobal, setLoadingGlobal] = useState(false);
+
+  // ── CC Bill Pay State ────────────────────────────────────────────────────────
+  const [adminCcBaseline, setAdminCcBaseline] = useState([]);
+  const [companyDefaultCcRules, setCompanyDefaultCcRules] = useState([]);
+  const [loadingCcRules, setLoadingCcRules] = useState(false);
+  const [ccUsers, setCcUsers] = useState([]);
+  const [ccUserSearch, setCcUserSearch] = useState('');
+  const [selectedCcUserId, setSelectedCcUserId] = useState('');
+  const [selectedCcUserRules, setSelectedCcUserRules] = useState([]);
+  const [loadingSelectedCcUser, setLoadingSelectedCcUser] = useState(false);
+  const [isCcModalOpen, setIsCcModalOpen] = useState(false);
+  const [ccModalMode, setCcModalMode] = useState('company_default'); // 'company_default' | 'user_override'
+  const [editingCcRule, setEditingCcRule] = useState(null);
+  const [ccForm, setCcForm] = useState({
+    from_amount: '',
+    to_amount: '',
+    rate: '',
+    rate_type: 'flat',
+    is_active: true,
+    description: '',
+  });
+  const [isSavingCc, setIsSavingCc] = useState(false);
+
+  // ── Payout State ─────────────────────────────────────────────────────────────
+  const [adminPayoutBaseline, setAdminPayoutBaseline] = useState([]);
+  const [payoutUsers, setPayoutUsers] = useState([]);
+  const [payoutUserSearch, setPayoutUserSearch] = useState('');
+  const [selectedPayoutUserId, setSelectedPayoutUserId] = useState('');
+  const [selectedPayoutUserData, setSelectedPayoutUserData] = useState(null);
+  const [loadingSelectedPayoutUser, setLoadingSelectedPayoutUser] = useState(false);
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [editingPayoutRule, setEditingPayoutRule] = useState(null);
+  const [payoutForm, setPayoutForm] = useState({
+    from_amount: '',
+    to_amount: '',
+    rate: '',
+    rate_type: 'flat',
+    is_active: true,
+    description: '',
+  });
+  const [isSavingPayout, setIsSavingPayout] = useState(false);
+
+  // ── Rental State ─────────────────────────────────────────────────────────────
+  const [rentalList, setRentalList] = useState([]);
+  const [loadingRental, setLoadingRental] = useState(false);
+  const [rentalForm, setRentalForm] = useState({ franchise_rate: '', merchant_rate: '', is_active: true });
+  const [isSavingRental, setIsSavingRental] = useState(false);
 
   const methodOptions = ["CARD", "UPI"];
   const networkOptions = ["MASTER_CARD", "VISA", "RUPAY", "AMEX", "DINERS", " "];
@@ -251,6 +365,34 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   }, [activeTab, defaultPagination.page, defaultPagination.limit]);
 
   useEffect(() => {
+    if (activeTab === 'cc_bill') {
+      fetchCcData();
+    } else if (activeTab === 'payout') {
+      fetchPayoutData();
+    } else if (activeTab === 'rental') {
+      fetchRentalData();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedCcUserId) {
+      fetchSelectedUserCcRules(selectedCcUserId);
+    }
+  }, [selectedCcUserId]);
+
+  useEffect(() => {
+    if (selectedPayoutUserId) {
+      fetchSelectedUserPayoutRules(selectedPayoutUserId);
+    }
+  }, [selectedPayoutUserId]);
+
+  useEffect(() => {
+    if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+      fetchSuperFranchiseRates(selectedSuperFranchiseId);
+    }
+  }, [activeTab, selectedSuperFranchiseId]);
+
+  useEffect(() => {
     const timeoutId = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim());
     }, 300);
@@ -260,7 +402,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   useEffect(() => {
     const canUseRemoteSearch =
-      viewMode === 'matrix' && (activeTab === 'specific' || activeTab === 'unassigned');
+      viewMode === 'matrix' && (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned');
 
     if (!canUseRemoteSearch || !debouncedSearchTerm) {
       setMatrixSearchResults([]);
@@ -276,7 +418,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setMatrixSearchError('');
 
       try {
-        const role = activeTab === 'specific' ? 'franchaise' : 'merchant';
+        const role = activeTab === 'super_franchise'
+          ? 'super_franchise'
+          : activeTab === 'specific'
+            ? 'franchaise'
+            : 'merchant';
         const response = await searchUsers({
           q: debouncedSearchTerm,
           status: 'active',
@@ -332,16 +478,72 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [franchisesData, defaults, unassignedMerchantsData] = await Promise.all([
+      if (isSuperAdmin) {
+        const [adminsRes, defaultRules] = await Promise.all([
+          fetchSuperAdminAdminsPosMatrix().catch(() => ({ data: [] })),
+          fetchPlatformDefaultPosRules().catch(() => []),
+        ]);
+        const adminRows = adminsRes?.data || [];
+        const admMatrix = {};
+        const adminUsers = [];
+        adminRows.forEach((item) => {
+          const adm = item?.admin;
+          if (adm?.id) {
+            adminUsers.push(adm);
+            admMatrix[adm.id] = (item.overrides || []).map((r) =>
+              mapRuleToAdminFormat(r, {
+                adminId: adm.id,
+                isInherited: false,
+              })
+            );
+          }
+        });
+
+        if (adminUsers.length === 0) {
+          const fallbackAdmins = await getAdminList({ limit: 1000 }).catch(() => ({ data: [] }));
+          const list = fallbackAdmins?.data || fallbackAdmins?.users || (Array.isArray(fallbackAdmins) ? fallbackAdmins : []);
+          list.forEach((adm) => {
+            if (adm?.id) {
+              adminUsers.push(adm);
+              admMatrix[adm.id] = [];
+            }
+          });
+        }
+
+        const mappedDefaults = (defaultRules || []).map((r) =>
+          mapRuleToAdminFormat(r, {
+            isInherited: false,
+          })
+        );
+
+        setSuperFranchises([]);
+        setFranchises(adminUsers);
+        setUnassignedMerchants([]);
+        setRates(mappedDefaults);
+        setDefaultRatesAttributes(
+          buildColumnStructure(
+            mappedDefaults,
+            ...Object.values(admMatrix)
+          )
+        );
+        setMatrixData(admMatrix);
+        fetchGlobalRate();
+        return;
+      }
+
+      const [superFranchisesData, franchisesData, defaults, unassignedMerchantsData] = await Promise.all([
+        getSuperFranchises(),
         getFranchises(),
         getFranchiseRates('default'),
         getUnassignedMerchants(),
       ]);
 
+      setSuperFranchises(superFranchisesData);
       setFranchises(franchisesData);
       setUnassignedMerchants(unassignedMerchantsData);
 
-      const [matrix, unassignedMerchantMatrix] = await Promise.all([
+      const [sfMatrix, matrix, unassignedMerchantMatrix] = await Promise.all([
+        getAllSuperFranchiseRates(superFranchisesData),
         getAllFranchiseRates(franchisesData),
         getAllMerchantRates(unassignedMerchantsData),
       ]);
@@ -349,10 +551,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setDefaultRatesAttributes(
         buildColumnStructure(
           defaults,
+          ...Object.values(sfMatrix),
           ...Object.values(matrix),
           ...Object.values(unassignedMerchantMatrix)
         )
       );
+      setSuperFranchiseMatrixData(sfMatrix);
       setMatrixData(matrix);
       setUnassignedMerchantMatrixData(unassignedMerchantMatrix);
 
@@ -366,12 +570,26 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
   };
 
+  const fetchSuperFranchiseRates = async (sfId) => {
+    setLoadingRates(true);
+    try {
+      const data = await getSuperFranchiseRates(sfId);
+      setRates(data);
+    } catch (error) {
+      console.error('Failed to load super franchise rates', error);
+      toast.error('Failed to load rates');
+    } finally {
+      setLoadingRates(false);
+    }
+  };
+
   const fetchGlobalRate = async () => {
     setLoadingGlobal(true);
     try {
-      const data = await getGlobalPOSRate();
-      if (data) {
-        setGlobalRate(data.percent_fee);
+      const data = isSuperAdmin ? await getSuperAdminGlobalPosRate() : await getGlobalPOSRate();
+      const val = data?.data?.percent_fee ?? data?.percent_fee ?? (typeof data === 'number' ? data : null);
+      if (val !== null && val !== undefined) {
+        setGlobalRate(val);
       }
     } catch (error) {
       console.error("Failed to load global rate", error);
@@ -387,15 +605,399 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
     setLoadingGlobal(true);
     try {
-      const res = await updateGlobalPOSRate(globalRateInput);
+      const res = isSuperAdmin
+        ? await updateSuperAdminGlobalPosRate(globalRateInput)
+        : await updateGlobalPOSRate(globalRateInput);
       toast.success("Global Fallback Rate updated successfully!");
-      setGlobalRate(res.record ? res.record.percent_fee : globalRateInput);
+      const updatedVal = res?.data?.percent_fee ?? res?.record?.percent_fee ?? globalRateInput;
+      setGlobalRate(updatedVal);
       setIsEditingGlobal(false);
       setGlobalRateInput('');
     } catch (error) {
       toast.error("Failed to update global rate. " + (error.response?.data?.message || error.message));
     } finally {
       setLoadingGlobal(false);
+    }
+  };
+
+  // ── CC Bill Pay Handlers ─────────────────────────────────────────────────────
+  const fetchCcData = async () => {
+    setLoadingCcRules(true);
+    try {
+      if (isSuperAdmin) {
+        const [rulesRes, adminsRes] = await Promise.all([
+          fetchSuperAdminCcBillRules(),
+          getAdminList({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        ]);
+        const rules = rulesRes?.data || [];
+        setAdminCcBaseline(rules.filter((r) => !r.user_id));
+        setCompanyDefaultCcRules(rules);
+        const adminUsers = (adminsRes?.data || []).map((m) => ({ ...m, userType: 'Admin' }));
+        setCcUsers(adminUsers);
+        return;
+      }
+
+      const [applicableChargesRes, defaultRulesRes, merchantsRes, franchisesRes] = await Promise.all([
+        fetchMyAdminApplicableCharges().catch(() => null),
+        listBbpsChargeRules({ user_id: 'default' }).catch(() => ({ data: [] })),
+        MerchantAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        FranchiseAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+      ]);
+
+      const cc = applicableChargesRes?.data?.ccBillRate || applicableChargesRes?.ccBillRate || applicableChargesRes?.data?.cc_bill || applicableChargesRes?.data?.ccBill;
+      const baseline = Array.isArray(cc?.configuredRates) ? cc.configuredRates : (Array.isArray(cc) ? cc : []);
+      setAdminCcBaseline(baseline);
+
+      const defRules = Array.isArray(defaultRulesRes?.data) ? defaultRulesRes.data : Array.isArray(defaultRulesRes) ? defaultRulesRes : [];
+      setCompanyDefaultCcRules(defRules);
+
+      const mList = (Array.isArray(merchantsRes?.data) ? merchantsRes.data : Array.isArray(merchantsRes) ? merchantsRes : []).map(m => ({ ...m, userType: 'Merchant' }));
+      const fList = (Array.isArray(franchisesRes?.data) ? franchisesRes.data : Array.isArray(franchisesRes) ? franchisesRes : []).map(f => ({ ...f, userType: 'Franchise' }));
+      setCcUsers([...fList, ...mList]);
+    } catch (err) {
+      console.error('Failed to load CC Bill data', err);
+    } finally {
+      setLoadingCcRules(false);
+    }
+  };
+
+  const fetchSelectedUserCcRules = async (userId) => {
+    if (!userId) {
+      setSelectedCcUserRules([]);
+      return;
+    }
+    setLoadingSelectedCcUser(true);
+    try {
+      const res = await fetchApplicableCcBillRulesForUser(userId);
+      const userRules = res?.data?.userRules || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+      setSelectedCcUserRules(userRules);
+    } catch (err) {
+      console.error('Failed to fetch user CC rules', err);
+    } finally {
+      setLoadingSelectedCcUser(false);
+    }
+  };
+
+  const handleOpenAddCcModal = (mode, rule = null) => {
+    setCcModalMode(mode);
+    setEditingCcRule(rule);
+    if (rule) {
+      setCcForm({
+        from_amount: rule.from_amount ?? '',
+        to_amount: rule.to_amount ?? '',
+        rate: rule.rate ?? '',
+        rate_type: rule.rate_type ?? 'flat',
+        is_active: rule.is_active ?? true,
+        description: rule.description ?? '',
+      });
+    } else {
+      setCcForm({
+        from_amount: '',
+        to_amount: '',
+        rate: '',
+        rate_type: 'flat',
+        is_active: true,
+        description: '',
+      });
+    }
+    setIsCcModalOpen(true);
+  };
+
+  const handleSaveCcRule = async (e) => {
+    e?.preventDefault();
+    if (!ccForm.from_amount || !ccForm.to_amount || !ccForm.rate) {
+      toast.error('From amount, to amount, and rate are required');
+      return;
+    }
+    setIsSavingCc(true);
+    try {
+      const payload = {
+        from_amount: parseFloat(ccForm.from_amount),
+        to_amount: parseFloat(ccForm.to_amount),
+        rate: parseFloat(ccForm.rate),
+        rate_type: ccForm.rate_type,
+        is_active: ccForm.is_active,
+        description: ccForm.description || 'BBPS CC Bill Charge',
+        user_id: ccModalMode === 'user_override' ? selectedCcUserId : null,
+      };
+
+      if (isSuperAdmin) {
+        if (editingCcRule?.id) {
+          await updateSuperAdminCcBillRule(editingCcRule.id, payload);
+          toast.success('CC Bill rule updated successfully');
+        } else {
+          await createSuperAdminCcBillRule(payload);
+          toast.success(ccModalMode === 'user_override' ? 'Admin override created successfully' : 'Default platform rate created successfully');
+        }
+        setIsCcModalOpen(false);
+        setEditingCcRule(null);
+        fetchCcData();
+        return;
+      }
+
+      if (editingCcRule?.id) {
+        await updateBbpsChargeRule(editingCcRule.id, payload);
+        toast.success('CC Bill rule updated successfully');
+      } else {
+        await createBbpsChargeRule(payload);
+        toast.success(ccModalMode === 'user_override' ? 'User override created successfully' : 'Company default rate created successfully');
+      }
+
+      setIsCcModalOpen(false);
+      setEditingCcRule(null);
+      if (ccModalMode === 'user_override' && selectedCcUserId) {
+        fetchSelectedUserCcRules(selectedCcUserId);
+      } else {
+        const defRulesRes = await listBbpsChargeRules({ user_id: 'default' });
+        setCompanyDefaultCcRules(Array.isArray(defRulesRes?.data) ? defRulesRes.data : []);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save CC rule');
+    } finally {
+      setIsSavingCc(false);
+    }
+  };
+
+  const handleDeleteCcRule = async (id, isUserRule = false) => {
+    if (!window.confirm('Are you sure you want to delete this rule?')) return;
+    try {
+      if (isSuperAdmin) {
+        await deleteSuperAdminCcBillRule(id);
+        toast.success('CC Bill rule deleted successfully');
+        fetchCcData();
+        return;
+      }
+      await deleteBbpsChargeRule(id);
+      toast.success('CC Bill rule deleted successfully');
+      if (isUserRule && selectedCcUserId) {
+        fetchSelectedUserCcRules(selectedCcUserId);
+      } else {
+        const defRulesRes = await listBbpsChargeRules({ user_id: 'default' });
+        setCompanyDefaultCcRules(Array.isArray(defRulesRes?.data) ? defRulesRes.data : []);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete rule');
+    }
+  };
+
+  // ── Payout Handlers ──────────────────────────────────────────────────────────
+  const fetchPayoutData = async () => {
+    try {
+      if (isSuperAdmin) {
+        const [rulesRes, adminsRes] = await Promise.all([
+          fetchSuperAdminPayoutRules(),
+          getAdminList({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        ]);
+        const defaults = rulesRes?.defaults || rulesRes?.data || [];
+        setAdminPayoutBaseline(defaults);
+        const adminUsers = (adminsRes?.data || []).map((a) => ({ ...a, userType: 'Admin' }));
+        setPayoutUsers(adminUsers);
+        return;
+      }
+
+      const [applicableChargesRes, merchantsRes, franchisesRes] = await Promise.all([
+        fetchMyAdminApplicableCharges().catch(() => null),
+        MerchantAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        FranchiseAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+      ]);
+
+      const pay = applicableChargesRes?.data?.payRate || applicableChargesRes?.payRate || applicableChargesRes?.data?.payout || applicableChargesRes?.data?.pay;
+      const baseline = Array.isArray(pay?.configuredRates) ? pay.configuredRates : (Array.isArray(pay) ? pay : []);
+      setAdminPayoutBaseline(baseline);
+
+      const mList = (Array.isArray(merchantsRes?.data) ? merchantsRes.data : Array.isArray(merchantsRes) ? merchantsRes : []).map(m => ({ ...m, userType: 'Merchant' }));
+      const fList = (Array.isArray(franchisesRes?.data) ? franchisesRes.data : Array.isArray(franchisesRes) ? franchisesRes : []).map(f => ({ ...f, userType: 'Franchise' }));
+      setPayoutUsers([...fList, ...mList]);
+    } catch (err) {
+      console.error('Failed to load Payout data', err);
+    }
+  };
+
+  const fetchSelectedUserPayoutRules = async (userId) => {
+    if (!userId) {
+      setSelectedPayoutUserData(null);
+      return;
+    }
+    setLoadingSelectedPayoutUser(true);
+    try {
+      const res = await fetchApplicableUserPayoutCharges(userId);
+      setSelectedPayoutUserData(res?.data || null);
+    } catch (err) {
+      console.error('Failed to fetch user payout charges', err);
+    } finally {
+      setLoadingSelectedPayoutUser(false);
+    }
+  };
+
+  const handleOpenAddPayoutModal = (rule = null) => {
+    setEditingPayoutRule(rule);
+    if (rule) {
+      setPayoutForm({
+        from_amount: rule.from_amount ?? '',
+        to_amount: rule.to_amount ?? '',
+        rate: rule.rate ?? '',
+        rate_type: rule.rate_type ?? 'flat',
+        is_active: rule.is_active ?? true,
+        description: rule.description ?? '',
+      });
+    } else {
+      setPayoutForm({
+        from_amount: '',
+        to_amount: '',
+        rate: '',
+        rate_type: 'flat',
+        is_active: true,
+        description: '',
+      });
+    }
+    setIsPayoutModalOpen(true);
+  };
+
+  const handleSavePayoutRule = async (e) => {
+    e?.preventDefault();
+    if (!selectedPayoutUserId) {
+      toast.error('Please select a target user first');
+      return;
+    }
+    if (!payoutForm.from_amount || !payoutForm.to_amount || !payoutForm.rate) {
+      toast.error('From amount, to amount, and rate are required');
+      return;
+    }
+    setIsSavingPayout(true);
+    try {
+      const payload = {
+        user_id: parseInt(selectedPayoutUserId, 10),
+        from_amount: parseFloat(payoutForm.from_amount),
+        to_amount: parseFloat(payoutForm.to_amount),
+        rate: parseFloat(payoutForm.rate),
+        rate_type: payoutForm.rate_type,
+        is_active: payoutForm.is_active,
+        description: payoutForm.description || (isSuperAdmin ? 'Admin Payout Charge' : 'User Payout Charge'),
+      };
+
+      if (isSuperAdmin) {
+        if (editingPayoutRule?.id) {
+          await updateSuperAdminPayoutRule(editingPayoutRule.id, {
+            ...payload,
+            is_admin_override: Boolean(selectedPayoutUserId),
+          });
+          toast.success('Payout charge updated successfully');
+        } else {
+          await createSuperAdminPayoutRule(payload);
+          toast.success('Payout charge configured successfully');
+        }
+        setIsPayoutModalOpen(false);
+        setEditingPayoutRule(null);
+        if (selectedPayoutUserId) {
+          fetchSelectedUserPayoutRules(selectedPayoutUserId);
+        } else {
+          fetchPayoutData();
+        }
+        return;
+      }
+
+      if (editingPayoutRule?.id) {
+        await updateUserPayoutCharge(editingPayoutRule.id, payload);
+        toast.success('Payout charge updated successfully');
+      } else {
+        await createUserPayoutCharge(payload);
+        toast.success('User payout charge configured successfully');
+      }
+
+      setIsPayoutModalOpen(false);
+      setEditingPayoutRule(null);
+      fetchSelectedUserPayoutRules(selectedPayoutUserId);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save payout charge');
+    } finally {
+      setIsSavingPayout(false);
+    }
+  };
+
+  const handleDeletePayoutRule = async (id) => {
+    if (!window.confirm(isSuperAdmin ? 'Reset this rate to inherit from platform baseline?' : 'Reset this rate to inherit from Super Admin baseline?')) return;
+    try {
+      if (isSuperAdmin) {
+        await deleteSuperAdminPayoutRule(id, { is_admin_override: Boolean(selectedPayoutUserId) });
+        toast.success('Payout charge reset successfully');
+        if (selectedPayoutUserId) {
+          fetchSelectedUserPayoutRules(selectedPayoutUserId);
+        } else {
+          fetchPayoutData();
+        }
+        return;
+      }
+      await deleteUserPayoutCharge(id);
+      toast.success('Rule reset to inherited baseline successfully');
+      if (selectedPayoutUserId) {
+        fetchSelectedUserPayoutRules(selectedPayoutUserId);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to reset payout charge');
+    }
+  };
+
+  // ── Rental Handlers ──────────────────────────────────────────────────────────
+  const fetchRentalData = async () => {
+    setLoadingRental(true);
+    try {
+      const res = isSuperAdmin ? await fetchSuperAdminRentalRates({ limit: 100 }) : await listPosRentals({ limit: 100 });
+      const rows = res?.data || (Array.isArray(res) ? res : []);
+      setRentalList(rows);
+      if (rows.length > 0) {
+        const item = rows[0];
+        setRentalForm({
+          franchise_rate: item.amount ?? item.franchise_rate ?? '',
+          merchant_rate: item.merchant_rate ?? '',
+          is_active: item.status === 'active' || item.is_active === true,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load rental data', err);
+    } finally {
+      setLoadingRental(false);
+    }
+  };
+
+  const handleSaveRental = async (e) => {
+    e?.preventDefault();
+    setIsSavingRental(true);
+    try {
+      if (isSuperAdmin) {
+        const payload = {
+          amount: parseFloat(rentalForm.franchise_rate || rentalForm.amount || 0),
+          target_user_type: 'admin',
+          status: rentalForm.is_active ? 'active' : 'inactive',
+          type: 'pos',
+        };
+        if (rentalList.length > 0 && rentalList[0].id) {
+          await updateSuperAdminRentalRate(rentalList[0].id, payload);
+          toast.success('Rental rates updated successfully');
+        } else {
+          await createSuperAdminRentalRate(payload);
+          toast.success('Rental rates configured successfully');
+        }
+        fetchRentalData();
+        return;
+      }
+
+      const payload = {
+        franchise_rate: parseFloat(rentalForm.franchise_rate || 0),
+        merchant_rate: parseFloat(rentalForm.merchant_rate || 0),
+        status: rentalForm.is_active ? 'active' : 'inactive',
+      };
+      if (rentalList.length > 0) {
+        await updatePosRental(rentalList[0].id, payload);
+        toast.success('Rental rates updated successfully');
+      } else {
+        await createPosRental(payload);
+        toast.success('Rental rates configured successfully');
+      }
+      fetchRentalData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save rental rates');
+    } finally {
+      setIsSavingRental(false);
     }
   };
 
@@ -409,8 +1011,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       window.scrollTo(0, 0);
     }
 
-    if (activeTab === 'rental') {
-      // Rental tab renders a separate component; no data fetching needed here
+    if (activeTab === 'rental' || activeTab === 'cc_bill' || activeTab === 'payout') {
       return;
     }
 
@@ -439,6 +1040,26 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchFranchiseRates = async (id, page = 1, limit = 100) => {
     setLoadingRates(true);
     try {
+      if (isSuperAdmin) {
+        if (id === 'default') {
+          const defaultRules = await fetchPlatformDefaultPosRules();
+          const mapped = (defaultRules || []).map((rule) =>
+            mapRuleToAdminFormat(rule, {
+              isInherited: false,
+            })
+          );
+          setRates(mapped);
+        } else {
+          const [adminOverrides, defaultRules] = await Promise.all([
+            fetchAdminPosRules(id),
+            fetchPlatformDefaultPosRules(),
+          ]);
+          const mapped = buildAdminEffectiveRules(defaultRules, adminOverrides, id);
+          setRates(mapped);
+        }
+        return;
+      }
+
       const data = await getFranchiseRates(id, {
         paginate: id === 'default',
         page,
@@ -486,6 +1107,23 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
 
+    if(activeTab === "specific" && isSuperAdmin) {
+      const id = selectedFranchiseId;
+      const [adminOverrides, defaultRules] = await Promise.all([
+        fetchAdminPosRules(id),
+        fetchPlatformDefaultPosRules(),
+      ]);
+      const mapped = buildAdminEffectiveRules(defaultRules, adminOverrides, id);
+      setRates(mapped);
+      return;
+    }
+
+    if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+      await fetchSuperFranchiseRates(selectedSuperFranchiseId);
+      await fetchInitialData();
+      return;
+    }
+
     if (activeTab === 'specific' && selectedFranchiseId) {
       await fetchFranchiseRates(selectedFranchiseId);
       await fetchInitialData();
@@ -498,8 +1136,33 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
   };
 
+  const handleEditSuperFranchiseDetail = (sfId) => {
+    setSelectedSuperFranchiseId(sfId);
+    setSelectedFranchiseId('');
+    setSelectedMerchantId('');
+    setDetailReadOnly(false);
+    setEditingId(null);
+    setEditValue('');
+    setEditGstValue('');
+    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+    setViewMode('detail');
+  };
+
+  const handleViewSuperFranchiseDetail = (sfId) => {
+    setSelectedSuperFranchiseId(sfId);
+    setSelectedFranchiseId('');
+    setSelectedMerchantId('');
+    setDetailReadOnly(true);
+    setEditingId(null);
+    setEditValue('');
+    setEditGstValue('');
+    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+    setViewMode('detail');
+  };
+
   const handleEditFranchiseDetail = (franchiseId) => {
     setSelectedFranchiseId(franchiseId);
+    setSelectedSuperFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(false);
     setEditingId(null);
@@ -511,6 +1174,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleEditMerchantDetail = (merchantId) => {
     setSelectedMerchantId(merchantId);
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setDetailReadOnly(false);
     setEditingId(null);
@@ -522,6 +1186,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleViewFranchiseDetail = (franchiseId) => {
     setSelectedFranchiseId(franchiseId);
+    setSelectedSuperFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(true);
     setEditingId(null);
@@ -533,6 +1198,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleViewMerchantDetail = (merchantId) => {
     setSelectedMerchantId(merchantId);
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setDetailReadOnly(true);
     setEditingId(null);
@@ -543,6 +1209,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleBackToMatrix = () => {
+    setSelectedSuperFranchiseId('');
     setSelectedFranchiseId('');
     setSelectedMerchantId('');
     setDetailReadOnly(false);
@@ -572,6 +1239,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       toast.error('Unauthorized: Super Admin can only configure default/admin-level rates.');
       return;
     }
+    if (!isSuperAdmin && activeTab === 'default') {
+      toast.error('Admins cannot modify Super Admin default rates. Please configure downstream rates.');
+      return;
+    }
     if (editValue === '') {
       toast.error('Please enter a valid rate.');
       return;
@@ -594,6 +1265,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       let updatedRate;
       if (activeTab === 'default') {
         updatedRate = await updateFranchiseRate('default', rate, updates);
+      } else if (activeTab === 'super_franchise') {
+        updatedRate = await updateSuperFranchiseRate(selectedSuperFranchiseId, rate, updates);
       } else if (activeTab === 'specific') {
         updatedRate = await updateFranchiseRate(selectedFranchiseId, rate, updates);
       } else {
@@ -650,8 +1323,44 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         base_rate: newRateForm.chargeType === 'percent' ? newRateForm.chargeValue : '0',
         company_name: newRateForm.companyName || null
       };
-      await createDefaultFranchiseRate(payload);
-      toast.success("New default rate created successfully.");
+
+      if (isSuperAdmin && activeTab === 'default') {
+        await createPlatformDefaultPosRule({
+          payment_mode: payload.method,
+          card_brand: payload.network,
+          card_type: payload.card_type,
+          card_classification: payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("New platform default rate created successfully.");
+      } else if (isSuperAdmin && activeTab === 'specific' && selectedFranchiseId) {
+        await createAdminPosRule({
+          user_id: selectedFranchiseId,
+          payment_mode: payload.method,
+          card_brand: payload.network,
+          card_type: payload.card_type,
+          card_classification: payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("Admin rate override created successfully.");
+      } else {
+        await createDefaultFranchiseRate(payload);
+        toast.success("New default rate created successfully.");
+      }
       setIsModalOpen(false);
 
       // Reset form
@@ -660,6 +1369,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       fetchInitialData();
       if (activeTab === 'default') {
         fetchFranchiseRates('default');
+      } else if (activeTab === 'specific' && selectedFranchiseId) {
+        fetchFranchiseRates(selectedFranchiseId);
       }
     } catch (error) {
       toast.error('Failed to create rate: ' + (error.response?.data?.message || error.message));
@@ -685,8 +1396,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const confirmDelete = async () => {
     const rate = pendingDelete?.rate;
     const tab = pendingDelete?.tab;
-    if (isSuperAdmin && tab !== 'default') {
-      toast.error('Unauthorized: Super Admin can only delete default/admin-level rates.');
+    if (isSuperAdmin && tab !== 'default' && tab !== 'specific') {
+      toast.error('Unauthorized: Super Admin can only delete default or admin-level rates.');
       setPendingDelete(null);
       return;
     }
@@ -695,8 +1406,16 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const deleteId = rate.rule_id || rate.id;
     setIsDeleting(true);
     try {
-      await deleteDefaultPOSRate(deleteId);
-      toast.success('Rate deleted successfully');
+      if (isSuperAdmin && tab === 'default') {
+        await deletePlatformDefaultPosRule(deleteId);
+        toast.success('Platform default rate deleted successfully');
+      } else if (isSuperAdmin && tab === 'specific') {
+        await deleteAdminPosRule(deleteId);
+        toast.success('Admin rate override reset to platform default');
+      } else {
+        await deleteDefaultPOSRate(deleteId);
+        toast.success('Rate deleted successfully');
+      }
 
       if (tab === 'default') {
         await fetchFranchiseRates('default');
@@ -705,7 +1424,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       } else if (tab === 'unassigned' && selectedMerchantId) {
         await fetchMerchantRates(selectedMerchantId);
       }
-      await fetchInitialData();
+      await refreshAfterUpdate();
       setEditingId(null);
       setEditValue('');
       setEditGstValue('');
@@ -752,8 +1471,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleSavePosTxnEdit = async () => {
-    if (isSuperAdmin && activeTab !== 'default') {
-      toast.error('Unauthorized: Super Admin can only edit default/admin-level rates.');
+    if (isSuperAdmin && activeTab !== 'default' && activeTab !== 'specific') {
+      toast.error('Unauthorized: Super Admin can only edit default or admin-level rates.');
       setIsPosTxnEditModalOpen(false);
       return;
     }
@@ -775,14 +1494,36 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         gst_required: posTxnEditForm.gstRequired,
         gst_percent: posTxnEditForm.gstRequired ? posTxnEditForm.gstPercent : '0',
         chargePercent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
+        charge_percent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
         company_name: posTxnEditForm.companyName || null
       };
       if (activeTab === 'default') {
-        await updateFranchiseRate('default', posTxnEditRate, updates);
+        if (!isSuperAdmin) {
+          toast.error('Admins cannot modify Super Admin default rates.');
+          return;
+        }
+        await updatePlatformDefaultPosRule(posTxnEditRate.rule_id || posTxnEditRate.id, updates);
+        toast.success('Platform default rate updated successfully.');
+      } else if (isSuperAdmin && activeTab === 'specific') {
+        const ruleId = posTxnEditRate.rule_id || posTxnEditRate.id;
+        if (posTxnEditRate.isInherited) {
+          await createAdminPosRule({
+            ...updates,
+            user_id: selectedFranchiseId,
+          });
+        } else {
+          await updateAdminPosRule(ruleId, updates);
+        }
+        toast.success('Admin rate rule updated successfully.');
+      } else if (activeTab === 'super_franchise') {
+        await updateSuperFranchiseRate(selectedSuperFranchiseId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       } else if (activeTab === 'specific') {
         await updateFranchiseRate(selectedFranchiseId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       } else {
         await updateMerchantRate(selectedMerchantId, posTxnEditRate, updates);
+        toast.success('Rule updated successfully.');
       }
       toast.success('Rule updated successfully.');
       setIsPosTxnEditModalOpen(false);
@@ -799,21 +1540,40 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const renderMatrix = () => {
     if (loading) return <div className="flex justify-center p-8"><Loader /></div>;
+    const isSuperFranchiseTab = activeTab === 'super_franchise';
     const isUnassignedTab = activeTab === 'unassigned';
     const showMatrixRateColumns = !isPosTxnMode;
-    const baseEntities = isUnassignedTab ? unassignedMerchants : franchises;
-    const matrixSource = isUnassignedTab ? unassignedMerchantMatrixData : matrixData;
-    const entityLabel = isUnassignedTab ? 'Merchant' : 'Franchise';
+    const baseEntities = isSuperFranchiseTab
+      ? superFranchises
+      : isUnassignedTab
+        ? unassignedMerchants
+        : franchises;
+    const matrixSource = isSuperFranchiseTab
+      ? superFranchiseMatrixData
+      : isUnassignedTab
+        ? unassignedMerchantMatrixData
+        : matrixData;
+    const entityLabel = isSuperFranchiseTab
+      ? 'Super Franchise'
+      : isUnassignedTab
+        ? 'Merchant'
+        : isSuperAdmin
+          ? 'Admin'
+          : 'Franchise';
     const matrixAttributes = buildColumnStructure(
       defaultRatesAttributes.filter((rate) => rate.source_scope === 'admin'),
       ...Object.values(matrixSource)
     );
-    const searchPlaceholder = isUnassignedTab
-      ? 'Search Merchant by Name, ID, or Phone...'
-      : 'Search Franchise by Name, ID, or Phone...';
+    const searchPlaceholder = isSuperFranchiseTab
+      ? 'Search Super Franchise by Name, ID, or Phone...'
+      : isUnassignedTab
+        ? 'Search Merchant by Name, ID, or Phone...'
+        : isSuperAdmin
+          ? 'Search Admin by Name, ID, or Phone...'
+          : 'Search Franchise by Name, ID, or Phone...';
     const shouldUseRemoteSearch =
       viewMode === 'matrix' &&
-      (activeTab === 'specific' || activeTab === 'unassigned') &&
+      (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned') &&
       searchTerm.trim().length > 0;
     const remoteSearchPending = shouldUseRemoteSearch && (
       matrixSearchLoading || debouncedSearchTerm !== searchTerm.trim()
@@ -837,12 +1597,14 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const emptyStateMessage = matrixSearchError
       ? matrixSearchError
       : remoteSearchPending
-        ? `Searching ${isUnassignedTab ? 'merchants' : 'franchises'}...`
+        ? `Searching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'}...`
         : shouldUseRemoteSearch
-          ? `No matching ${isUnassignedTab ? 'merchants' : 'franchises'} found.`
-          : isUnassignedTab
-            ? 'No unassigned merchants found.'
-            : 'No franchises found.';
+          ? `No matching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'} found.`
+          : isSuperFranchiseTab
+            ? 'No super franchises found.'
+            : isUnassignedTab
+              ? 'No unassigned merchants found.'
+              : 'No franchises found.';
 
     const totalFilteredEntities = filteredEntities.length;
     const totalMatrixPages = Math.max(1, Math.ceil(totalFilteredEntities / matrixRowsPerPage));
@@ -902,13 +1664,21 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
                     <button
-                      onClick={() => isUnassignedTab ? handleViewMerchantDetail(entity.id) : handleViewFranchiseDetail(entity.id)}
+                      onClick={() => {
+                        if (isSuperFranchiseTab) handleViewSuperFranchiseDetail(entity.id);
+                        else if (isUnassignedTab) handleViewMerchantDetail(entity.id);
+                        else handleViewFranchiseDetail(entity.id);
+                      }}
                       className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
                     >
                       View
                     </button>
                     <button
-                      onClick={() => isUnassignedTab ? handleEditMerchantDetail(entity.id) : handleEditFranchiseDetail(entity.id)}
+                      onClick={() => {
+                        if (isSuperFranchiseTab) handleEditSuperFranchiseDetail(entity.id);
+                        else if (isUnassignedTab) handleEditMerchantDetail(entity.id);
+                        else handleEditFranchiseDetail(entity.id);
+                      }}
                       className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
                     >
                       Edit
@@ -1007,13 +1777,21 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium sticky right-0 bg-white z-10 border-l border-gray-100 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                       <div className="flex items-center justify-center gap-3">
                         <button
-                          onClick={() => isUnassignedTab ? handleViewMerchantDetail(entity.id) : handleViewFranchiseDetail(entity.id)}
+                          onClick={() => {
+                            if (isSuperFranchiseTab) handleViewSuperFranchiseDetail(entity.id);
+                            else if (isUnassignedTab) handleViewMerchantDetail(entity.id);
+                            else handleViewFranchiseDetail(entity.id);
+                          }}
                           className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
                         >
                           View
                         </button>
                         <button
-                          onClick={() => isUnassignedTab ? handleEditMerchantDetail(entity.id) : handleEditFranchiseDetail(entity.id)}
+                          onClick={() => {
+                            if (isSuperFranchiseTab) handleEditSuperFranchiseDetail(entity.id);
+                            else if (isUnassignedTab) handleEditMerchantDetail(entity.id);
+                            else handleEditFranchiseDetail(entity.id);
+                          }}
                           className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
                         >
                           Edit
@@ -1077,9 +1855,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const SCOPE_BADGES = {
-    super_admin_default: { label: 'Platform Default', color: 'bg-indigo-100 text-indigo-800' },
+    super_admin_default: { label: 'Global Default', color: 'bg-indigo-100 text-indigo-800' },
     super_admin_admin: { label: 'SuperAdmin→Admin', color: 'bg-indigo-100 text-indigo-800' },
-    admin_default: { label: 'Global Default', color: 'bg-blue-100 text-blue-800' },
+    admin_default: { label: 'Platform Default', color: 'bg-blue-100 text-blue-800' },
+    admin_super_franchise: { label: 'Admin→SuperFranchise', color: 'bg-emerald-100 text-emerald-800' },
     admin_franchise: { label: 'Admin→Franchise', color: 'bg-purple-100 text-purple-800' },
     admin_merchant: { label: 'Admin→Merchant', color: 'bg-orange-100 text-orange-800' },
     franchise_default: { label: 'Franchise Default', color: 'bg-green-100 text-green-800' },
@@ -1097,11 +1876,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const renderDetailTable = () => {
-    const isReadOnlyDetail = detailReadOnly && activeTab !== 'default';
+    const isReadOnlyDetail = (detailReadOnly && activeTab !== 'default') || (!isSuperAdmin && activeTab === 'default');
     const shouldShowSpecificSettlementFilter =
       isPosTxnMode &&
       viewMode === 'detail' &&
-      (activeTab === 'specific' || activeTab === 'unassigned');
+      (activeTab === 'super_franchise' || activeTab === 'specific' || activeTab === 'unassigned');
     const filteredRates = shouldShowSpecificSettlementFilter
       ? rates.filter((rate) =>
         specificSettlementFilter === 'all'
@@ -1128,14 +1907,25 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 value={specificSettlementFilter}
                 onChange={(e) => setSpecificSettlementFilter(e.target.value)}
               >
+                <option value="all">All</option>
                 <option value="today_settlement">Today Settlement</option>
                 <option value="next_day_settlement">Next Day Settlement</option>
-                <option value="all">All</option>
               </select>
             </div>
           </div>
         )}
-        {activeTab === 'default' && (
+        {activeTab === 'default' && !isSuperAdmin && (
+          <div className="mx-4 mt-4 p-3.5 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2.5 text-blue-900 text-sm">
+            <Info className="w-5 h-5 flex-shrink-0 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-semibold text-blue-950">Inherited from Super Admin (Read-Only)</p>
+              <p className="text-xs text-blue-800 mt-0.5">
+                These are global platform default POS rates set by Super Admin. Admins inherit these defaults and cannot alter them directly. To configure custom rates for your downstream users, switch to the <strong>Super Franchise Specific Rates</strong>, <strong>Franchise Specific Rates</strong>, or <strong>Merchants Under Admin Rates</strong> tabs.
+              </p>
+            </div>
+          </div>
+        )}
+        {activeTab === 'default' && isSuperAdmin && (
           <div className="flex justify-stretch md:justify-end p-4 pb-0">
             <button
               onClick={openCreateRateModal}
@@ -1219,9 +2009,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                       <p className="text-gray-500 text-xs">
                         {activeTab === 'default'
                           ? 'Default Base Rate (%)'
-                          : activeTab === 'specific'
-                            ? 'Franchise Base Rate (%)'
-                            : 'Merchant Base Rate (%)'}
+                          : activeTab === 'super_franchise'
+                            ? 'Super Franchise Base Rate (%)'
+                            : activeTab === 'specific'
+                              ? 'Franchise Base Rate (%)'
+                              : 'Merchant Base Rate (%)'}
                       </p>
                       {!isPosTxnMode && editingId === rate.id ? (
                         <>
@@ -1340,9 +2132,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {activeTab === 'default'
                         ? 'Default Base Rate (%)'
-                        : activeTab === 'specific'
-                          ? 'Franchise Base Rate (%)'
-                          : 'Merchant Base Rate (%)'}
+                        : activeTab === 'super_franchise'
+                          ? 'Super Franchise Base Rate (%)'
+                          : activeTab === 'specific'
+                            ? 'Franchise Base Rate (%)'
+                            : 'Merchant Base Rate (%)'}
                     </th>
                     {!isReadOnlyDetail && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -1497,10 +2291,606 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     );
   }
 
+  // ── Native CC Bill Tab ───────────────────────────────────────────────────────
+  const renderCcBillTab = () => {
+    const filteredCcUsers = ccUsers.filter((u) => {
+      const term = ccUserSearch.toLowerCase().trim();
+      if (!term) return true;
+      return (
+        u.name?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term) ||
+        u.username?.toLowerCase().includes(term) ||
+        u.phone?.toLowerCase().includes(term) ||
+        String(u.id).includes(term)
+      );
+    });
+
+    const selectedCcUserObj = ccUsers.find((u) => String(u.id) === String(selectedCcUserId));
+
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        {/* 1. Super Admin Configured Baseline */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-gray-100 gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-600" />
+                Super Admin Configured CC Bill Rates (Your Baseline)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                These rates are configured for your account by Super Admin. All your merchants and franchises inherit these rates by default unless overridden.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-200">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Super Admin Baseline
+            </span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            {adminCcBaseline.length === 0 ? (
+              <div className="py-4 text-center text-sm text-gray-500">
+                No custom baseline configured. Platform default (₹20.00 Flat) applies.
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Amount Slab</th>
+                    <th className="px-4 py-2 text-left">Configured Rate</th>
+                    <th className="px-4 py-2 text-left">Rate Type</th>
+                    <th className="px-4 py-2 text-left">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {adminCcBaseline.map((rule, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                        ₹{Number(rule.from_amount).toLocaleString()} – ₹{Number(rule.to_amount).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-indigo-700">
+                        {rule.rate_type === 'flat' ? `₹${rule.rate}` : `${rule.rate}%`}
+                      </td>
+                      <td className="px-4 py-2.5 capitalize text-gray-600">{rule.rate_type}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                          {rule.source || 'Super Admin'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Admin Global Company Default Rates (For Every User Under Admin) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-teal-600" />
+                Company Default CC Bill Rates (Global for Every User)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Set default rates for all merchants and franchises in your company. Every user without an individual override automatically inherits these slabs.
+              </p>
+            </div>
+            <button
+              onClick={() => handleOpenAddCcModal('company_default')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#00D3CD] text-white text-xs font-semibold rounded-lg hover:bg-[#00b8b3] transition shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Add Company Default Slab
+            </button>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            {loadingCcRules ? (
+              <div className="flex items-center justify-center py-6 text-gray-500">
+                <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#00D3CD]" /> Loading company rules...
+              </div>
+            ) : companyDefaultCcRules.length === 0 ? (
+              <div className="py-6 text-center text-sm text-gray-500 bg-gray-50 rounded-lg">
+                No company default rates configured yet. All your users currently inherit the Super Admin baseline above.
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Amount Slab</th>
+                    <th className="px-4 py-2 text-left">Rate</th>
+                    <th className="px-4 py-2 text-left">Type</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {companyDefaultCcRules.map((rule) => (
+                    <tr key={rule.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                        ₹{Number(rule.from_amount).toLocaleString()} – ₹{Number(rule.to_amount).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-teal-700">
+                        {rule.rate_type === 'flat' ? `₹${rule.rate}` : `${rule.rate}%`}
+                      </td>
+                      <td className="px-4 py-2.5 capitalize text-gray-600">{rule.rate_type}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${rule.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {rule.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right space-x-2">
+                        <button
+                          onClick={() => handleOpenAddCcModal('company_default', rule)}
+                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCcRule(rule.id, false)}
+                          className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* 3. User-Specific CC Bill Overrides */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-gray-100 gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                User-Specific CC Bill Overrides (Merchants & Franchises)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Configure customized CC bill charges for specific merchants or franchises in your company.
+              </p>
+            </div>
+            {selectedCcUserId && (
+              <button
+                onClick={() => handleOpenAddCcModal('user_override')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Add User Override
+              </button>
+            )}
+          </div>
+
+          {/* User Selector */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Select User (Franchise or Merchant)</label>
+              <select
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                value={selectedCcUserId}
+                onChange={(e) => setSelectedCcUserId(e.target.value)}
+              >
+                <option value="">-- Choose a user to configure override --</option>
+                {filteredCcUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    [{u.userType}] {u.name || u.username} {u.phone ? `(${u.phone})` : ''} - ID: {u.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Filter User List</label>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search user by name, phone, or ID..."
+                  value={ccUserSearch}
+                  onChange={(e) => setCcUserSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Selected User Table */}
+          {selectedCcUserId && (
+            <div className="mt-5 border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-gray-800">
+                  Applicable Rates for: <span className="text-blue-700 font-bold">{selectedCcUserObj?.name || `User #${selectedCcUserId}`}</span> ({selectedCcUserObj?.userType || 'User'})
+                </span>
+              </div>
+
+              {loadingSelectedCcUser ? (
+                <div className="flex items-center justify-center py-6 text-gray-500">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2 text-blue-600" /> Loading user rates...
+                </div>
+              ) : selectedCcUserRules.length === 0 ? (
+                <div className="py-6 text-center text-sm text-gray-500 bg-gray-50 rounded-lg">
+                  No individual overrides configured for this user. This user inherits your Company Default / Super Admin Baseline rates.
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Amount Slab</th>
+                      <th className="px-4 py-2 text-left">User Override Rate</th>
+                      <th className="px-4 py-2 text-left">Type</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedCcUserRules.map((rule) => (
+                      <tr key={rule.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-900">
+                          ₹{Number(rule.from_amount).toLocaleString()} – ₹{Number(rule.to_amount).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2.5 font-bold text-blue-700">
+                          {rule.rate_type === 'flat' ? `₹${rule.rate}` : `${rule.rate}%`}
+                        </td>
+                        <td className="px-4 py-2.5 capitalize text-gray-600">{rule.rate_type}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${rule.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {rule.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right space-x-2">
+                          <button
+                            onClick={() => handleOpenAddCcModal('user_override', rule)}
+                            className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCcRule(rule.id, true)}
+                            className="px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded"
+                          >
+                            Reset to Default
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Native Payout Tab ────────────────────────────────────────────────────────
+  const renderPayoutTab = () => {
+    const filteredPayoutUsers = payoutUsers.filter((u) => {
+      const term = payoutUserSearch.toLowerCase().trim();
+      if (!term) return true;
+      return (
+        u.name?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term) ||
+        u.username?.toLowerCase().includes(term) ||
+        u.phone?.toLowerCase().includes(term) ||
+        String(u.id).includes(term)
+      );
+    });
+
+    const selectedPayoutUserObj = payoutUsers.find((u) => String(u.id) === String(selectedPayoutUserId));
+    const comparisonRules = selectedPayoutUserData?.comparison || [];
+
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        {/* 1. Super Admin Baseline */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-gray-100 gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-600" />
+                Super Admin Configured Payout Rates (Your Baseline)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                These rates are configured for your account by Super Admin. All your merchants and franchises inherit these rates by default unless overridden.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-200">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Super Admin Baseline
+            </span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            {adminPayoutBaseline.length === 0 ? (
+              <div className="py-4 text-center text-sm text-gray-500">
+                No custom baseline configured. Platform default payout charges apply.
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Amount Slab</th>
+                    <th className="px-4 py-2 text-left">Configured Rate</th>
+                    <th className="px-4 py-2 text-left">Rate Type</th>
+                    <th className="px-4 py-2 text-left">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {adminPayoutBaseline.map((rule, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                        ₹{Number(rule.from_amount).toLocaleString()} – ₹{Number(rule.to_amount).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-indigo-700">
+                        {rule.rate_type === 'flat' ? `₹${rule.rate}` : `${rule.rate}%`}
+                      </td>
+                      <td className="px-4 py-2.5 capitalize text-gray-600">{rule.rate_type}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                          {rule.source || 'Super Admin'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* 2. User Payout Rates & Overrides */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-gray-100 gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                Configure User Payout Rates (Merchants & Franchises)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Select a user to configure customized payout slab rates or view effective rate comparison.
+              </p>
+            </div>
+            {selectedPayoutUserId && (
+              <button
+                onClick={() => handleOpenAddPayoutModal()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Add Payout Slab Override
+              </button>
+            )}
+          </div>
+
+          {/* User Selector */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Select User (Franchise or Merchant)</label>
+              <select
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                value={selectedPayoutUserId}
+                onChange={(e) => setSelectedPayoutUserId(e.target.value)}
+              >
+                <option value="">-- Choose a user to view/set payout rates --</option>
+                {filteredPayoutUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    [{u.userType}] {u.name || u.username} {u.phone ? `(${u.phone})` : ''} - ID: {u.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Filter User List</label>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search user by name, phone, or ID..."
+                  value={payoutUserSearch}
+                  onChange={(e) => setPayoutUserSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Selected User Table */}
+          {selectedPayoutUserId && (
+            <div className="mt-5 border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-gray-800">
+                  Rate Comparison for: <span className="text-blue-700 font-bold">{selectedPayoutUserObj?.name || `User #${selectedPayoutUserId}`}</span> ({selectedPayoutUserObj?.userType || 'User'})
+                </span>
+              </div>
+
+              {loadingSelectedPayoutUser ? (
+                <div className="flex items-center justify-center py-6 text-gray-500">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2 text-blue-600" /> Loading user payout rates...
+                </div>
+              ) : comparisonRules.length === 0 ? (
+                <div className="py-6 text-center text-sm text-gray-500 bg-gray-50 rounded-lg">
+                  No rate slabs found. User inherits Super Admin platform default charges.
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Amount Range</th>
+                      <th className="px-4 py-2 text-left">Super Admin Baseline</th>
+                      <th className="px-4 py-2 text-left">User Configured Rate</th>
+                      <th className="px-4 py-2 text-left">Effective Rate</th>
+                      <th className="px-4 py-2 text-left">Source</th>
+                      <th className="px-4 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {comparisonRules.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-900">
+                          ₹{Number(row.from_amount).toLocaleString()} – ₹{Number(row.to_amount).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-600">
+                          {row.baselineRule ? `${row.baselineRule.rate_type === 'flat' ? '₹' : ''}${row.baselineRule.rate}${row.baselineRule.rate_type === 'percentage' ? '%' : ''}` : '₹20.00 Flat'}
+                        </td>
+                        <td className="px-4 py-2.5 font-bold text-blue-700">
+                          {row.userRule ? `${row.userRule.rate_type === 'flat' ? '₹' : ''}${row.userRule.rate}${row.userRule.rate_type === 'percentage' ? '%' : ''}` : '— (Inherited)'}
+                        </td>
+                        <td className="px-4 py-2.5 font-bold text-gray-900">
+                          {row.effectiveRate}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${row.hasOverride ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
+                            {row.source}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right space-x-2">
+                          <button
+                            onClick={() => handleOpenAddPayoutModal(row.userRule || { from_amount: row.from_amount, to_amount: row.to_amount, rate: row.baselineRule?.rate || '', rate_type: row.baselineRule?.rate_type || 'flat' })}
+                            className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                          >
+                            {row.hasOverride ? 'Edit' : 'Set Override'}
+                          </button>
+                          {row.hasOverride && (
+                            <button
+                              onClick={() => handleDeletePayoutRule(row.userRule.id)}
+                              className="px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Native Rental Tab ────────────────────────────────────────────────────────
+  const renderRentalTab = () => {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-2xl">
+          <div className="pb-3 border-b border-gray-100 mb-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-indigo-600" />
+              POS Machine Rental Charges
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Configure monthly rental rates charged to your franchises and merchants for POS terminals.
+            </p>
+          </div>
+
+          {loadingRental ? (
+            <div className="py-6 flex items-center justify-center text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin mr-2 text-indigo-600" /> Loading rental charges...
+            </div>
+          ) : (
+            <form onSubmit={handleSaveRental} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Franchise Monthly Rental (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 500"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                  value={rentalForm.franchise_rate}
+                  onChange={(e) => setRentalForm({ ...rentalForm, franchise_rate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Merchant Monthly Rental (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 700"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                  value={rentalForm.merchant_rate}
+                  onChange={(e) => setRentalForm({ ...rentalForm, merchant_rate: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="rentalActive"
+                  className="w-4 h-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
+                  checked={rentalForm.is_active}
+                  onChange={(e) => setRentalForm({ ...rentalForm, is_active: e.target.checked })}
+                />
+                <label htmlFor="rentalActive" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Active (Rental charges enabled)
+                </label>
+              </div>
+
+              <div className="pt-3">
+                <button
+                  type="submit"
+                  disabled={isSavingRental}
+                  className="px-6 py-2.5 bg-[#00D3CD] text-white rounded-lg text-sm font-semibold hover:bg-[#00b8b3] transition disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {isSavingRental ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    'Save Rental Settings'
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-gray-100 min-h-screen">
       <div> {/* Wider for Matrix */}
         <div className="bg-white rounded-lg shadow-sm">
+          {!isSuperAdmin && (
+            <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 rounded-t-lg">
+              <button
+                type="button"
+                onClick={() => setHierarchyMode('inherited')}
+                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                  hierarchyMode === 'inherited'
+                    ? 'border-[#00D3CD] text-[#008c87]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Lock className="h-4 w-4" />
+                <span>Inherited Rates (From Super Admin)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setHierarchyMode('downline')}
+                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                  hierarchyMode === 'downline'
+                    ? 'border-[#00D3CD] text-[#008c87]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Sliders className="h-4 w-4" />
+                <span>Set Downline Rates (For Super Franchise)</span>
+              </button>
+            </div>
+          )}
+
+          {!isSuperAdmin && hierarchyMode === 'inherited' ? (
+            <div className="p-4 md:p-6">
+              <InheritedRatesView uplineRoleName="Super Admin" currentRoleName="Admin" />
+            </div>
+          ) : (
+            <>
           {/* Header */}
           <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gray-50/50 rounded-t-lg">
             <div>
@@ -1592,105 +2982,172 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
           )}
 
           {/* Tabs */}
-          <div className="grid grid-cols-1 md:flex border-b border-gray-200">
+          <div className="grid grid-cols-1 md:flex border-b border-gray-200 overflow-x-auto">
             <button
-              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'default' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'default' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
               onClick={() => {
                 setActiveTab('default');
                 setViewMode('detail');
                 setDetailReadOnly(false);
                 setSearchTerm('');
                 setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                setSelectedSuperFranchiseId('');
                 setSelectedFranchiseId('');
                 setSelectedMerchantId('');
               }}
             >
-              Default Rates
+              {isSuperAdmin ? 'Default POS Rates (Global for Every User)' : 'Default POS Rates (Inherited)'}
             </button>
             {!isSuperAdmin && (
-              <>
-                <button
-                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-                  onClick={() => {
-                    setActiveTab('specific');
-                    setViewMode('matrix');
-                    setDetailReadOnly(false);
-                    setSearchTerm('');
-                    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                    setSelectedMerchantId('');
-                  }}
-                >
-                  Franchise Rates
-                </button>
-                <button
-                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-                  onClick={() => {
-                    setActiveTab('unassigned');
-                    setViewMode('matrix');
-                    setDetailReadOnly(false);
-                    setSearchTerm('');
-                    setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-                    setSelectedFranchiseId('');
-                  }}
-                >
-                  Merchants under admin rates
-                </button>
-                <button
-                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-                  onClick={() => {
-                    setActiveTab('payout');
-                    setDetailReadOnly(false);
-                    setSearchTerm('');
-                    setSelectedFranchiseId('');
-                    setSelectedMerchantId('');
-                  }}
-                >
-                  Payout Rates
-                </button>
-              </>
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'super_franchise' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('super_franchise');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Super Franchise Specific Rates
+              </button>
             )}
-
+            {isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('specific');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Admin Specific Rates
+              </button>
+            )}
+            {!isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'specific' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('specific');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Franchise Specific Rates
+              </button>
+            )}
+            {!isSuperAdmin && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'unassigned' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('unassigned');
+                  setViewMode('matrix');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Merchants Under Admin Rates
+              </button>
+            )}
             {!isPosTxnMode && (
-              <>
-                <button
-                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'rental' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-                  onClick={() => {
-                    setActiveTab('rental');
-                    setDetailReadOnly(false);
-                    setSearchTerm('');
-                    setSelectedFranchiseId('');
-                    setSelectedMerchantId('');
-                  }}
-                >
-                  Rental Rate
-                </button>
-                <button
-                  className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center ${activeTab === 'cc_bill' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
-                  onClick={() => {
-                    setActiveTab('cc_bill');
-                    setDetailReadOnly(false);
-                    setSearchTerm('');
-                    setSelectedFranchiseId('');
-                    setSelectedMerchantId('');
-                  }}
-                >
-                  CC Bill Pay Charges
-                </button>
-              </>
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'cc_bill' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('cc_bill');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                CC Bill Pay Charges
+              </button>
+            )}
+            {!isPosTxnMode && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'payout' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('payout');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Payout Rates
+              </button>
+            )}
+            {!isPosTxnMode && (
+              <button
+                className={`px-4 md:px-6 py-3 font-medium text-sm focus:outline-none text-left md:text-center whitespace-nowrap ${activeTab === 'rental' ? 'border-b-2 border-[#00D3CD] text-[#00D3CD]' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => {
+                  setActiveTab('rental');
+                  setDetailReadOnly(false);
+                  setSearchTerm('');
+                  setSelectedSuperFranchiseId('');
+                  setSelectedFranchiseId('');
+                  setSelectedMerchantId('');
+                }}
+              >
+                Rental Rate
+              </button>
             )}
           </div>
 
           {/* Content */}
           <div className="p-0">
             {activeTab === 'default' && renderDetailTable()}
+            {activeTab === 'super_franchise' && viewMode === 'matrix' && renderMatrix()}
+            {activeTab === 'super_franchise' && viewMode === 'detail' && (
+              <div>
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="font-semibold text-blue-800">Super Franchise: </span>
+                    <span className="ml-2 text-blue-900">{superFranchises.find(sf => sf.id === Number(selectedSuperFranchiseId))?.name || 'Unknown'}</span>
+                  </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
+                </div>
+                {renderDetailTable()}
+              </div>
+            )}
             {activeTab === 'specific' && viewMode === 'matrix' && renderMatrix()}
             {activeTab === 'specific' && viewMode === 'detail' && (
               <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center">
-                    <span className="font-semibold text-blue-800">Franchise: </span>
+                    <span className="font-semibold text-blue-800">{isSuperAdmin ? 'Admin: ' : 'Franchise: '}</span>
                     <span className="ml-2 text-blue-900">{franchises.find(f => f.id === Number(selectedFranchiseId))?.name || 'Unknown'}</span>
                   </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
                 </div>
                 {renderDetailTable()}
               </div>
@@ -1698,31 +3155,27 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             {activeTab === 'unassigned' && viewMode === 'matrix' && renderMatrix()}
             {activeTab === 'unassigned' && viewMode === 'detail' && (
               <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center">
                     <span className="font-semibold text-blue-800">Merchant: </span>
                     <span className="ml-2 text-blue-900">{unassignedMerchants.find((m) => m.id === Number(selectedMerchantId))?.name || 'Unknown'}</span>
                   </div>
+                  <button
+                    onClick={handleBackToMatrix}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-50 transition"
+                  >
+                    ← Back to Matrix
+                  </button>
                 </div>
                 {renderDetailTable()}
               </div>
             )}
-            {activeTab === 'payout' && (
-              <div className="pt-6">
-                <PayoutRateSettings />
-              </div>
-            )}
-            {activeTab === 'rental' && (
-              <div className="pt-6">
-                <RateSettings hideTabs />
-              </div>
-            )}
-            {activeTab === 'cc_bill' && (
-              <div className="pt-6">
-                <RateSettings hideTabs initialTab="bbps_cc" />
-              </div>
-            )}
+            {activeTab === 'payout' && renderPayoutTab()}
+            {activeTab === 'rental' && renderRentalTab()}
+            {activeTab === 'cc_bill' && renderCcBillTab()}
           </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -2162,6 +3615,222 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CC Bill Modal */}
+      {isCcModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h3 className="text-base font-bold text-gray-800">
+                {editingCcRule?.id ? 'Edit CC Bill Slab' : ccModalMode === 'company_default' ? 'Add Company Default CC Bill Slab' : 'Add User CC Bill Override'}
+              </h3>
+              <button onClick={() => { setIsCcModalOpen(false); setEditingCcRule(null); }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            <form onSubmit={handleSaveCcRule} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">From Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    required
+                    className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                    value={ccForm.from_amount}
+                    onChange={(e) => setCcForm({ ...ccForm, from_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">To Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="10000"
+                    required
+                    className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                    value={ccForm.to_amount}
+                    onChange={(e) => setCcForm({ ...ccForm, to_amount: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Rate Type</label>
+                <div className="flex rounded-md border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setCcForm({ ...ccForm, rate_type: 'flat' })}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded ${ccForm.rate_type === 'flat' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                  >
+                    Flat (₹)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCcForm({ ...ccForm, rate_type: 'percentage' })}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded ${ccForm.rate_type === 'percentage' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                  >
+                    Percentage (%)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Rate Value ({ccForm.rate_type === 'flat' ? '₹' : '%'})</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={ccForm.rate_type === 'flat' ? 'e.g. 5.00' : 'e.g. 0.5'}
+                  required
+                  className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                  value={ccForm.rate}
+                  onChange={(e) => setCcForm({ ...ccForm, rate: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="ccActive"
+                  className="w-4 h-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
+                  checked={ccForm.is_active}
+                  onChange={(e) => setCcForm({ ...ccForm, is_active: e.target.checked })}
+                />
+                <label htmlFor="ccActive" className="text-xs font-medium text-gray-700 cursor-pointer">
+                  Active
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => { setIsCcModalOpen(false); setEditingCcRule(null); }}
+                  className="px-4 py-2 border rounded text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCc}
+                  className="px-4 py-2 bg-[#00D3CD] text-white rounded text-xs font-semibold hover:bg-[#00b8b3] disabled:opacity-50"
+                >
+                  {isSavingCc ? 'Saving...' : 'Save Rule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Modal */}
+      {isPayoutModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h3 className="text-base font-bold text-gray-800">
+                {editingPayoutRule?.id ? 'Edit Payout Charge Slab' : 'Add User Payout Charge Slab'}
+              </h3>
+              <button onClick={() => { setIsPayoutModalOpen(false); setEditingPayoutRule(null); }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            <form onSubmit={handleSavePayoutRule} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">From Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    required
+                    className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                    value={payoutForm.from_amount}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, from_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">To Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="10000"
+                    required
+                    className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                    value={payoutForm.to_amount}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, to_amount: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Rate Type</label>
+                <div className="flex rounded-md border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setPayoutForm({ ...payoutForm, rate_type: 'flat' })}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded ${payoutForm.rate_type === 'flat' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                  >
+                    Flat (₹)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayoutForm({ ...payoutForm, rate_type: 'percentage' })}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded ${payoutForm.rate_type === 'percentage' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                  >
+                    Percentage (%)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Rate Value ({payoutForm.rate_type === 'flat' ? '₹' : '%'})</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={payoutForm.rate_type === 'flat' ? 'e.g. 10.00' : 'e.g. 1.2'}
+                  required
+                  className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] outline-none"
+                  value={payoutForm.rate}
+                  onChange={(e) => setPayoutForm({ ...payoutForm, rate: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="payoutActive"
+                  className="w-4 h-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
+                  checked={payoutForm.is_active}
+                  onChange={(e) => setPayoutForm({ ...payoutForm, is_active: e.target.checked })}
+                />
+                <label htmlFor="payoutActive" className="text-xs font-medium text-gray-700 cursor-pointer">
+                  Active
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => { setIsPayoutModalOpen(false); setEditingPayoutRule(null); }}
+                  className="px-4 py-2 border rounded text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPayout}
+                  className="px-4 py-2 bg-[#00D3CD] text-white rounded text-xs font-semibold hover:bg-[#00b8b3] disabled:opacity-50"
+                >
+                  {isSavingPayout ? 'Saving...' : 'Save Rule'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,350 +1,219 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   X,
-  Percent,
-  Sliders,
-  CheckCircle2,
-  Loader2,
-  Plus,
-  Trash2,
-  Info,
-  DollarSign,
+  CreditCard,
+  ArrowUpRight,
   ShieldCheck,
+  ChevronRight,
+  Building,
+  Globe,
+  User,
+  Sliders,
+  ExternalLink,
 } from "lucide-react";
-import { toast } from "react-toastify";
 
-const DEFAULT_ADMIN_RATES = [
-  {
-    id: "rate_pos_card",
-    service: "POS Debit / Credit Card",
-    category: "POS & Hardware",
-    minAmount: 1,
-    maxAmount: 100000,
-    feeType: "percentage",
-    feeValue: 1.25,
-    gstPercent: 18,
-    isGstInclusive: false,
-    isActive: true,
-  },
-  {
-    id: "rate_pos_upi",
-    service: "POS UPI Transaction",
-    category: "POS & Hardware",
-    minAmount: 1,
-    maxAmount: 100000,
-    feeType: "flat",
-    feeValue: 0.0,
-    gstPercent: 18,
-    isGstInclusive: true,
-    isActive: true,
-  },
-  {
-    id: "rate_payout_imps",
-    service: "Instant Payout (IMPS)",
-    category: "Payout & Banking",
-    minAmount: 1,
-    maxAmount: 25000,
-    feeType: "flat",
-    feeValue: 6.5,
-    gstPercent: 18,
-    isGstInclusive: false,
-    isActive: true,
-  },
-  {
-    id: "rate_payout_neft",
-    service: "Direct Payout (NEFT)",
-    category: "Payout & Banking",
-    minAmount: 1,
-    maxAmount: 200000,
-    feeType: "flat",
-    feeValue: 3.5,
-    gstPercent: 18,
-    isGstInclusive: false,
-    isActive: true,
-  },
-  {
-    id: "rate_qr_soundbox",
-    service: "Dynamic QR & Soundbox",
-    category: "Digital QR",
-    minAmount: 1,
-    maxAmount: 50000,
-    feeType: "percentage",
-    feeValue: 0.0,
-    gstPercent: 18,
-    isGstInclusive: true,
-    isActive: true,
-  },
-  {
-    id: "rate_bbps",
-    service: "BBPS Bill Payments",
-    category: "Bill Payments",
-    minAmount: 10,
-    maxAmount: 50000,
-    feeType: "flat",
-    feeValue: 2.0,
-    gstPercent: 18,
-    isGstInclusive: false,
-    isActive: true,
-  },
-];
-
-const AdminRateModal = ({ isOpen, onClose, admin, onSuccess }) => {
-  const [rates, setRates] = useState([]);
-  const [activeTab, setActiveTab] = useState("all");
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!admin) return;
-    // Load existing admin custom rates from local storage or defaults
-    try {
-      const storageKey = `admin_rates_${admin.id}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        setRates(JSON.parse(saved));
-      } else {
-        setRates(DEFAULT_ADMIN_RATES);
-      }
-    } catch {
-      setRates(DEFAULT_ADMIN_RATES);
-    }
-  }, [admin]);
+/**
+ * AdminRateModal (Step 2: Rate Category Selection Modal)
+ * Displays the selected admin's details and three clickable cards:
+ * 1. POS Rate
+ * 2. Pay Rate
+ * 3. CC Bill Rate
+ */
+const AdminRateModal = ({ isOpen, onClose, admin }) => {
+  const navigate = useNavigate();
 
   if (!isOpen || !admin) return null;
 
   const adminName = admin.name || "Administrator";
+  const adminCode = admin.abheepay_id || admin.username || `ID: #${admin.id}`;
   const companyName =
     admin.company?.company_name ||
     admin.company_or_shop_name ||
     "Company Not Specified";
   const domainName = admin.company?.domain_name || "Platform Admin";
+  const isActive = admin.status === "active";
 
-  const handleRateChange = (index, field, value) => {
-    setRates((prev) => {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-      };
-      return updated;
+  const categories = [
+    {
+      id: "pos",
+      title: "POS Rate",
+      badge: "POS & Card Rules",
+      badgeColor: "bg-[#00D3CD]/10 text-[#00a8a3] border-[#00D3CD]/20",
+      icon: <CreditCard className="h-6 w-6 text-[#00a8a3]" />,
+      iconBg: "bg-[#00D3CD]/10 border border-[#00D3CD]/20",
+      description:
+        "Manage POS card transaction charges, applicable transaction methods, networks, card types, classifications, amount ranges, settlement types, flat charges, GST, and percentage rates.",
+      actionText: "Configure POS Rates",
+      onClick: () => {
+        onClose();
+        navigate(`/super-admin/admin/${admin.id}/rates/pos`, {
+          state: { admin },
+        });
+      },
+    },
+    {
+      id: "pay",
+      title: "Pay Rate",
+      badge: "Payout & Banking",
+      badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+      icon: <ArrowUpRight className="h-6 w-6 text-blue-600" />,
+      iconBg: "bg-blue-50 border border-blue-200",
+      description:
+        "Manage the applicable payout and banking transaction rates. Configure slab-wise flat or percentage fees across Instant Payout (IMPS), NEFT, and RTGS methods.",
+      actionText: "Configure Pay Rates",
+      onClick: () => {
+        onClose();
+        navigate(`/super-admin/admin/${admin.id}/rates/pay`, {
+          state: { admin },
+        });
+      },
+    },
+    {
+      id: "cc-bill",
+      title: "CC Bill Rate",
+      badge: "Credit Card Bill",
+      badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+      icon: <ShieldCheck className="h-6 w-6 text-purple-600" />,
+      iconBg: "bg-purple-50 border border-purple-200",
+      description:
+        "Manage the applicable credit card bill payment charges. Configure slab-wise charges, fee types, and custom overrides for BBPS credit card bill payments.",
+      actionText: "Configure CC Bill Rates",
+      onClick: () => {
+        onClose();
+        navigate(`/super-admin/admin/${admin.id}/rates/cc-bill`, {
+          state: { admin },
+        });
+      },
+    },
+  ];
+
+  const handleOpenAllRates = () => {
+    onClose();
+    navigate(`/super-admin/admin/${admin.id}/rates`, {
+      state: { admin },
     });
   };
-
-  const handleToggleActive = (index) => {
-    setRates((prev) => {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        isActive: !updated[index].isActive,
-      };
-      return updated;
-    });
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    try {
-      setSubmitting(true);
-      // Persist admin rates
-      const storageKey = `admin_rates_${admin.id}`;
-      localStorage.setItem(storageKey, JSON.stringify(rates));
-
-      toast.success(
-        `Rate settings for ${adminName} (${companyName}) updated successfully.`
-      );
-
-      if (typeof onSuccess === "function") {
-        onSuccess(rates);
-      }
-      onClose();
-    } catch (err) {
-      console.error("[AdminRateModal] Error saving rates:", err);
-      toast.error(err?.message || "Failed to update rate settings.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const filteredRates =
-    activeTab === "all"
-      ? rates
-      : rates.filter((r) => r.category.toLowerCase().includes(activeTab.toLowerCase()));
-
-  const categories = ["all", "POS & Hardware", "Payout & Banking", "Digital QR", "Bill Payments"];
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
+      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* HEADER */}
-        <div className="flex items-start justify-between border-b border-gray-100 bg-gray-50/80 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-[#00D3CD]/10 border border-[#00D3CD]/20 p-2 text-[#00D3CD]">
-              <Percent size={22} />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-gray-900">
-                Rate & Slab Management
+        <div className="flex items-start justify-between border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 px-6 py-5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-[#00D3CD]/15 p-1.5 text-[#00a8a3]">
+                <Sliders size={18} />
+              </span>
+              <h2 className="text-lg font-bold text-gray-900">
+                Rate Management
               </h2>
-              <p className="text-xs text-gray-500">
-                {adminName} • {companyName} • {domainName}
-              </p>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${
+                  isActive
+                    ? "bg-green-100 text-green-700 border border-green-200"
+                    : "bg-red-100 text-red-700 border border-red-200"
+                }`}
+              >
+                {admin.status || "active"}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-gray-600">
+              <span className="font-semibold text-gray-900">{adminName}</span>
+              <span className="text-gray-300">•</span>
+              <span className="font-mono text-gray-500">{adminCode}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <span className="inline-flex items-center gap-1 font-medium text-blue-600">
+                <Building size={12} />
+                {companyName}
+              </span>
+              {domainName && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span className="inline-flex items-center gap-1 text-gray-500">
+                    <Globe size={12} />
+                    {domainName}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            disabled={submitting}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            title="Close"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
-        {/* HERO BANNER */}
-        <div className="bg-gradient-to-br from-[#00D3CD] to-[#00a8a3] px-6 py-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-teal-100 font-semibold">
-                Company Commission & Charge Slabs
-              </p>
-              <h3 className="text-lg font-bold mt-0.5">
-                {companyName}
-              </h3>
-            </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md text-white border border-white/20">
-              Admin Specific
-            </span>
-          </div>
+        {/* INFORMATIVE SUBHEADER */}
+        <div className="bg-gray-50/80 border-b border-gray-100 px-6 py-3 flex items-center justify-between text-xs text-gray-600">
+          <span>
+            Select a rate category below to inspect platform defaults and configure admin-specific overrides.
+          </span>
+          <button
+            type="button"
+            onClick={handleOpenAllRates}
+            className="inline-flex items-center gap-1 font-semibold text-[#00a8a3] hover:underline"
+          >
+            <span>Overview Hub</span>
+            <ExternalLink size={12} />
+          </button>
         </div>
 
-        {/* CATEGORY TABS */}
-        <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex items-center gap-1 overflow-x-auto">
+        {/* CATEGORY CARDS */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           {categories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setActiveTab(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap capitalize transition-all ${
-                activeTab === cat
-                  ? "bg-[#00D3CD] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-              }`}
+            <div
+              key={cat.id}
+              onClick={cat.onClick}
+              className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:border-[#00D3CD] hover:shadow-md transition-all flex flex-col justify-between"
             >
-              {cat === "all" ? "All Services" : cat}
-            </button>
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className={`rounded-xl p-2.5 ${cat.iconBg} group-hover:scale-105 transition-transform`}>
+                    {cat.icon}
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border ${cat.badgeColor}`}>
+                    {cat.badge}
+                  </span>
+                </div>
+
+                <h3 className="text-base font-bold text-gray-900 mt-4 group-hover:text-[#00a8a3] transition-colors">
+                  {cat.title}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                  {cat.description}
+                </p>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-[#00a8a3] group-hover:translate-x-1 transition-transform">
+                <span>{cat.actionText}</span>
+                <ChevronRight size={14} />
+              </div>
+            </div>
           ))}
         </div>
 
-        {/* RATE SLABS LIST */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4">
-          <div className="space-y-3">
-            {filteredRates.map((rate) => {
-              const actualIdx = rates.findIndex((r) => r.id === rate.id);
-
-              return (
-                <div
-                  key={rate.id}
-                  className={`p-4 rounded-xl border transition-all ${
-                    rate.isActive
-                      ? "border-gray-200 bg-white hover:border-[#00D3CD]/50"
-                      : "border-gray-100 bg-gray-50/60 opacity-60"
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleActive(actualIdx)}
-                        className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${
-                          rate.isActive
-                            ? "bg-[#00D3CD] border-[#00D3CD] text-white"
-                            : "border-gray-300 bg-white"
-                        }`}
-                      >
-                        {rate.isActive && <CheckCircle2 size={14} />}
-                      </button>
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900">
-                          {rate.service}
-                        </h4>
-                        <span className="text-[11px] text-gray-400 font-medium">
-                          {rate.category} • Range: ₹{rate.minAmount.toLocaleString()} - ₹{rate.maxAmount.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* FEE INPUTS */}
-                    <div className="flex items-center gap-3">
-                      {/* Fee Type Toggle */}
-                      <select
-                        value={rate.feeType}
-                        onChange={(e) =>
-                          handleRateChange(actualIdx, "feeType", e.target.value)
-                        }
-                        className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:ring-1 focus:ring-[#00D3CD]"
-                      >
-                        <option value="percentage">Percent (%)</option>
-                        <option value="flat">Flat (₹)</option>
-                      </select>
-
-                      {/* Fee Value Input */}
-                      <div className="relative w-24">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={rate.feeValue}
-                          onChange={(e) =>
-                            handleRateChange(
-                              actualIdx,
-                              "feeValue",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-full text-xs font-semibold border border-gray-300 rounded-lg px-2 py-1.5 text-right focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
-                        />
-                        <span className="absolute left-2 top-1.5 text-xs text-gray-400 font-medium">
-                          {rate.feeType === "percentage" ? "%" : "₹"}
-                        </span>
-                      </div>
-
-                      {/* GST Tag */}
-                      <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                        +18% GST
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* FOOTER ACTIONS */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-            <span className="text-xs text-gray-400">
-              Rates apply to all downstream franchises & merchants under {companyName}.
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={submitting}
-                className="px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-xl bg-[#00D3CD] hover:bg-[#00bdb7] text-white shadow-sm transition-all disabled:opacity-50"
-              >
-                {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
-                <span>Save Rate Changes</span>
-              </button>
-            </div>
-          </div>
-        </form>
+        {/* FOOTER */}
+        <div className="border-t border-gray-100 bg-gray-50/50 px-6 py-3.5 flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            Platform defaults remain unchanged. All changes are saved specifically for {adminName}.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

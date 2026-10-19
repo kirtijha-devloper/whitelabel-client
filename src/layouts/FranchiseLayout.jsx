@@ -141,6 +141,7 @@ export default function FranchiseLayout() {
               <Route path="create-user/pos/:id" element={<CreateUserPosDetails currentUser={currentUser} />} />
               <Route path="create-user/charge-set/:id" element={<CreateChargeSet currentUser={currentUser} />} />
               <Route path="user/:id" element={<UserDetails currentUser={currentUser} />} />
+              <Route path="user/:id/edit" element={<AddUser currentUser={currentUser} />} />
               <Route path="merchant-list" element={<MerchantList />} />
               <Route path="list" element={<UserList currentUser={currentUser} />} />
               <Route path="pos-machine-list" element={<PosMachineList />} />
@@ -239,7 +240,7 @@ export default function FranchiseLayout() {
               <Route path="complaint" element={<ComplaintBox currentUser={currentUser} />} />
               <Route path="commissions" element={<Navigate to="/franchise/dashboard" replace />} />
               <Route path="merchant-rates" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
-              <Route path="rate-settings" element={<FranchiseRateSettings />} />
+              <Route path="rate-settings" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
               {/* show same ledger statements page as admin; backend will restrict results to franchise user */}
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               {/* keep legacy/alternate entries view if needed */}

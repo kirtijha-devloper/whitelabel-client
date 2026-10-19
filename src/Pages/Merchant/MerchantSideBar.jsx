@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Wallet,
   CreditCard,
@@ -10,18 +10,36 @@ import {
   ChevronRight,
   Box,
   Layers,
-  HelpCircle
+  HelpCircle,
+  X
 } from "lucide-react";
 import AbheePayLogo from '../../assets/FORMAT-PNG.png';
 import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
+import { getCompanyLogoUrl } from "../../utils/userAccess";
 
 const MerchantSideBar = ({ currentUser }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+  const [isCollapsed, setIsCollapsed] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 1024 : false
+  );
+
+  useEffect(() => {
+    const handleToggle = () => setIsCollapsed((prev) => !prev);
+    window.addEventListener("toggleMerchantSidebar", handleToggle);
+    return () => window.removeEventListener("toggleMerchantSidebar", handleToggle);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setIsCollapsed(true);
+    }
+  }, [location.pathname]);
+
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
   const currentFullPath = location.pathname + location.search;
   const isActivePath = (path) => {
     if (path.includes("?")) {
@@ -91,6 +109,12 @@ const MerchantSideBar = ({ currentUser }) => {
 
   return (
     <>
+      {!isCollapsed && (
+        <div
+          className="fixed inset-0 bg-black/60 z-30 lg:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsCollapsed(true)}
+        />
+      )}
       <div
         className={`fixed lg:static inset-y-0 left-0 z-40 bg-gray-900 transform transition-transform duration-300 ease-in-out
           ${isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-64"}
@@ -98,7 +122,20 @@ const MerchantSideBar = ({ currentUser }) => {
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          {!isCollapsed && <Link to={"/merchant/dashboard"} className="text-xl font-bold text-pink-500"><img src={AbheePayLogo} width={150}/></Link>}
+          {!isCollapsed && (
+            <Link to="/merchant/dashboard" className="flex items-center">
+              <img
+                src={companyLogoUrl || AbheePayLogo}
+                alt={currentUser?.company?.company_name || "Company Logo"}
+                width={150}
+                className="max-h-12 w-auto object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = AbheePayLogo;
+                }}
+              />
+            </Link>
+          )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="hidden lg:block p-1 rounded-lg hover:bg-gray-800 text-gray-400"
@@ -108,6 +145,13 @@ const MerchantSideBar = ({ currentUser }) => {
             ) : (
               <ChevronLeft className="w-5 h-5" />
             )}
+          </button>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="lg:hidden p-1.5 rounded-lg hover:bg-gray-800 text-gray-400"
+            aria-label="Close Sidebar"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -140,6 +184,11 @@ const MerchantSideBar = ({ currentUser }) => {
                     <Link
                       to={item.path}
                       title={tooltip}
+                      onClick={() => {
+                        if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                          setIsCollapsed(true);
+                        }
+                      }}
                       className={`flex items-center px-3 py-2 rounded-lg transition-colors
                         ${isActive
                           ? "bg-[#00D3CD] text-white"

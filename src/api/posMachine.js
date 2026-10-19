@@ -46,7 +46,7 @@ const buildApprovedCompanyLookup = (companyRecords = []) => {
 };
 
 // Get all POS machines
-export const getAllPosMachines = async ({ tidNumber = null, companyName = null, page = 1, limit = 10 } = {}) => {
+export const getAllPosMachines = async ({ tidNumber = null, companyName = null, status = null, search = null, page = 1, limit = 10 } = {}) => {
   try {
     const token = getAuthToken();
     if (!token) throw new Error("Not Authorized");
@@ -54,6 +54,8 @@ export const getAllPosMachines = async ({ tidNumber = null, companyName = null, 
     const params = new URLSearchParams();
     if (tidNumber) params.append('tid_number', tidNumber);
     if (companyName) params.append('company_name', companyName);
+    if (status) params.append('status', status);
+    if (search) params.append('search', search);
     params.append('page', page);
     params.append('limit', limit);
     const listEndpoint = `/pos-machine/list?${params.toString()}`;

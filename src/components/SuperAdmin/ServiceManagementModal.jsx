@@ -5,12 +5,6 @@ import { getAdminServices } from "../../api/superAdminApi";
 import ConfirmationModal from "../Common/ConfirmationModal";
 
 const FALLBACK_SERVICES = [
-  { key: "pos", label: "POS", category: "POS & Hardware" },
-  { key: "pg", label: "Payment Gateway", category: "Payment Gateway" },
-  { key: "qr", label: "QR Payments", category: "Digital QR" },
-  { key: "soundbox", label: "Soundbox", category: "Digital QR" },
-  { key: "dmt", label: "DMT & Payouts", category: "Payout & Banking" },
-  { key: "billpayments", label: "Bill Payments", category: "Bill Payments" },
 ];
 
 // Stable empty reference — prevents useQuery's `= {}` default from creating a
@@ -43,18 +37,24 @@ const ServiceManagementModal = ({
 
   // Extract available services from the admin-specific map or fallback
   const availableServices = useMemo(() => {
-    const list = Object.values(adminServicesMap || {});
+    const list = Object.values(adminServicesMap || {}).filter(
+      (s) => (s?.key || s?.service_key) !== "mx_payout"
+    );
     if (list.length > 0) {
       return list.map((s) => ({
         key: s.key || s.service_key,
         label: s.label || s.key,
         category: s.category || "General",
-        is_globally_disabled: Boolean(s.is_super_admin_disabled),
+        is_globally_disabled: Boolean(
+          s.is_globally_disabled ?? s.is_super_admin_disabled ?? (s.global_enabled === false)
+        ),
+        admin_enabled: s.admin_enabled !== undefined ? Boolean(s.admin_enabled) : (s.is_enabled !== false),
       }));
     }
-    return FALLBACK_SERVICES.map((s) => ({
+    return FALLBACK_SERVICES.filter((s) => s.key !== "mx_payout").map((s) => ({
       ...s,
       is_globally_disabled: false,
+      admin_enabled: true,
     }));
   }, [adminServicesMap]);
 
@@ -63,8 +63,6 @@ const ServiceManagementModal = ({
       if (!company) return;
       const initial = {};
       const companyServices = company.services || {};
-      // availableServices is derived from adminServicesMap — safe to read here
-      // without adding it to deps (avoids double-trigger on the same data change)
       FALLBACK_SERVICES.forEach((s) => {
         if (companyServices[s.key] !== undefined) {
           initial[s.key] = Boolean(companyServices[s.key]);
@@ -79,16 +77,13 @@ const ServiceManagementModal = ({
     const initial = {};
     Object.values(adminServicesMap).forEach((s) => {
       const sKey = s.key || s.service_key;
-      if (s.is_super_admin_disabled) {
-        initial[sKey] = false;
-      } else {
-        initial[sKey] = s.is_enabled !== false;
-      }
+      // Preserve the Admin's saved preference
+      initial[sKey] = s.admin_enabled !== undefined ? Boolean(s.admin_enabled) : (s.is_enabled !== false);
     });
 
     setServices(initial);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminServicesMap, company]); // availableServices intentionally omitted — it's derived from adminServicesMap
+  }, [adminServicesMap, company]);
 
   if (!isOpen) return null;
 
@@ -154,23 +149,6 @@ const ServiceManagementModal = ({
             </button>
           </div>
 
-          {/* CATEGORY TABS */}
-          <div className="px-6 py-2.5 border-b border-gray-100 flex items-center gap-1 overflow-x-auto bg-white">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedCategory === cat
-                    ? "bg-[#00D3CD] text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {cat === "all" ? "All Services" : cat}
-              </button>
-            ))}
-          </div>
 
           {/* SERVICES LIST */}
           <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
@@ -181,16 +159,18 @@ const ServiceManagementModal = ({
               </div>
             ) : filteredServices.length > 0 ? (
               filteredServices.map((service) => {
-                const isLocked = service.is_globally_disabled;
-                const isEnabled = isLocked ? false : Boolean(services[service.key]);
+                const isLocked = Boolean(service.is_globally_disabled);
+                const adminPref = services[service.key] !== undefined ? Boolean(services[service.key]) : Boolean(service.admin_enabled);
+                // Effective status: only enabled if both Global is ON and Admin is ON
+                const isEffectiveEnabled = !isLocked && adminPref;
 
                 return (
                   <div
                     key={service.key}
                     className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-all ${
                       isLocked
-                        ? "border-amber-200 bg-amber-50/40 opacity-75"
-                        : isEnabled
+                        ? "border-amber-200 bg-amber-50/40"
+                        : isEffectiveEnabled
                         ? "border-gray-200 bg-white hover:border-[#00D3CD]/40"
                         : "border-gray-100 bg-gray-50/50"
                     }`}
@@ -205,22 +185,34 @@ const ServiceManagementModal = ({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[11px] font-medium text-gray-400">
-                          {service.category}
-                        </span>
-                        {isLocked ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                            <Lock size={10} /> Locked by Super Admin
+                      <div className="flex flex-col gap-1 mt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium text-gray-400">
+                            {service.category}
                           </span>
-                        ) : (
-                          <span
-                            className={`text-[11px] font-bold ${
-                              isEnabled ? "text-emerald-600" : "text-rose-500"
-                            }`}
-                          >
-                            {isEnabled ? "Enabled for Tenant" : "Disabled for Tenant"}
-                          </span>
+                          {isLocked ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                              <Lock size={10} /> Disabled Globally by Super Admin
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-[11px] font-bold ${
+                                isEffectiveEnabled ? "text-emerald-600" : "text-rose-500"
+                              }`}
+                            >
+                              {isEffectiveEnabled ? "Enabled for Tenant" : "Disabled for Tenant"}
+                            </span>
+                          )}
+                        </div>
+
+                        {isLocked && (
+                          <p className="text-[10px] text-amber-800/80 leading-tight">
+                            Saved Admin preference:{" "}
+                            <span className={adminPref ? "font-semibold text-emerald-700" : "font-semibold text-rose-600"}>
+                              {adminPref ? "Enabled" : "Disabled"}
+                            </span>{" "}
+                            (Restored when enabled globally)
+                          </p>
                         )}
                       </div>
                     </div>
@@ -230,17 +222,24 @@ const ServiceManagementModal = ({
                       type="button"
                       disabled={isLocked || saving}
                       onClick={() => toggleService(service.key, isLocked)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:cursor-not-allowed ${
+                      title={
                         isLocked
-                          ? "bg-gray-200 opacity-60"
-                          : isEnabled
+                          ? "This service is disabled globally by Super Admin. It cannot be enabled for this tenant until enabled globally."
+                          : isEffectiveEnabled
+                          ? "Click to disable for this tenant"
+                          : "Click to enable for this tenant"
+                      }
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isLocked
+                          ? "bg-gray-200 opacity-60 cursor-not-allowed"
+                          : isEffectiveEnabled
                           ? "bg-[#00D3CD]"
                           : "bg-gray-300"
                       }`}
                     >
                       <span
                         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                          isEnabled && !isLocked ? "translate-x-5" : "translate-x-0"
+                          isEffectiveEnabled ? "translate-x-5" : "translate-x-0"
                         }`}
                       />
                     </button>

@@ -343,6 +343,48 @@ const applyAdminWalletAdjustment = async ({ action, user_id, amount, reason, ide
   }
 };
 
+export const superAdminWalletCredit = async ({ user_id, id, amount, reason, idempotency_key }) => {
+  const token = getAuthToken();
+  if (!token) throw new Error("No token found");
+
+  const targetId = id || user_id;
+  const response = await api.post(
+    `/super-admin/wallet/credit`,
+    {
+      user_id: Number(targetId),
+      amount: Number(amount),
+      reason: reason ? String(reason).trim() : undefined,
+      idempotency_key,
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: ADMIN_WALLET_TIMEOUT_MS,
+    }
+  );
+  return response.data;
+};
+
+export const superAdminWalletDebit = async ({ user_id, id, amount, reason, idempotency_key }) => {
+  const token = getAuthToken();
+  if (!token) throw new Error("No token found");
+
+  const targetId = id || user_id;
+  const response = await api.post(
+    `/super-admin/wallet/debit`,
+    {
+      user_id: Number(targetId),
+      amount: Number(amount),
+      reason: reason ? String(reason).trim() : undefined,
+      idempotency_key,
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: ADMIN_WALLET_TIMEOUT_MS,
+    }
+  );
+  return response.data;
+};
+
 export const adminWalletCredit = async (payload) =>
   applyAdminWalletAdjustment({ ...payload, action: "credit" });
 

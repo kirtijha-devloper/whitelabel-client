@@ -462,9 +462,16 @@ const AdminList = ({
   };
 
   const handleSelectRateManagement = (admin) => {
+    const targetAdmin = admin || selectedAdminForAction;
     setIsAdminActionMenuOpen(false);
-    setSelectedAdminForAction(admin || selectedAdminForAction);
-    setIsRateModalOpen(true);
+    if (targetAdmin?.id) {
+      navigate(`/super-admin/admin/${targetAdmin.id}/rates`, {
+        state: { admin: targetAdmin },
+      });
+    } else {
+      setSelectedAdminForAction(targetAdmin);
+      setIsRateModalOpen(true);
+    }
   };
 
   const handleCloseRateModal = () => {
@@ -520,8 +527,6 @@ const AdminList = ({
     const companyData = {
 
       id:
-        row.company?.id ||
-        row.company_id ||
         row.id,
 
       company_id:

@@ -1,3 +1,31 @@
+import { BASE_SITE_URL } from "../constants";
+
+/**
+ * Resolves uploaded image path to full URL (supporting absolute URLs and /uploads/ paths)
+ */
+export const resolveLogoUrl = (logoPath) => {
+  if (!logoPath || typeof logoPath !== "string") return null;
+  const trimmed = logoPath.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const clean = trimmed.replace(/\\/g, "/");
+  const slashPrefixed = clean.startsWith("/") ? clean : `/${clean}`;
+  return `${BASE_SITE_URL}${slashPrefixed}`;
+};
+
+/**
+ * Extracts and resolves the company logo for any user (admin, employee, merchant, franchise, super franchise)
+ */
+export const getCompanyLogoUrl = (user) => {
+  if (!user) return null;
+  const rawLogo =
+    user?.company?.logo ||
+    user?.company?.company_logo ||
+    (user?.role === "admin" ? user?.shop_with_photo_url : null) ||
+    null;
+  return resolveLogoUrl(rawLogo);
+};
+
 export const normalizeUserRole = (value) => {
   let roleValue = value;
 

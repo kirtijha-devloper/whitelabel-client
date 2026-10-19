@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Clock, Bell, Wallet, Sliders, ArrowRightLeft } from "lucide-react";
+import { Clock, Bell, Wallet, Sliders, ArrowRightLeft, Menu } from "lucide-react";
 import {
   getEffectiveUserDailyLimit,
   getUserTodayUtilized,
@@ -239,6 +239,14 @@ const MerchantHeaderInfo = ({ dashboardData, currentUser, pageTitle = "Merchant 
               <span className="rounded-full bg-[#00D3CD]/10 text-[#00D3CD] border border-[#00D3CD]/20 px-2.5 py-1 text-xs font-semibold uppercase">
                 {role}
               </span>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("toggleMerchantSidebar"))}
+                className="lg:hidden flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition active:scale-95"
+                aria-label="Toggle Navigation Menu"
+              >
+                <Menu className="h-4 w-4" />
+              </button>
             </div>
           </div>
           {abheepay_id !== "N/A" && (

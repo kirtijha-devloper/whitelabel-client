@@ -1,20 +1,39 @@
-import { FaHistory } from "react-icons/fa";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import StatCard from "../components/StatCard";
-import DataCard from "../components/DataCard";
+import {
+  Users,
+  Building2,
+  ShieldCheck,
+  Smartphone,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  CreditCard,
+  TrendingUp,
+  Wallet,
+  Calendar,
+  Layers,
+  Sparkles,
+  BarChart3,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react";
+import { FaHistory } from "react-icons/fa";
 import DashboardChartLauncher from "../components/DashboardChartLauncher";
 
 const Dashboard = ({ dashboardData = {} }) => {
   const navigate = useNavigate();
   const rawData = dashboardData?.data ?? dashboardData ?? {};
-  console.log("Admin dashboard ------->>>>> ,:" , rawData);
+
   const merchants = rawData.merchants ?? { count: rawData.merchantCount ?? 0 };
   const franchises = rawData.franchaises ?? { count: rawData.franchiseCount ?? 0 };
+  const super_franchises = rawData.super_franchises ?? rawData.superFranchises ?? { count: rawData.superFranchiseCount ?? 0 };
   const pos_machines =
     rawData.pos_machines ??
     ({
       active: rawData.posActive ?? 0,
       inactive: rawData.posDActive ?? 0,
+      total: rawData.posTotal ?? 0,
     });
   const pos_transactions =
     rawData.pos_transactions ??
@@ -43,237 +62,457 @@ const Dashboard = ({ dashboardData = {} }) => {
 
   const formatCount = (value) => toNumber(value).toLocaleString("en-IN");
 
-  const getStatTone = (title = "") => {
-    const normalized = title.toLowerCase();
-    if (normalized.includes("success")) return "bg-emerald-500";
-    if (normalized.includes("failed") || normalized.includes("fail")) return "bg-rose-500";
-    if (normalized.includes("cc")) return "bg-primary";
-    return "bg-primary";
-  };
+  const totalPosCount = toNumber(
+    pos_machines.total ?? (toNumber(pos_machines.active) + toNumber(pos_machines.inactive))
+  );
 
-  const todayLabel = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
+  const todayFormatted = new Date().toLocaleDateString("en-US", {
+    month: "long",
     day: "numeric",
-    month: "short",
+    year: "numeric",
   });
 
-  const sections = [
+  // User & Partner Network Cards
+  const networkCards = [
     {
-      cards: [{ title: "Merchant List", count: merchants.count || 0 }],
+      title: "Merchant List",
+      count: merchants.count || 0,
+      subtitle: "Active retail merchants",
+      link: "/admin/list?role=merchant",
+      icon: Users,
+      iconBox: "bg-purple-50 text-purple-600 border border-purple-100",
+      pillClass: "bg-purple-50 text-purple-700 border border-purple-200",
+      hoverBorder: "hover:border-purple-300",
+      linkText: "View Merchant List",
     },
     {
-      cards: [{ title: "Franchise List", count: franchises.count || 0 }],
+      title: "Franchise List",
+      count: franchises.count || 0,
+      subtitle: "Regional business partners",
+      link: "/admin/list?role=franchise",
+      icon: Building2,
+      iconBox: "bg-blue-50 text-blue-600 border border-blue-100",
+      pillClass: "bg-blue-50 text-blue-700 border border-blue-200",
+      hoverBorder: "hover:border-blue-300",
+      linkText: "View Franchise List",
     },
     {
-      cards: [
-        {
-          title: "POS Machine List",
-          count: toNumber(pos_machines.active) + toNumber(pos_machines.inactive),
-          link: "admin/stock-pos",
-        },
-        { title: "Active Machine", count: pos_machines.active || 0, link: "admin/stock-pos" },
-        { title: "D-Active Machine", count: pos_machines.inactive || 0, link: "admin/stock-pos" },
-      ],
+      title: "Super Franchise List",
+      count: super_franchises.count || 0,
+      subtitle: "Master network franchises",
+      link: "/admin/list?role=super_franchise",
+      icon: ShieldCheck,
+      iconBox: "bg-amber-50 text-amber-600 border border-amber-100",
+      pillClass: "bg-amber-50 text-amber-700 border border-amber-200",
+      hoverBorder: "hover:border-amber-300",
+      linkText: "View Super Franchise List",
     },
   ];
 
-  const stats = [
-    { title: "Today POS", amount: pos_transactions.total || 0 },
-    { title: "Today POS Success", amount: pos_transactions.success || 0 },
-    {
-      title: "Today POS T0 / T+1",
-      amount: (
-        <div className="flex flex-col text-[13px] md:text-sm font-semibold space-y-1 mt-1 leading-tight text-gray-800">
-          <div>T0: ₹{formatAmount(pos_transactions.t0_amount)}</div>
-          <div>T+1: ₹{formatAmount(pos_transactions.t1_amount)}</div>
-        </div>
-      )
-    },
-    { title: "Today CC BILLPAYMENT TXN", amount: ccBillPaymentTXN },
-    { title: "Today CC BILLPAYMENT Success", amount: ccBillPaymentSuccess },
-    { title: "Today CC BILLPAYMENT Failed", amount: ccBillPaymentFailed },
-  ];
-
-  const mobileEntityCards = [
-    { section: "Merchant", title: "Merchant List", count: merchants.count || 0 },
-    { section: "Franchise", title: "Franchise List", count: franchises.count || 0 },
-  ];
-
-  const mobileMachineCards = [
+  // POS Terminal Fleet Cards
+  const posFleetCards = [
     {
       title: "POS Machine List",
-      count: toNumber(pos_machines.active) + toNumber(pos_machines.inactive),
-      link: "/admin/stock-pos",
+      count: totalPosCount,
+      subtitle: "Total fleet inventory",
+      link: "/admin/pos-machine-list",
+      icon: Smartphone,
+      iconBox: "bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20",
+      pillClass: "bg-[#00D3CD]/15 text-[#008b87] border border-[#00D3CD]/30 font-bold",
+      hoverBorder: "hover:border-[#00D3CD]/50",
+      linkText: "View All Terminals",
     },
-    { title: "Active Machine", count: pos_machines.active || 0, link: "/admin/stock-pos" },
-    { title: "D-Active Machine", count: pos_machines.inactive || 0, link: "/admin/stock-pos" },
+    {
+      title: "Active POS Machine",
+      count: pos_machines.active || 0,
+      subtitle: "Operational & ready",
+      link: "/admin/pos-machine-list?status=active",
+      icon: CheckCircle2,
+      iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+      pillClass: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
+      hoverBorder: "hover:border-emerald-300",
+      linkText: "View Active Terminals",
+    },
+    {
+      title: "De-Active POS Machine",
+      count: pos_machines.inactive || 0,
+      subtitle: "Inactive or maintenance",
+      link: "/admin/pos-machine-list?status=inactive",
+      icon: XCircle,
+      iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
+      pillClass: "bg-rose-50 text-rose-700 border border-rose-200 font-bold",
+      hoverBorder: "hover:border-rose-300",
+      linkText: "View De-Active Terminals",
+    },
   ];
 
   return (
-    <div className="bg-gray-100 min-h-screen w-full">
-      <div className="md:hidden space-y-3 pb-6">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 space-y-8">
+      {/* ================= HEADER ================= */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-6">
+        <div>
+          <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20 mb-2">
+            Admin Overview
+          </span>
+
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+            Admin Dashboard
+          </h2>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Real-time business performance, partner hierarchy, and terminal metrics
+          </p>
+        </div>
+
+        {/* Date & Chart Launcher */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-fit items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00D3CD]/10 text-[#00D3CD]">
+              <Calendar className="h-5 w-5" />
+            </div>
+
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Admin Dashboard</p>
-              <h2 className="mt-1 text-lg font-semibold text-gray-900">Daily Snapshot</h2>
-              <p className="text-xs text-gray-500">{todayLabel}</p>
-            </div>
-            <div className="rounded-xl bg-primary/10 px-3 py-2 text-right">
-              <p className="text-[10px] uppercase tracking-wide text-gray-500">Payout</p>
-              <p className="text-sm font-semibold text-gray-900">INR {formatAmount(today_total_payout)}</p>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-gray-50 p-2">
-              <p className="text-[10px] text-gray-500">Merchants</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCount(merchants.count || 0)}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-2">
-              <p className="text-[10px] text-gray-500">Franchise</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCount(franchises.count || 0)}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-2">
-              <p className="text-[10px] text-gray-500">Machines</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {formatCount(toNumber(pos_machines.active) + toNumber(pos_machines.inactive))}
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+                Today
+              </p>
+              <p className="text-sm font-semibold text-gray-800">
+                {todayFormatted}
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 gap-3">
           <DashboardChartLauncher
-            buttonClassName="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary px-3 py-3 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
+            label="Analytics"
+            buttonClassName="inline-flex h-12 items-center gap-2 px-4 rounded-2xl bg-gradient-to-r from-[#00D3CD] to-[#00b8b3] text-white text-sm font-semibold shadow-sm hover:opacity-95 transition active:scale-[0.98]"
           />
-          <button
-            onClick={() => navigate("/admin/total-payouts")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-3 py-3 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
-          >
-            <FaHistory className="text-xs" />
-            Payout History
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {mobileEntityCards.map((card) => {
-            const CardBody = (
-              <>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{card.section}</p>
-                <div className="mt-2 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5">
-                  <span className="text-sm font-medium text-gray-700">{card.title}</span>
-                  <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
-                    {formatCount(card.count)}
-                  </span>
-                </div>
-              </>
-            );
-
-            if (card.link) {
-              return (
-                <Link key={card.section} to={card.link} className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-                  {CardBody}
-                </Link>
-              );
-            }
-
-            return (
-              <div key={card.section} className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-                {CardBody}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">POS Machines</p>
-          <div className="space-y-2">
-            {mobileMachineCards.map((card) => (
-              <Link
-                key={card.title}
-                to={card.link}
-                className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 transition active:scale-[0.99]"
-              >
-                <span className="text-sm font-medium text-gray-700">{card.title}</span>
-                <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
-                  {formatCount(card.count)}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-900">Today Activity</p>
-            <p className="text-xs text-gray-500">{stats.length} metrics</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {stats.map((item, index) => (
-              <div key={index} className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-                <p className="min-h-[2.4rem] text-[11px] font-medium leading-4 text-gray-500">{item.title}</p>
-                {typeof item.amount === 'number' ? (
-                  <p className="mt-1 text-base font-semibold text-gray-900">INR {formatAmount(item.amount)}</p>
-                ) : (
-                  <div className="mt-1">{item.amount}</div>
-                )}
-                <div className={`mt-2 h-1 rounded-full ${getStatTone(item.title)}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">Today Payout</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">INR {formatAmount(today_total_payout)}</p>
-          <button
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-2.5 text-sm font-medium text-white"
-            onClick={() => navigate("/admin/total-payouts")}
-          >
-            <FaHistory />
-            View Payout History
-          </button>
         </div>
       </div>
 
-      <div className="hidden md:block">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {sections.map((section, index) => (
-            <div key={index} className="flex flex-col space-y-4">
-              {section.button && (
-                <Link
-                  to={`/${section.button.link}`}
-                  className="bg-primary text-white py-3 px-4 rounded-lg hover:opacity-80 transition"
-                >
-                  {section.button.label}
-                </Link>
-              )}
-              {section.cards.map((card, cardIndex) => (
-                <StatCard key={cardIndex} title={card.title} count={card.count} link={card.link} />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {stats.map((item, index) => (
-            <DataCard key={index} title={item.title} amount={item.amount} currency="\u20B9" />
-          ))}
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="bg-green-500 text-white p-6 rounded-lg shadow-md flex-1">
-            <p className="text-sm">Today Payout</p>
-            <p className="text-2xl font-bold">{"\u20B9"}{today_total_payout}</p>
+      {/* ================= SECTION 1: PARTNER NETWORK ================= */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-[#00a8a3]" />
+              User & Partner Network
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Active merchants, franchise partners, and master accounts
+            </p>
           </div>
+          <span className="text-xs font-semibold text-gray-400 hidden sm:inline-block">
+            Click card to view records
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {networkCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.title}
+                to={card.link}
+                className={`group flex min-h-[145px] flex-col justify-between rounded-2xl bg-white p-5 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${card.hoverBorder} active:scale-[0.99]`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      {card.title}
+                    </p>
+                    <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900 group-hover:text-[#00a8a3] transition-colors">
+                      {formatCount(card.count)}
+                    </h3>
+                  </div>
+
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${card.iconBox}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                  <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+                    {card.subtitle}
+                  </span>
+                  <div className="inline-flex items-center gap-1 text-xs font-semibold text-[#00a8a3] group-hover:translate-x-1 transition-transform">
+                    <span>{card.linkText}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SECTION 2: POS TERMINAL FLEET ================= */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-[#00a8a3]" />
+              POS Terminal Fleet
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Live hardware allocation, active status, and inactive terminals
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-gray-400 hidden sm:inline-block">
+            Click card to filter terminal status
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {posFleetCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.title}
+                to={card.link}
+                className={`group flex min-h-[145px] flex-col justify-between rounded-2xl bg-white p-5 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${card.hoverBorder} active:scale-[0.99]`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      {card.title}
+                    </p>
+                    <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900 group-hover:text-[#00a8a3] transition-colors">
+                      {formatCount(card.count)}
+                    </h3>
+                  </div>
+
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${card.iconBox}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                  <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+                    {card.subtitle}
+                  </span>
+                  <div className="inline-flex items-center gap-1 text-xs font-semibold text-[#00a8a3] group-hover:translate-x-1 transition-transform">
+                    <span>{card.linkText}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SECTION 3: TRANSACTION ACTIVITY & EARNINGS ================= */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#00a8a3]" />
+              Today's Transaction Metrics
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              POS swipe volume, instant settlement, and bill payment breakdown
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20">
+            Live Daily
+          </span>
+        </div>
+
+        {/* First Row: POS Transactions (with Hero Card) */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-4">
+          {/* Hero Card: Today POS Business */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-gradient-to-br from-[#00D3CD] to-[#00b8b3] text-white shadow-sm border border-[#00D3CD]/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/90">
+                  Today POS Volume
+                </p>
+                <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-white">
+                  ₹{formatAmount(pos_transactions.total)}
+                </h3>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-transform group-hover:scale-105">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-white/80">
+              Total volume processed through POS terminals today
+            </p>
+          </div>
+
+          {/* Today POS Success */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-white text-gray-900 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Today POS Success
+                  </p>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Settled
+                  </span>
+                </div>
+                <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900">
+                  ₹{formatAmount(pos_transactions.success)}
+                </h3>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 transition-transform group-hover:scale-105">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-emerald-600 font-medium">
+              Successfully settled & captured volume
+            </p>
+          </div>
+
+          {/* POS T0 / T+1 Split */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-white text-gray-900 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Today POS Settlement Split
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="rounded-xl bg-sky-50 px-3 py-1.5 border border-sky-100">
+                    <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider block">
+                      T0 Instant
+                    </span>
+                    <span className="text-sm font-extrabold text-gray-900 block mt-0.5">
+                      ₹{formatAmount(pos_transactions.t0_amount)}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-violet-50 px-3 py-1.5 border border-violet-100">
+                    <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider block">
+                      T+1 Next Day
+                    </span>
+                    <span className="text-sm font-extrabold text-gray-900 block mt-0.5">
+                      ₹{formatAmount(pos_transactions.t1_amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 transition-transform group-hover:scale-105">
+                <Clock className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-gray-400">
+              Breakdown by instant vs standard settlement cycles
+            </p>
+          </div>
+        </div>
+
+        {/* Second Row: CC Bill Payments */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* CC Total */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-white text-gray-900 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Today CC Billpayment TXN
+                </p>
+                <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900">
+                  ₹{formatAmount(ccBillPaymentTXN)}
+                </h3>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0284c7]/10 text-[#0284c7] border border-[#0284c7]/20 transition-transform group-hover:scale-105">
+                <CreditCard className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-gray-400">
+              Total credit card bill payments initiated
+            </p>
+          </div>
+
+          {/* CC Success */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-white text-gray-900 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Today CC Success
+                  </p>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Success
+                  </span>
+                </div>
+                <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900">
+                  ₹{formatAmount(ccBillPaymentSuccess)}
+                </h3>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 transition-transform group-hover:scale-105">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-emerald-600 font-medium">
+              Completed without biller errors
+            </p>
+          </div>
+
+          {/* CC Failed */}
+          <div className="group flex min-h-[145px] flex-col justify-between rounded-2xl p-5 bg-white text-gray-900 border border-gray-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-rose-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Today CC Failed
+                  </p>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-700 border border-rose-200">
+                    Failed
+                  </span>
+                </div>
+                <h3 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-900">
+                  ₹{formatAmount(ccBillPaymentFailed)}
+                </h3>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200 transition-transform group-hover:scale-105">
+                <XCircle className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-rose-600 font-medium">
+              Failed or rejected requests
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= SECTION 4: TODAY TOTAL PAYOUT CARD ================= */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-7 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20">
+            <Wallet className="h-7 w-7" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Today Total Payout
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                Wallet Settled
+              </span>
+            </div>
+            <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 mt-1">
+              ₹{formatAmount(today_total_payout)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Total volume settled directly into merchant and franchise accounts today.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
           <DashboardChartLauncher
-            buttonClassName="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-white transition hover:opacity-90"
+            label="View 5-Day Charts"
+            buttonClassName="inline-flex h-11 items-center gap-2 px-5 rounded-xl border border-gray-200 bg-white text-gray-800 text-sm font-semibold shadow-sm hover:bg-gray-50 hover:border-gray-300 transition active:scale-[0.98]"
           />
           <button
-            className="bg-purple-300 text-gray-800 py-2 px-4 rounded-lg hover:bg-purple-400 transition"
-            onClick={() => navigate("/admin/total-payouts")} hidden
+            onClick={() => navigate("/admin/total-payouts")}
+            className="inline-flex h-11 items-center gap-2 px-5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold shadow-sm transition active:scale-[0.98]"
           >
-            <FaHistory className="inline-block mr-2" /> Click to History Show
+            <FaHistory className="w-3.5 h-3.5 text-gray-400" />
+            Payout History
           </button>
         </div>
       </div>

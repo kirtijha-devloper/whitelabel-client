@@ -31,19 +31,7 @@ import {
   isAdminUser,
   isSuperAdminUser,
 } from "../utils/accessControl";
-
-/**
- * Resolves uploaded image path to full URL (supporting absolute URLs and /uploads/ paths)
- */
-const resolveLogoUrl = (logoPath) => {
-  if (!logoPath || typeof logoPath !== "string") return null;
-  const trimmed = logoPath.trim();
-  if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  const clean = trimmed.replace(/\\/g, "/");
-  const slashPrefixed = clean.startsWith("/") ? clean : `/${clean}`;
-  return `${BASE_SITE_URL}${slashPrefixed}`;
-};
+import { getCompanyLogoUrl, resolveLogoUrl } from "../utils/userAccess";
 
 const Sidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -57,8 +45,7 @@ const Sidebar = ({ currentUser }) => {
   const isSuperAdmin = isSuperAdminUser(currentUser);
   const landingPath = getAdminLandingPathForUser(currentUser);
 
-  const rawLogo = currentUser?.company?.logo || currentUser?.shop_with_photo_url || null;
-  const companyLogoUrl = resolveLogoUrl(rawLogo);
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const isActivePath = (path) => {
@@ -180,12 +167,12 @@ const Sidebar = ({ currentUser }) => {
         "settlement.manage",
       ],
     },
-    {
-      name: "Service Management",
-      path: "/admin/service-management",
-      icon: <FaSlidersH />,
-      permissions: ["rate.settings.read", "rate.settings.manage"],
-    },
+    // {
+    //   name: "Service Management",
+    //   path: "/admin/service-management",
+    //   icon: <FaSlidersH />,
+    //   permissions: ["rate.settings.read", "rate.settings.manage"],
+    // },
     { name: "Setting", path: "/admin/setting", icon: <FaCog /> },
     {
       name: "System Log",
@@ -302,6 +289,7 @@ const Sidebar = ({ currentUser }) => {
                 src={companyLogoUrl || AbheePayLogo}
                 alt={currentUser?.company?.company_name || "Company Logo"}
                 width={150}
+                className="max-h-12 w-auto object-contain rounded"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = AbheePayLogo;

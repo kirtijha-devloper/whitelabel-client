@@ -1,719 +1,749 @@
-import { createElement, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Building2,
-  CircleDollarSign,
-  Loader2,
+  CreditCard,
+  ArrowUpRight,
+  ShieldCheck,
+  RefreshCw,
   Search,
-  Users,
-  UserRound,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  Layers,
+  Sparkles,
+  Zap,
+  Building2,
+  Clock,
+  ArrowRight,
 } from "lucide-react";
-import { AllUsers } from "../api/FranchiseApi";
-import { ChargesSetByUserId } from "../api/chargeSet";
-import {
-  getUserPayoutChargesByUser,
-  listAllUserPayoutCharges,
-} from "../api/rateSettingsApi";
-import { extractUsersArray, normalizeUserRole } from "../utils/userAccess";
+import { fetchMyAdminApplicableCharges } from "../api/rateSettingsApi";
 
-const USER_TYPES = [
-  { value: "all", label: "All" },
-  { value: "merchant", label: "Merchant" },
-  { value: "franchise", label: "Franchise" },
-  { value: "super_franchise", label: "Super Franchise" },
-  { value: "employee", label: "Employee" },
+const CATEGORIES = [
+  { id: "pos", label: "POS Rate", icon: CreditCard, description: "Card, UPI & Terminal transaction charges" },
+  { id: "rental", label: "POS Rental", icon: Building2, description: "Monthly terminal rental charges" },
+  { id: "pay", label: "Pay Rate", icon: ArrowUpRight, description: "Payout & Banking transfer slab rates" },
+  { id: "cc-bill", label: "CC Bill Rate", icon: ShieldCheck, description: "BBPS Credit card bill payment charges" },
 ];
 
-const SERVICE_CATEGORIES = [
-  "Payout & Banking",
-  "Credit Card & Utility",
-  "POS & Hardware",
-  "Digital QR",
-  "Payment Gateway",
-  "Financial Controls",
-  "Settlement & Limits",
-];
-
-const PAGE_SIZE = 1000;
-
-const getRows = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.slabs)) return payload.slabs;
-  if (Array.isArray(payload?.charges)) return payload.charges;
-  return [];
+const formatCurrency = (val) => {
+  if (val === null || val === undefined || val === "" || isNaN(Number(val))) return "—";
+  const num = Number(val);
+  return `₹${num.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 };
 
-const fetchManagedUsers = async () => {
-  const firstPage = await AllUsers({ page: 1, limit: PAGE_SIZE });
-  const users = extractUsersArray(firstPage);
-  const reportedTotal = Number(firstPage?.pagination?.total);
-  const totalPages = Math.max(
-    1,
-    Number(firstPage?.pagination?.totalPages) ||
-      Math.ceil((reportedTotal || users.length) / PAGE_SIZE),
-  );
-
-  if (totalPages === 1) return users;
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) =>
-      AllUsers({ page: index + 2, limit: PAGE_SIZE }),
-    ),
-  );
-
-  return [...users, ...remainingPages.flatMap(extractUsersArray)];
+const formatSlabRange = (min, max) => {
+  const minStr = min !== null && min !== undefined ? formatCurrency(min) : "₹0";
+  const maxStr = max !== null && max !== undefined && Number(max) > 0 ? formatCurrency(max) : "Unlimited";
+  return `${minStr} – ${maxStr}`;
 };
 
-const roleLabel = (role) => {
-  const normalizedRole = normalizeUserRole(role);
-  return (
-    USER_TYPES.find((type) => type.value === normalizedRole)?.label ||
-    (normalizedRole
-      ? `${normalizedRole.charAt(0).toUpperCase()}${normalizedRole.slice(1)}`
-      : "User")
-  );
+const formatSettlement = (type) => {
+  if (!type || type === "ANY" || type === "any") return "Standard Settlement";
+  const lower = String(type).toLowerCase();
+  if (lower === "today_settlement" || lower === "t0") return "Today Settlement (T0)";
+  if (lower === "next_day_settlement" || lower === "t1") return "Next Day (T1)";
+  return String(type);
 };
 
-const getUserStatus = (user = {}) => {
-  const value = user.status ?? user.user_status ?? user.is_active ?? user.active;
-  const normalized = String(value ?? "").trim().toLowerCase();
+export default function MyCharges() {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("pos");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("ALL"); // ALL | override | default
 
-  if (value === true || ["active", "enabled", "1"].includes(normalized)) {
-    return "Active";
-  }
-  if (value === false || ["inactive", "disabled", "blocked", "0"].includes(normalized)) {
-    return "Inactive";
-  }
-  return "Pending";
-};
-
-const getUserName = (user = {}) =>
-  user.name ||
-  user.username ||
-  user.abheepay_id ||
-  (user.id !== undefined ? `User #${user.id}` : "Unknown user");
-
-const getCompanyName = (user = {}) =>
-  user.company_or_shop_name ||
-  user.company_name ||
-  user.shop_name ||
-  user.business_name ||
-  "Company not provided";
-
-const getHierarchyPath = (user = {}) => {
-  const role = normalizeUserRole(user.role);
-  const franchise = user.franchise_details || user.franchise || user.franchaise;
-  const superFranchise =
-    user.super_franchise_details ||
-    franchise?.super_franchise_details ||
-    franchise?.super_franchise;
-  const path = [];
-
-  if (superFranchise?.name || superFranchise?.abheepay_id) {
-    path.push(superFranchise.name || superFranchise.abheepay_id);
-  }
-  if (franchise?.name || franchise?.abheepay_id) {
-    path.push(franchise.name || franchise.abheepay_id);
-  }
-  path.push(getCompanyName(user) === "Company not provided" ? getUserName(user) : getCompanyName(user));
-
-  if (role === "employee" || role === "super_franchise") {
-    return [getCompanyName(user) === "Company not provided" ? getUserName(user) : getCompanyName(user)];
-  }
-
-  return [...new Set(path)];
-};
-
-const getRuleUserId = (rule) =>
-  rule?.user_id ?? rule?.userId ?? rule?.user?.id ?? rule?.merchant_id ?? null;
-
-const getServiceName = (rule = {}, source) =>
-  rule.service_name ||
-  rule.service?.name ||
-  rule.service_key ||
-  rule.charge_type ||
-  rule.charge_type_name ||
-  rule.charge_type_category ||
-  rule.category ||
-  (source === "payout" ? "Payout charge" : "—");
-
-const getCategory = (rule = {}, source) =>
-  rule.category ||
-  rule.charge_type_category ||
-  rule.service?.category ||
-  (source === "payout" ? "Payout & Banking" : "—");
-
-const getStatus = (rule = {}) => {
-  const value = rule.is_active ?? rule.status ?? rule.active;
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (value === true || ["active", "enabled", "1"].includes(normalized)) return "Active";
-  if (value === false || ["inactive", "disabled", "0"].includes(normalized)) return "Inactive";
-  return "Pending";
-};
-
-const formatAmount = (value) => {
-  if (value === null || value === undefined || value === "") return "—";
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return String(value);
-  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-};
-
-const getSlabRange = (rule = {}) => {
-  const min = rule.from_amount ?? rule.min_amount;
-  const max = rule.to_amount ?? rule.max_amount;
-  if (min === undefined && max === undefined) return "—";
-  return `${formatAmount(min ?? 0)} – ${max === null ? "No upper limit" : formatAmount(max)}`;
-};
-
-const getChargeLabel = (rule = {}) => {
-  const rate = rule.rate ?? rule.charge;
-  const type = String(rule.rate_type || rule.fee_type || "").toLowerCase();
-
-  if (rate !== undefined && rate !== null) {
-    return type === "flat" ? `Flat ${formatAmount(rate)}` : `${rate}%`;
-  }
-
-  const flat = Number(rule.flat_fee || 0);
-  const percent = Number(rule.percent_fee || 0);
-  const parts = [];
-  if (flat) parts.push(`Flat ${formatAmount(flat)}`);
-  if (percent) parts.push(`${percent}%`);
-  return parts.length ? parts.join(" + ") : "—";
-};
-
-const getGstLabel = (rule = {}) => {
-  if (rule.gst_required === false) return "Not charged";
-  const gst = rule.gst_percent ?? rule.gst_rate ?? rule.gst;
-  if (gst === undefined || gst === null || gst === "") return "—";
-  return `${gst}%${rule.is_gst_inclusive ? " (incl.)" : ""}`;
-};
-
-const getTransferMode = (rule = {}) =>
-  rule.payment_mode || rule.transfer_mode || rule.method || "—";
-
-const normalizeChargeRow = (rule, user, source) => ({
-  id: `${source}-${rule.id ?? `${getRuleUserId(rule) || user?.id || "unknown"}-${rule.service_key || rule.charge_type_category || "charge"}`}`,
-  userId: getRuleUserId(rule) ?? user?.id ?? null,
-  user,
-  role: normalizeUserRole(user?.role || rule.user?.role || rule.target_role),
-  service: getServiceName(rule, source),
-  category: getCategory(rule, source),
-  range: getSlabRange(rule),
-  charge: getChargeLabel(rule),
-  gst: getGstLabel(rule),
-  transferMode: getTransferMode(rule),
-  status: getStatus(rule),
-});
-
-const STATUS_STYLES = {
-  Active: "bg-green-100 text-green-800",
-  Inactive: "bg-red-100 text-red-800",
-  Pending: "bg-amber-100 text-amber-800",
-};
-
-const SummaryCard = ({ label, value, detail, icon: Icon, tone }) => (
-  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-sm font-medium text-gray-500">{label}</p>
-        <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
-        <p className="mt-1 text-xs text-gray-500">{detail}</p>
-      </div>
-      <span className={`rounded-lg p-2.5 ${tone}`}>
-        {createElement(Icon, { className: "h-5 w-5", "aria-hidden": true })}
-      </span>
-    </div>
-  </div>
-);
-
-const MyCharges = () => {
-  const [selectedType, setSelectedType] = useState("all");
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [userSearch, setUserSearch] = useState("");
-  const [chargeSearch, setChargeSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedStatus, setSelectedStatus] = useState("all");
-
+  // Fetch only the authenticated Admin's applicable rates from backend
   const {
-    data: users = [],
-    isLoading: usersLoading,
-    isError: usersError,
+    data: apiResponse,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
   } = useQuery({
-    queryKey: ["admin-my-charges", "managed-users"],
-    queryFn: fetchManagedUsers,
+    queryKey: ["admin-my-applicable-charges"],
+    queryFn: fetchMyAdminApplicableCharges,
+    staleTime: 60 * 1000,
+    retry: 1,
   });
 
-  const {
-    data: chargeData,
-    isLoading: chargesLoading,
-    isError: chargesError,
-    error: chargeError,
-  } = useQuery({
-    queryKey: ["admin-my-charges", "rules", selectedUserId || "all"],
-    queryFn: async () => {
-      if (!selectedUserId) {
-        return {
-          payoutRules: getRows(await listAllUserPayoutCharges()),
-          assignedSlabs: [],
-          sourceErrors: [],
-        };
-      }
+  const responseData = apiResponse?.data || apiResponse || {};
+  const adminInfo = apiResponse?.admin || null;
 
-      const [payoutResult, slabResult] = await Promise.allSettled([
-        getUserPayoutChargesByUser(selectedUserId),
-        ChargesSetByUserId(selectedUserId),
-      ]);
+  // Resolved categorized lists from backend
+  const posRates = useMemo(() => {
+    const list = responseData.pos || responseData.categories?.pos || [];
+    return Array.isArray(list) ? list : [];
+  }, [responseData]);
 
-      return {
-        payoutRules:
-          payoutResult.status === "fulfilled" ? getRows(payoutResult.value) : [],
-        assignedSlabs:
-          slabResult.status === "fulfilled" ? getRows(slabResult.value) : [],
-        sourceErrors: [payoutResult, slabResult]
-          .filter((result) => result.status === "rejected")
-          .map((result) => result.reason?.message || "Charge source unavailable."),
-      };
-    },
-  });
+  const rentalRates = useMemo(() => {
+    const list = responseData.rental || responseData.categories?.rental || [];
+    return Array.isArray(list) ? list : [];
+  }, [responseData]);
 
-  const userById = useMemo(
-    () => new Map(users.map((user) => [String(user.id), user])),
-    [users],
-  );
-  const managedUsers = useMemo(
-    () =>
-      users.filter((user) =>
-        USER_TYPES.some(
-          (type) => type.value !== "all" && type.value === normalizeUserRole(user.role),
-        ),
-      ),
-    [users],
-  );
-  const selectedUser = userById.get(String(selectedUserId));
+  const payRates = useMemo(() => {
+    const list = responseData.payout || responseData.pay || responseData.categories?.payout || [];
+    return Array.isArray(list) ? list : [];
+  }, [responseData]);
 
-  const filteredUsers = useMemo(() => {
-    const search = userSearch.trim().toLowerCase();
-    return managedUsers.filter((user) => {
-      const roleMatches =
-        selectedType === "all" || normalizeUserRole(user.role) === selectedType;
-      const statusMatches =
-        selectedStatus === "all" || getUserStatus(user).toLowerCase() === selectedStatus;
-      const searchMatches =
-        !search ||
-        [getUserName(user), getCompanyName(user), user.abheepay_id, user.mobile_number]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(search));
-      return roleMatches && statusMatches && searchMatches;
+  const ccBillRates = useMemo(() => {
+    const list = responseData.cc_bill || responseData.ccBill || responseData.categories?.cc_bill || [];
+    return Array.isArray(list) ? list : [];
+  }, [responseData]);
+
+  // Active rate list
+  const activeRateList = useMemo(() => {
+    if (activeTab === "pos") return posRates;
+    if (activeTab === "rental") return rentalRates;
+    if (activeTab === "pay") return payRates;
+    if (activeTab === "cc-bill") return ccBillRates;
+    return [];
+  }, [activeTab, posRates, rentalRates, payRates, ccBillRates]);
+
+  // Filtered rows for currently active category
+  const filteredRows = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return activeRateList.filter((row) => {
+      // Source filter
+      if (sourceFilter === "override" && !row.is_override) return false;
+      if (sourceFilter === "default" && row.is_override) return false;
+
+      // Text search
+      if (!term) return true;
+      const fieldsToSearch = [
+        row.service_name,
+        row.payment_mode,
+        row.transfer_mode,
+        row.card_brand,
+        row.card_type,
+        row.card_classification,
+        row.company_name,
+        row.description,
+        row.rate_source,
+        row.source_label,
+      ].filter(Boolean);
+
+      return fieldsToSearch.some((f) => String(f).toLowerCase().includes(term));
     });
-  }, [managedUsers, selectedStatus, selectedType, userSearch]);
+  }, [activeRateList, searchTerm, sourceFilter]);
 
-  const chargeRows = useMemo(() => {
-    const payoutRules = chargeData?.payoutRules || [];
-    const assignedSlabs = chargeData?.assignedSlabs || [];
-    const normalizeRules = (rules, source) =>
-      rules.map((rule, index) => {
-        const owner =
-          userById.get(String(getRuleUserId(rule) || selectedUserId)) ||
-          rule.user ||
-          selectedUser;
-        return {
-          ...normalizeChargeRow(rule, owner, source),
-          id: `${source}-${rule.id ?? `${getRuleUserId(rule) || selectedUserId || "unknown"}-${index}`}-${index}`,
-        };
-      });
+  // Counts summary
+  const counts = useMemo(
+    () => ({
+      pos: posRates.length,
+      rental: rentalRates.length,
+      pay: payRates.length,
+      ccBill: ccBillRates.length,
+    }),
+    [posRates, rentalRates, payRates, ccBillRates],
+  );
 
-    return [
-      ...normalizeRules(payoutRules, "payout"),
-      ...normalizeRules(assignedSlabs, "assigned"),
-    ];
-  }, [chargeData, selectedUser, selectedUserId, userById]);
-
-  const visibleChargeRows = useMemo(() => {
-    const search = chargeSearch.trim().toLowerCase();
-    return chargeRows.filter((row) => {
-      const user = row.user || {};
-      const typeMatches =
-        selectedType === "all" || row.role === selectedType;
-      const categoryMatches =
-        selectedCategory === "all" || row.category === selectedCategory;
-      const statusMatches =
-        selectedStatus === "all" || row.status.toLowerCase() === selectedStatus;
-      const userMatches =
-        !selectedUserId || String(row.userId || user.id) === String(selectedUserId);
-      const searchMatches =
-        !search ||
-        [row.service, row.category, roleLabel(row.role), getUserName(user)]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(search));
-      return typeMatches && categoryMatches && statusMatches && userMatches && searchMatches;
-    });
-  }, [chargeRows, chargeSearch, selectedCategory, selectedStatus, selectedType, selectedUserId]);
-
-  const activeUserCount = managedUsers.filter(
-    (user) => getUserStatus(user) === "Active",
-  ).length;
-  const serviceCount = new Set(
-    visibleChargeRows.map((row) => row.service).filter((service) => service !== "—"),
-  ).size;
-  const typeCounts = managedUsers.reduce((counts, user) => {
-    const role = normalizeUserRole(user.role);
-    counts[role] = (counts[role] || 0) + 1;
-    return counts;
-  }, {});
-
-  const handleTypeChange = (value) => {
-    setSelectedType(value);
-    if (selectedUser && value !== "all" && normalizeUserRole(selectedUser.role) !== value) {
-      setSelectedUserId("");
-    }
-  };
-
-  const handleStatusChange = (value) => {
-    setSelectedStatus(value);
-    if (
-      selectedUser &&
-      value !== "all" &&
-      getUserStatus(selectedUser).toLowerCase() !== value
-    ) {
-      setSelectedUserId("");
-    }
-  };
-
-  const displayedValue = (value, loading) => (loading ? "…" : value);
+  const activeCategoryMeta = CATEGORIES.find((c) => c.id === activeTab);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex items-center gap-3">
-            <span className="rounded-lg bg-cyan-50 p-3 text-cyan-700">
-              <CircleDollarSign className="h-6 w-6" aria-hidden="true" />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Charges</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                View and manage charges applicable to your users and services.
-              </p>
-            </div>
-          </div>
-        </header>
-
-        {usersError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
-            Could not load the Admin user list. {" "}
-            <span>Check your access or try again later.</span>
-          </div>
-        )}
-
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Charge and user summary">
-          <SummaryCard
-            label="Total Users"
-            value={displayedValue(managedUsers.length, usersLoading)}
-            detail="Across merchants, franchises, super franchises and employees"
-            icon={Users}
-            tone="bg-cyan-50 text-cyan-700"
-          />
-          <SummaryCard
-            label="Active Users"
-            value={displayedValue(activeUserCount, usersLoading)}
-            detail="Accounts currently marked active"
-            icon={UserRound}
-            tone="bg-green-50 text-green-700"
-          />
-          <SummaryCard
-            label="Charge Rules"
-            value={displayedValue(visibleChargeRows.length, chargesLoading)}
-            detail={selectedUser ? `Applicable to ${getUserName(selectedUser)}` : "User payout overrides returned by the API"}
-            icon={CircleDollarSign}
-            tone="bg-blue-50 text-blue-700"
-          />
-          <SummaryCard
-            label="Services"
-            value={displayedValue(serviceCount, chargesLoading)}
-            detail="Services with loaded applicable rules"
-            icon={Building2}
-            tone="bg-amber-50 text-amber-700"
-          />
-        </section>
-
-        <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Users and hierarchy</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Select an account to view its assigned charge slabs and payout overrides.
-              </p>
+    <div className="min-h-screen bg-slate-50/60 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Page Header */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-[#00A39D] to-[#00D3CD] text-white shadow-sm">
+                <Layers className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-slate-900">My Charges</h1>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                    Effective Rates
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Rates configured by your Super Admin
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter users by type">
-              {USER_TYPES.map((type) => {
-                const count =
-                  type.value === "all" ? managedUsers.length : typeCounts[type.value] || 0;
-                const active = selectedType === type.value;
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => handleTypeChange(type.value)}
-                    aria-pressed={active}
-                    className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? "border-cyan-700 bg-cyan-700 text-white"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:text-cyan-800"
+            {/* Header Right Actions */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {adminInfo?.name && (
+                <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 md:block">
+                  <span className="font-medium text-slate-900">{adminInfo.name}</span>
+                  {adminInfo.username && <span className="ml-1 text-slate-400">({adminInfo.username})</span>}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["admin-my-applicable-charges"] });
+                  refetch();
+                }}
+                disabled={isFetching}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-[#00A39D]" : "text-slate-500"}`} />
+                <span>{isFetching ? "Refreshing..." : "Refresh Rates"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Navigation Tabs */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            const count = counts[cat.id === "cc-bill" ? "ccBill" : cat.id] || 0;
+            const isSelected = activeTab === cat.id;
+
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(cat.id);
+                  setSearchTerm("");
+                  setSourceFilter("ALL");
+                }}
+                className={`relative flex items-center justify-between rounded-2xl border p-4 text-left transition-all duration-200 ${
+                  isSelected
+                    ? "border-[#00D3CD] bg-white shadow-sm ring-2 ring-[#00D3CD]/20"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+                      isSelected
+                        ? "bg-[#00D3CD]/15 text-[#008c87]"
+                        : "bg-slate-100 text-slate-600"
                     }`}
                   >
-                    {type.label} <span className={active ? "text-cyan-100" : "text-gray-400"}>({count})</span>
-                  </button>
-                );
-              })}
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">{cat.label}</h2>
+                    <p className="line-clamp-1 text-xs text-slate-500">{cat.description}</p>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      isSelected
+                        ? "bg-[#00D3CD]/20 text-[#00736e]"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {isLoading ? "…" : `${count} rule${count !== 1 ? "s" : ""}`}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content Box */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Subheader / Filter Bar */}
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-slate-900">
+                  {activeCategoryMeta?.label} Configuration
+                </h3>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  Read Only
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Displaying only applicable charge rules configured by your Super Admin.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_190px]">
-              <label className="relative block">
-                <span className="sr-only">Search users</span>
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+            {/* Search & Source Filter */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1 sm:w-64 sm:flex-none">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
-                  value={userSearch}
-                  onChange={(event) => setUserSearch(event.target.value)}
-                  placeholder="Search user or company..."
-                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                  type="text"
+                  placeholder="Filter rules..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
                 />
-              </label>
-              <label>
-                <span className="sr-only">Filter by service category</span>
-                <select
-                  value={selectedCategory}
-                  onChange={(event) => setSelectedCategory(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
-                >
-                  <option value="all">All service categories</option>
-                  {SERVICE_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="sr-only">Filter by status</span>
-                <select
-                  value={selectedStatus}
-                  onChange={(event) => handleStatusChange(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.7fr)]">
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-gray-800">Managed users</h3>
-                  <span className="text-xs text-gray-500">{filteredUsers.length} shown</span>
-                </div>
-                <div className="max-h-[390px] overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserId("")}
-                    aria-pressed={!selectedUserId}
-                    className={`w-full border-b border-gray-100 px-4 py-3 text-left text-sm font-medium ${
-                      !selectedUserId ? "bg-cyan-50 text-cyan-900" : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    All Users
-                    <span className="ml-2 text-xs text-gray-500">({managedUsers.length})</span>
-                  </button>
-                  {usersLoading ? (
-                    <div className="flex items-center gap-2 px-4 py-5 text-sm text-gray-500">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading users...
-                    </div>
-                  ) : filteredUsers.length ? (
-                    filteredUsers.map((user) => {
-                      const active = String(user.id) === String(selectedUserId);
-                      const status = getUserStatus(user);
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => setSelectedUserId(String(user.id))}
-                          aria-pressed={active}
-                          className={`w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 ${
-                            active ? "bg-cyan-50" : "hover:bg-gray-50"
-                          }`}
-                        >
-                          <span className="flex items-start justify-between gap-3">
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-gray-900">{getUserName(user)}</span>
-                              <span className="mt-0.5 block truncate text-xs text-gray-500">
-                                {roleLabel(user.role)} · {getCompanyName(user)}
-                              </span>
-                              <span className="mt-1 block truncate text-xs text-gray-400">
-                                {getHierarchyPath(user).join(" › ")}
-                              </span>
-                            </span>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[status]}`}>
-                              {status}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <p className="px-4 py-5 text-sm text-gray-500">No users match these filters.</p>
-                  )}
-                </div>
               </div>
 
-              <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-4 md:p-5">
-                {selectedUser ? (
-                  <>
-                    <p className="text-xs font-semibold uppercase text-gray-500">Selected user</p>
-                    <h3 className="mt-1 text-xl font-semibold text-gray-900">{getUserName(selectedUser)}</h3>
-                    <p className="mt-1 text-sm text-gray-600">
-                      {roleLabel(selectedUser.role)} <span className="px-1 text-gray-300">·</span> {getCompanyName(selectedUser)}
-                    </p>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {getHierarchyPath(selectedUser).map((part, index, path) => (
-                        <span key={`${part}-${index}`} className="inline-flex items-center gap-2">
-                          <span className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700">{part}</span>
-                          {index < path.length - 1 && <span className="text-gray-400" aria-hidden="true">›</span>}
-                        </span>
-                      ))}
-                    </div>
-                    <span className={`mt-4 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[getUserStatus(selectedUser)]}`}>
-                      {getUserStatus(selectedUser)}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs font-semibold uppercase text-gray-500">All managed accounts</p>
-                    <h3 className="mt-1 text-xl font-semibold text-gray-900">Applicable charge rules</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-                      Showing user payout overrides returned by the existing API. Select an account to load its assigned charge slabs as well.
-                    </p>
-                  </>
-                )}
-              </div>
+              {/* Source Filter Select */}
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
+              >
+                <option value="ALL">All Sources</option>
+                <option value="override">Admin Override Only</option>
+                <option value="default">Inherited Default Only</option>
+              </select>
             </div>
           </div>
-        </section>
 
-        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-gray-200 p-5 md:flex-row md:items-center md:justify-between md:p-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Applicable charges</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Read-only charge assignments and user payout overrides.
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="relative flex h-12 w-12 items-center justify-center">
+                <div className="absolute h-12 w-12 animate-ping rounded-full bg-[#00D3CD]/20" />
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#00A39D]" />
+              </div>
+              <p className="mt-4 text-sm font-medium text-slate-700">Loading your applicable charges...</p>
+              <p className="mt-1 text-xs text-slate-400">Fetching Super Admin configured rate records</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {!isLoading && isError && (
+            <div className="p-8">
+              <div className="mx-auto max-w-md rounded-2xl border border-rose-200 bg-rose-50/60 p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <h4 className="mt-3 text-sm font-semibold text-rose-900">Failed to Load Charges</h4>
+                <p className="mt-1.5 text-xs text-rose-700">
+                  {error?.message || "Could not retrieve applicable charges from backend. Please verify authentication or try again."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Retry Request
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !isError && filteredRows.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <Layers className="h-6 w-6" />
+              </div>
+              <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                No Applicable Rates Found
+              </h4>
+              <p className="mt-1 max-w-sm text-xs text-slate-500">
+                {searchTerm || sourceFilter !== "ALL"
+                  ? "No rules matched your search or source filters. Try resetting the filters."
+                  : `No ${activeCategoryMeta?.label} rules configured by your Super Admin. Please contact your Super Admin to assign applicable charges.`}
               </p>
+              {(searchTerm || sourceFilter !== "ALL") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSourceFilter("ALL");
+                  }}
+                  className="mt-3 text-xs font-semibold text-[#008c87] hover:underline"
+                >
+                  Clear search & filters
+                </button>
+              )}
             </div>
-            <label className="relative block w-full md:max-w-sm">
-              <span className="sr-only">Search user, service, or category</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
-              <input
-                value={chargeSearch}
-                onChange={(event) => setChargeSearch(event.target.value)}
-                placeholder="Search user, service, category..."
-                className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
-              />
-            </label>
-          </div>
+          )}
 
-          {chargesLoading ? (
-            <div className="flex items-center justify-center gap-2 p-10 text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading applicable charges...
-            </div>
-          ) : chargesError ? (
-            <div className="p-6 text-sm text-red-700" role="alert">
-              Could not load applicable charges: {chargeError?.message || "Charge data is unavailable."}
-            </div>
-          ) : (
-            <>
-              {chargeData?.sourceErrors?.length > 0 && (
-                <div className="mx-5 mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 md:mx-6">
-                  Some charge sources could not be loaded. {chargeData.sourceErrors.join(" ")}
-                </div>
-              )}
-              {!selectedUserId && (
-                <div className="mx-5 mt-5 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900 md:mx-6">
-                  Account-specific legacy slabs are loaded when you select a user. Global Set Charges defaults are not treated as user assignments.
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="min-w-[1050px] w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-600">
+          {/* Rate Tables */}
+          {!isLoading && !isError && filteredRows.length > 0 && (
+            <div className="overflow-x-auto">
+              {activeTab === "pos" && (
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
-                      <th className="px-4 py-3">Service</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">User / Role</th>
-                      <th className="px-4 py-3">Slab range</th>
-                      <th className="px-4 py-3">Charge</th>
-                      <th className="px-4 py-3">GST</th>
-                      <th className="px-4 py-3">Transfer mode</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Actions</th>
+                      <th scope="col" className="px-5 py-3.5">Service & Mode</th>
+                      <th scope="col" className="px-4 py-3.5">Network & Type</th>
+                      <th scope="col" className="px-4 py-3.5">Card Classification</th>
+                      <th scope="col" className="px-4 py-3.5">Amount Slab</th>
+                      <th scope="col" className="px-4 py-3.5">Settlement Type</th>
+                      <th scope="col" className="px-4 py-3.5">Charge Rate</th>
+                      <th scope="col" className="px-4 py-3.5">GST</th>
+                      <th scope="col" className="px-5 py-3.5 text-right">Rate Source</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {visibleChargeRows.map((row) => (
-                      <tr key={row.id} className="align-top hover:bg-gray-50/70">
-                        <td className="px-4 py-3 font-medium text-gray-900">{row.service}</td>
-                        <td className="px-4 py-3 text-gray-600">{row.category}</td>
-                        <td className="px-4 py-3">
-                          <span className="block font-medium text-gray-900">{getUserName(row.user || {})}</span>
-                          <span className="text-xs text-gray-500">{roleLabel(row.role)}</span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.range}</td>
-                        <td className="whitespace-nowrap px-4 py-3 font-semibold text-blue-700">{row.charge}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.gst}</td>
-                        <td className="px-4 py-3 text-gray-700">{row.transferMode}</td>
-                        <td className="px-4 py-3">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[row.status]}`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {row.userId ? (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedUserId(String(row.userId))}
-                              className="text-sm font-medium text-cyan-800 hover:text-cyan-950"
-                            >
-                              View user
-                            </button>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {visibleChargeRows.length === 0 && (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center">
-                          <CircleDollarSign className="mx-auto h-8 w-8 text-gray-300" aria-hidden="true" />
-                          <p className="mt-3 text-sm font-medium text-gray-700">No applicable charge rules found</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {selectedUser
-                              ? "No assigned slabs or payout overrides were returned for this account."
-                              : "No user payout overrides were returned for these filters."}
-                          </p>
-                        </td>
-                      </tr>
-                    )}
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => {
+                      const isCard = row.payment_mode === "CARD";
+                      const isOverride = Boolean(row.is_override);
+
+                      return (
+                        <tr
+                          key={`pos-${row.id}-${row.rule_key || row.service_name}`}
+                          className="transition hover:bg-slate-50/60"
+                        >
+                          {/* Service & Mode */}
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${
+                                  row.payment_mode === "UPI"
+                                    ? "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/20"
+                                    : "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20"
+                                }`}
+                              >
+                                {row.payment_mode || "CARD"}
+                              </span>
+                              <span>{row.service_name || "POS Charge"}</span>
+                            </div>
+                            {row.company_name && row.company_name !== "ANY" && (
+                              <span className="mt-1 block text-[10px] text-slate-400">
+                                Terminal Provider: <span className="uppercase text-slate-600">{row.company_name}</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Network & Card Type */}
+                          <td className="px-4 py-4">
+                            {isCard ? (
+                              <div className="space-y-0.5">
+                                <span className="font-medium text-slate-800">
+                                  {row.card_brand || "ANY"}
+                                </span>
+                                <span className="block text-[11px] text-slate-500">
+                                  {row.card_type || "ANY"}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">N/A (UPI)</span>
+                            )}
+                          </td>
+
+                          {/* Card Classification */}
+                          <td className="px-4 py-4">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                              {row.card_classification || "ANY"}
+                            </span>
+                          </td>
+
+                          {/* Amount Slab */}
+                          <td className="px-4 py-4 font-medium text-slate-700">
+                            {formatSlabRange(row.min_amount, row.max_amount)}
+                          </td>
+
+                          {/* Settlement Type */}
+                          <td className="px-4 py-4 text-slate-600">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-slate-400" />
+                              {formatSettlement(row.settlement_type)}
+                            </span>
+                          </td>
+
+                          {/* Charge Rate */}
+                          <td className="px-4 py-4 font-semibold text-slate-900">
+                            {row.charge_percent !== null && Number(row.charge_percent) > 0 ? (
+                              <span className="text-[#008782]">{row.charge_percent}%</span>
+                            ) : row.charge_flat !== null && Number(row.charge_flat) > 0 ? (
+                              <span className="text-[#008782]">Flat {formatCurrency(row.charge_flat)}</span>
+                            ) : (
+                              <span className="text-slate-400">0.00%</span>
+                            )}
+                            {Number(row.charge_flat) > 0 && Number(row.charge_percent) > 0 && (
+                              <span className="ml-1 text-[11px] font-normal text-slate-500">
+                                + Flat {formatCurrency(row.charge_flat)}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* GST */}
+                          <td className="px-4 py-4">
+                            {row.gst_required ? (
+                              <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                {row.gst_percent ? `${row.gst_percent}%` : "18%"}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">Exempt</span>
+                            )}
+                          </td>
+
+                          {/* Rate Source */}
+                          <td className="px-5 py-4 text-right">
+                            {isOverride ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
+                                <Sparkles className="h-3 w-3 text-violet-600" />
+                                {row.source_label || row.rate_source || "Admin Override"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                                {row.source_label || row.rate_source || "Inherited Default"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-              </div>
-              <div className="border-t border-gray-100 px-5 py-3 text-xs text-gray-500 md:px-6">
-                {visibleChargeRows.length} applicable rule{visibleChargeRows.length === 1 ? "" : "s"}
-              </div>
-            </>
+              )}
+
+              {activeTab === "rental" && (
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th scope="col" className="px-5 py-3.5">Service</th>
+                      <th scope="col" className="px-4 py-3.5">Rental Period</th>
+                      <th scope="col" className="px-4 py-3.5">Monthly Rental Charge</th>
+                      <th scope="col" className="px-4 py-3.5">Status</th>
+                      <th scope="col" className="px-5 py-3.5 text-right">Rate Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => {
+                      const isOverride = Boolean(row.is_override);
+
+                      return (
+                        <tr
+                          key={`rental-${row.id}`}
+                          className="transition hover:bg-slate-50/60"
+                        >
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                                POS
+                              </span>
+                              <span>{row.service_name || "POS Terminal Monthly Rental"}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-slate-700 font-medium">
+                            {row.billing_period || "30 Days (Monthly)"}
+                          </td>
+                          <td className="px-4 py-4 font-bold text-slate-900 text-sm">
+                            <span className="text-[#008782]">{formatCurrency(row.amount)}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                              Active
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            {isOverride ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
+                                <Sparkles className="h-3 w-3 text-violet-600" />
+                                {row.source_label || row.rate_source || "Admin Override"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                                {row.source_label || row.rate_source || "Inherited Default"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              {activeTab === "pay" && (
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th scope="col" className="px-5 py-3.5">Service Description</th>
+                      <th scope="col" className="px-4 py-3.5">Transfer Mode</th>
+                      <th scope="col" className="px-4 py-3.5">Amount Slab Range</th>
+                      <th scope="col" className="px-4 py-3.5">Applicable Charge</th>
+                      <th scope="col" className="px-4 py-3.5">GST</th>
+                      <th scope="col" className="px-4 py-3.5">Settlement Speed</th>
+                      <th scope="col" className="px-5 py-3.5 text-right">Rate Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => {
+                      const isOverride = Boolean(row.is_override);
+                      const isFlat = String(row.rate_type).toLowerCase() === "flat";
+
+                      return (
+                        <tr
+                          key={`pay-${row.id}-${row.slab_key || row.from_amount}`}
+                          className="transition hover:bg-slate-50/60"
+                        >
+                          {/* Service Description */}
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                                Payout
+                              </span>
+                              <span>{row.service_name || "Payout Bank Transfer"}</span>
+                            </div>
+                            {row.description && row.description !== row.service_name && (
+                              <span className="mt-0.5 block text-[11px] text-slate-400">
+                                {row.description}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Transfer Mode */}
+                          <td className="px-4 py-4">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                              {row.payment_mode || row.transfer_mode || "IMPS / NEFT / RTGS"}
+                            </span>
+                          </td>
+
+                          {/* Amount Slab */}
+                          <td className="px-4 py-4 font-medium text-slate-800">
+                            {formatSlabRange(row.from_amount, row.to_amount)}
+                          </td>
+
+                          {/* Applicable Charge */}
+                          <td className="px-4 py-4 font-semibold text-slate-900">
+                            <span className="text-[#008782]">
+                              {isFlat ? `Flat ${formatCurrency(row.rate)}` : `${row.rate}%`}
+                            </span>
+                          </td>
+
+                          {/* GST */}
+                          <td className="px-4 py-4">
+                            <span className="text-slate-400">Included / Exempt</span>
+                          </td>
+
+                          {/* Settlement Speed */}
+                          <td className="px-4 py-4 text-slate-600">
+                            <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                              <Zap className="h-3 w-3 text-emerald-500" />
+                              {row.settlement_type || "Instant (24x7)"}
+                            </span>
+                          </td>
+
+                          {/* Rate Source */}
+                          <td className="px-5 py-4 text-right">
+                            {isOverride ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
+                                <Sparkles className="h-3 w-3 text-violet-600" />
+                                {row.source_label || row.rate_source || "Admin Override"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                                {row.source_label || row.rate_source || "Inherited Default"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              {activeTab === "cc-bill" && (
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th scope="col" className="px-5 py-3.5">Service</th>
+                      <th scope="col" className="px-4 py-3.5">Bill Payment Method</th>
+                      <th scope="col" className="px-4 py-3.5">Amount Slab Range</th>
+                      <th scope="col" className="px-4 py-3.5">Applicable Charge</th>
+                      <th scope="col" className="px-4 py-3.5">GST</th>
+                      <th scope="col" className="px-4 py-3.5">Settlement Channel</th>
+                      <th scope="col" className="px-5 py-3.5 text-right">Rate Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRows.map((row) => {
+                      const isOverride = Boolean(row.is_override);
+                      const isFlat = String(row.rate_type).toLowerCase() === "flat";
+
+                      return (
+                        <tr
+                          key={`cc-${row.id}-${row.slab_key || row.from_amount}`}
+                          className="transition hover:bg-slate-50/60"
+                        >
+                          {/* Service */}
+                          <td className="px-5 py-4 font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                BBPS
+                              </span>
+                              <span>{row.service_name || "BBPS Credit Card Bill Payment"}</span>
+                            </div>
+                            {row.description && row.description !== row.service_name && (
+                              <span className="mt-0.5 block text-[11px] text-slate-400">
+                                {row.description}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Method */}
+                          <td className="px-4 py-4">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                              BBPS CC Bill
+                            </span>
+                          </td>
+
+                          {/* Amount Slab */}
+                          <td className="px-4 py-4 font-medium text-slate-800">
+                            {formatSlabRange(row.from_amount, row.to_amount)}
+                          </td>
+
+                          {/* Applicable Charge */}
+                          <td className="px-4 py-4 font-semibold text-slate-900">
+                            <span className="text-[#008782]">
+                              {isFlat ? `Flat ${formatCurrency(row.rate)}` : `${row.rate}%`}
+                            </span>
+                          </td>
+
+                          {/* GST */}
+                          <td className="px-4 py-4">
+                            <span className="text-slate-400">Included / Exempt</span>
+                          </td>
+
+                          {/* Settlement Channel */}
+                          <td className="px-4 py-4 text-slate-600">
+                            <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                              <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                              {row.settlement_type || "Standard BBPS"}
+                            </span>
+                          </td>
+
+                          {/* Rate Source */}
+                          <td className="px-5 py-4 text-right">
+                            {isOverride ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-700/20">
+                                <Sparkles className="h-3 w-3 text-violet-600" />
+                                {row.source_label || row.rate_source || "Admin Override"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                                {row.source_label || row.rate_source || "Inherited Default"}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           )}
-        </section>
+
+          {/* Footer Information Legend */}
+          <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="font-semibold text-slate-700">Source Legend:</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-violet-600" />
+                  <span className="font-medium text-slate-800">Admin Override:</span> Rate configured specifically for your Admin account by Super Admin
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-slate-400" />
+                  <span className="font-medium text-slate-800">Inherited Default:</span> Standard platform default rate
+                </span>
+              </div>
+              <div className="text-slate-400 text-[11px]">
+                Showing {filteredRows.length} of {activeRateList.length} rules
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-};
-
-export default MyCharges;
+}

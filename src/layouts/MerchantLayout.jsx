@@ -133,9 +133,8 @@ const MerchantLayout = () => {
     );
   }
 
-  if (dashboardError || userError) {
-    navigate("/login");
-    return null;
+  if (userError) {
+    return <Navigate to="/login" replace />;
   }
 
   const normalizedRole = String(currentUser?.role || "")
@@ -177,8 +176,9 @@ const MerchantLayout = () => {
     <div className="flex min-h-screen bg-gray-50">
       <MerchantSideBar currentUser={currentUser} />
       <div
-        className={`flex-1 min-w-0 bg-gray-100 ${isCompactMobileRoute ? "px-2.5 pb-4 pt-3 sm:p-4 lg:p-6" : "p-6"
-          }`}
+        className={`flex-1 min-w-0 bg-gray-50/70 overflow-y-auto ${
+          isCompactMobileRoute ? "px-2.5 pb-4 pt-3 sm:p-4 lg:p-6" : "p-3.5 sm:p-5 lg:p-7"
+        }`}
       >
         <MerchantHeaderInfo
           dashboardData={dashboardData}

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import StepIndicator from '../components/StepIndicator';
 import { useUserCreation } from '../context/UserCreationContext';
 import { createChargeSlab } from '../api/chargeSet';
+import { normalizeUserRole } from '../utils/userAccess';
 
 const steps = ['Basic Info', 'Address & Documents', 'POS Assignment', 'ChargeSet'];
 
@@ -62,7 +63,12 @@ const CreateChargeSet = ({currentUser}) => {
       console.error('Error creating slab:', error);
     }
   };
-  const redirectUrl = currentUser.role === "admin" ? '/admin/list' :'/franchise/list';
+  const normalizedRole = normalizeUserRole(currentUser?.role);
+  const redirectUrl = normalizedRole === "franchise"
+    ? '/franchise/list'
+    : normalizedRole === "super_franchise"
+      ? '/super-franchise/franchise-list'
+      : '/admin/list';
 
   const handleComplete = () => {
     dispatch({ type: 'NEXT_STEP' });

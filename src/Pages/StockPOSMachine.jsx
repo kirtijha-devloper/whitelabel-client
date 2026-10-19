@@ -954,14 +954,14 @@ const StockPOSMachine = ({ currentUser }) => {
     setShowEditModal(true);
   };
 
-  const handleDeleteClick = (machine) => {
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete POS machine #${machine.id}? This action cannot be undone.`
-    );
-    if (!confirmDelete) return;
+  // const handleDeleteClick = (machine) => {
+  //   const confirmDelete = window.confirm(
+  //     `Are you sure you want to delete POS machine #${machine.id}? This action cannot be undone.`
+  //   );
+  //   if (!confirmDelete) return;
 
-    deleteMutation.mutate(machine.id);
-  };
+  //   deleteMutation.mutate(machine.id);
+  // };
 
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
@@ -1480,15 +1480,6 @@ const StockPOSMachine = ({ currentUser }) => {
             >
               {isExporting ? "Exporting..." : "Export Excel"}
             </button>
-            {isAdminStyleStockViewer && (
-              <button
-                onClick={() => navigate('/admin/stock-pos/add-to-franchise')}
-                className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#00D3CD] text-white px-4 py-2 rounded-lg hover:bg-[#00bdb7] transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Assign To Franchise
-              </button>
-            )}
           </div>
         </div>
 
@@ -1686,7 +1677,7 @@ const StockPOSMachine = ({ currentUser }) => {
                     </button>
                   )}
                 </div>
-                {canManageStockModule && (
+                {/* {canManageStockModule && (
                   <div className="flex">
                     <button
                       onClick={() => handleDeleteClick(machine)}
@@ -1698,7 +1689,7 @@ const StockPOSMachine = ({ currentUser }) => {
                       <span>Delete</span>
                     </button>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           );
@@ -1794,7 +1785,7 @@ const StockPOSMachine = ({ currentUser }) => {
                           )}
                         </div>
 
-                        {canManageStockModule && (
+                        {/* {canManageStockModule && (
                           <div className="flex justify-center gap-2">
                             <button
                               onClick={() => handleDeleteClick(machine)}
@@ -1806,7 +1797,7 @@ const StockPOSMachine = ({ currentUser }) => {
                               <span>Delete</span>
                             </button>
                           </div>
-                        )}
+                        )} */}
                       </div>
                     </td>
                     <td>

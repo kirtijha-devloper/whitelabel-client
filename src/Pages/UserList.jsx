@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import ConfirmationModal from "../components/Common/ConfirmationModal";
@@ -7,7 +7,7 @@ import { saveAs } from "file-saver";
 import { AllUsers, searchUsers } from "../api/FranchiseApi";
 import { getAssignedPosMachines } from "../api/posMachine";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Ban, ChevronDown, Eye, Loader2, Lock, LogIn, MoreVertical, SquarePen, Wallet } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -345,7 +345,9 @@ const USER_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill",
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
-  mx_payout: "Payout MX",
+  pos_inventory: "POS Machine",
+  qr_inventory: "QR & Soundbox",
+  pg_inventory: "PG Routing",
 };
 
 const EXCLUDED_INLINE_SERVICE_KEYS = new Set([
@@ -364,7 +366,6 @@ const MASTER_SERVICE_CONTROLS = [
   { key: "cc_bill_pay", label: "CC Bill" },
   { key: "ba_cc_bill_pay", label: "BA CC Bill" },
   { key: "cc_bill_3", label: "CC Bill 3" },
-  { key: "mx_payout", label: "Payout MX" },
   { key: "user_daily_limit", label: "User Daily Limit" },
   { key: "pos_t0_settlement", label: "POS T0/T1 Settlement & Limit" },
 ];
@@ -380,9 +381,11 @@ const getServiceStatusSummary = (user = {}) => {
 const UserList = ({
   currentUser,
   title = "All Users",
-  lockedRole = "",
+  lockedRole: propLockedRole = "",
+  roleFilter = "",
   listMode = "all",
 }) => {
+  const lockedRole = propLockedRole || roleFilter || "";
   const [searchInputValue, setSearchInputValue] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const [impersonatingUser, setImpersonatingUser] = useState(null);
@@ -477,8 +480,8 @@ const UserList = ({
     isFranchiseViewer || hasPermission(currentUser, "users.status.update");
   const canViewWalletAmount =
     isFranchiseViewer || isAdmin || hasPermission(currentUser, "wallet.read");
-  const canCreditWallet = isAdmin || hasPermission(currentUser, "wallet.credit");
-  const canDebitWallet = isAdmin || hasPermission(currentUser, "wallet.debit");
+  const canCreditWallet = !isSuperFranchiseViewer && (isAdmin || hasPermission(currentUser, "wallet.credit"));
+  const canDebitWallet = !isSuperFranchiseViewer && (isAdmin || hasPermission(currentUser, "wallet.debit"));
   const canAdjustWallet = !isEmployeeDirectory && (canCreditWallet || canDebitWallet);
   const hasWalletPermission =
     isAdmin ||
@@ -486,6 +489,7 @@ const UserList = ({
     hasAnyPermission(currentUser, ["wallet.read", "wallet.credit", "wallet.debit"]);
   const canManageSettlementShortcut =
     !isEmployeeDirectory &&
+    !isSuperFranchiseViewer &&
     hasWalletPermission &&
     (isAdmin ||
       (hasPermission(currentUser, "users.update") &&
@@ -494,11 +498,12 @@ const UserList = ({
   const canViewAssignedPosMachines = !isEmployeeDirectory && canReadUsers;
   const canManageUserServiceSettings =
     !isEmployeeDirectory &&
-    (isAdmin || hasPermission(currentUser, "users.service_settings.manage"));
+    (isAdmin || isSuperFranchiseViewer || hasPermission(currentUser, "users.service_settings.manage"));
   const canViewWalletColumn =
     !isEmployeeDirectory &&
     (normalizedCurrentUserRole === "admin" ||
       normalizedCurrentUserRole === "franchise" ||
+      normalizedCurrentUserRole === "super_franchise" ||
       hasAnyPermission(currentUser, ["wallet.read", "wallet.credit", "wallet.debit"]) ||
       canManageSettlementShortcut);
 
@@ -515,12 +520,20 @@ const UserList = ({
     },
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roleFromQuery = searchParams.get("role") || "";
+  const normalizedQueryRole = roleFromQuery === "franchise" ? "franchaise" : roleFromQuery;
+  const initialRole = lockedRole || normalizedQueryRole || "";
+
+  const adminIdParam = isAdmin && currentUser?.id ? currentUser.id : undefined;
+
   // Query for all users (default list)
   const [allUsersParams, setAllUsersParams] = useState({
     page: 1,
     limit: 10,
     status: "",
-    role: lockedRole,
+    role: initialRole,
+    ...(adminIdParam ? { admin_id: adminIdParam } : {}),
   });
 
   // Separate page state for search results
@@ -544,12 +557,13 @@ const UserList = ({
     isLoading: searchLoading,
     error: searchError,
   } = useQuery({
-    queryKey: ["userSearch", committedSearch, allUsersParams.status, allUsersParams.role, searchPage, searchPageSize],
+    queryKey: ["userSearch", committedSearch, allUsersParams.status, allUsersParams.role, searchPage, searchPageSize, adminIdParam],
     queryFn: () =>
       searchUsers({
         q: committedSearch,
         status: allUsersParams.status,
         role: allUsersParams.role,
+        ...(adminIdParam ? { admin_id: adminIdParam } : {}),
         limit: searchPageSize,
         offset: (searchPage - 1) * searchPageSize,
       }),
@@ -557,8 +571,29 @@ const UserList = ({
     staleTime: 30 * 1000,
   });
 
-  const allUsers = allUsersResponse ? extractUsersArray(allUsersResponse) : [];
-  const searchUsers_ = searchResponse ? (Array.isArray(searchResponse?.data) ? searchResponse.data : extractUsersArray(searchResponse)) : [];
+  // Strict Admin Isolation Guard: Ensure only this Admin's downline is displayed
+  const filterByAdminOwnership = (users) => {
+    if (!isAdmin || !currentUser?.id) return users;
+    const currentAdminId = Number(currentUser.id);
+    return users.filter((u) => {
+      // Exclude other admin accounts
+      const uRole = normalizeUserRole(u.role);
+      if (uRole === 'admin' && Number(u.id) !== currentAdminId) {
+        return false;
+      }
+      // If user has admin_id, ensure it belongs to this admin
+      const uAdminId = u.admin_id ?? u.adminId;
+      if (uAdminId !== undefined && uAdminId !== null) {
+        return Number(uAdminId) === currentAdminId;
+      }
+      return true;
+    });
+  };
+
+  const allUsersRaw = allUsersResponse ? extractUsersArray(allUsersResponse) : [];
+  const searchUsersRaw = searchResponse ? (Array.isArray(searchResponse?.data) ? searchResponse.data : extractUsersArray(searchResponse)) : [];
+  const allUsers = filterByAdminOwnership(allUsersRaw);
+  const searchUsers_ = filterByAdminOwnership(searchUsersRaw);
 
   useEffect(() => {
     if (typeof allUsersResponse === "undefined") {
@@ -577,11 +612,26 @@ const UserList = ({
   }, [currentUser?.id, currentUser?.role, allUsersResponse]);
 
   useEffect(() => {
-    if (!lockedRole) return;
+    if (lockedRole) {
+      setAllUsersParams((prev) =>
+        prev.role === lockedRole ? prev : { ...prev, role: lockedRole, page: 1 }
+      );
+      return;
+    }
+    const targetRole = roleFromQuery === "franchise" ? "franchaise" : (roleFromQuery || "");
     setAllUsersParams((prev) =>
-      prev.role === lockedRole ? prev : { ...prev, role: lockedRole, page: 1 }
+      prev.role === targetRole ? prev : { ...prev, role: targetRole, page: 1 }
     );
-  }, [lockedRole]);
+  }, [roleFromQuery, lockedRole]);
+
+  const displayTitle = useMemo(() => {
+    if (lockedRole) return title;
+    const currentRole = allUsersParams.role || normalizedQueryRole;
+    if (currentRole === "merchant") return "Merchant List";
+    if (currentRole === "franchaise" || currentRole === "franchise") return "Franchise List";
+    if (currentRole === "super_franchise") return "Super Franchise List";
+    return title;
+  }, [allUsersParams.role, normalizedQueryRole, lockedRole, title]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -939,7 +989,7 @@ const UserList = ({
 
     return (
       <div
-        className={`inline-grid grid-cols-2 items-start gap-x-5 gap-y-1.5 whitespace-normal ${className}`.trim()}
+        className={`grid grid-cols-2 items-center gap-x-3 gap-y-1.5 w-full ${className}`.trim()}
       >
         {SERVICE_FLAG_CONFIG.filter((service) => !EXCLUDED_INLINE_SERVICE_KEYS.has(service.key)).map((service) => {
           const { rawEnabled, isSuperAdminDisabled, isAdminGlobalDisabled, isGloballyBlocked } = getServiceToggleState(row, service.key);
@@ -953,38 +1003,43 @@ const UserList = ({
             : undefined;
 
           return (
-            <div key={service.key} className="flex items-center">
+            <div key={service.key} className="flex items-center min-w-0">
               <label
-                title={tooltip}
-                className={`inline-flex items-center gap-2 whitespace-nowrap rounded px-0.5 py-0.5 text-[13px] ${
-                  isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700"
+                title={tooltip || service.label}
+                className={`flex items-center justify-between w-full gap-1.5 rounded px-1 py-0.5 text-xs transition-colors ${
+                  isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700 hover:bg-gray-100/70"
                 }`}
               >
-                <span className={`font-medium leading-none ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}>
+                <span
+                  className={`truncate font-medium ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}
+                  title={service.label}
+                >
                   {USER_SERVICE_INLINE_LABELS[service.key] || service.label}
                 </span>
 
-                {isSuperAdminDisabled ? (
-                  <span title="Locked globally by Super Admin" className="inline-flex items-center text-rose-500">
-                    <Lock className="h-3 w-3" />
-                  </span>
-                ) : isAdminGlobalDisabled ? (
-                  <span title="Disabled in Organization Settings by Admin" className="inline-flex items-center text-amber-500">
-                    <AlertTriangle className="h-3 w-3" />
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                  {isSuperAdminDisabled ? (
+                    <span title="Locked globally by Super Admin" className="inline-flex items-center text-rose-500">
+                      <Lock className="h-3 w-3" />
+                    </span>
+                  ) : isAdminGlobalDisabled ? (
+                    <span title="Disabled in Organization Settings by Admin" className="inline-flex items-center text-amber-500">
+                      <AlertTriangle className="h-3 w-3" />
+                    </span>
+                  ) : null}
 
-                <input
-                  type="checkbox"
-                  checked={!isGloballyBlocked && rawEnabled}
-                  disabled={!canManageUserServiceSettings || isUpdating || isGloballyBlocked}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    if (isGloballyBlocked) return;
-                    confirmToggleUserService(row, service, event.target.checked);
-                  }}
-                  className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-primary focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed"
-                />
+                  <input
+                    type="checkbox"
+                    checked={!isGloballyBlocked && rawEnabled}
+                    disabled={!canManageUserServiceSettings || isUpdating || isGloballyBlocked}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      if (isGloballyBlocked) return;
+                      confirmToggleUserService(row, service, event.target.checked);
+                    }}
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed cursor-pointer"
+                  />
+                </div>
               </label>
             </div>
           );
@@ -1117,7 +1172,7 @@ const UserList = ({
       {
         header: "Services",
         key: "user_service_settings",
-        render: (_value, row) => renderServiceSettingsInline(row, "min-w-[190px]"),
+        render: (_value, row) => renderServiceSettingsInline(row, "min-w-[260px]"),
       },
       {
         header: "KYC",
@@ -1864,7 +1919,7 @@ const UserList = ({
       return actions.length ? actions : null;
     }
 
-    if (isAdmin) {
+    if (isAdmin || isSuperFranchiseViewer) {
       actions.push({
         label: (
           <span
@@ -2015,18 +2070,21 @@ const UserList = ({
           q: committedSearch,
           status: allUsersParams.status,
           role: allUsersParams.role,
+          ...(adminIdParam ? { admin_id: adminIdParam } : {}),
           limit: total > 0 ? total : 1000,
           page: 1,
         });
-        exportUsers = Array.isArray(response?.data) ? response.data : extractUsersArray(response);
+        const raw = Array.isArray(response?.data) ? response.data : extractUsersArray(response);
+        exportUsers = filterByAdminOwnership(raw);
       } else {
         const total = Number(allUsersResponse?.pagination?.total ?? allUsers.length ?? 0);
         const response = await AllUsers({
           ...allUsersParams,
+          ...(adminIdParam ? { admin_id: adminIdParam } : {}),
           page: 1,
           limit: total > 0 ? total : 1000,
         });
-        exportUsers = extractUsersArray(response);
+        exportUsers = filterByAdminOwnership(extractUsersArray(response));
       }
 
       if (!Array.isArray(exportUsers) || exportUsers.length === 0) {
@@ -2062,7 +2120,7 @@ const UserList = ({
   return (
     <div className="bg-gray-100 min-h-screen">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{displayTitle}</h2>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm px-1 py-6 md:p-6">
@@ -2122,7 +2180,7 @@ const UserList = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {MASTER_SERVICE_CONTROLS.map((service) => {
                 const isPending = bulkServiceUpdatingKey === service.key;
                 const masterConfig = masterServiceSettingsData?.[service.key];
@@ -2222,7 +2280,21 @@ const UserList = ({
                 <label className="block text-xs font-medium text-gray-500">Role</label>
                 <select
                   value={allUsersParams.role}
-                  onChange={(e) => handleAllUsersFilterChange("role", e.target.value)}
+                  onChange={(e) => {
+                    const newRole = e.target.value;
+                    handleAllUsersFilterChange("role", newRole);
+                    if (!lockedRole) {
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        if (newRole) {
+                          next.set("role", newRole);
+                        } else {
+                          next.delete("role");
+                        }
+                        return next;
+                      });
+                    }
+                  }}
                   className="mt-1 block w-full rounded-md border-gray-200 bg-white py-1.5 px-2 text-sm text-gray-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="">All</option>
@@ -2230,8 +2302,10 @@ const UserList = ({
                     <>
                       <option value="admin">Admin</option>
                       <option value="employee">Employee</option>
-                      <option value="super_franchise">Super Franchise</option>
                     </>
+                  )}
+                  {(normalizedCurrentUserRole === "admin" || normalizedCurrentUserRole === "employee") && (
+                    <option value="super_franchise">Super Franchise</option>
                   )}
                   {normalizedCurrentUserRole !== "franchise" && (
                     <>

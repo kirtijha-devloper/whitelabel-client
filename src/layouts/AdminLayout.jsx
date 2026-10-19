@@ -129,7 +129,10 @@ const ServiceWiseReports = lazy(
 const SuperAdminReports = lazy(() => import("../Pages/Superadmin/SuperAdminReports"));
 
 const AdminList = lazy(() => import("../Pages/AdminList"));
-const SuperAdminsettlement= lazy(()=> import("../Pages/Superadmin/SuperAdminsettlement"))
+const SuperAdminsettlement = lazy(() => import("../Pages/Superadmin/SuperAdminsettlement"));
+const AdminSpecificRateManagement = lazy(
+  () => import("../Pages/Superadmin/AdminSpecificRateManagement")
+);
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -338,6 +341,50 @@ export default function AdminLayout() {
                 element={
                   isSuperAdminViewer ? (
                     <AdminProfile currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="admin/:adminId/rates"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="admin/:adminId/rates/:category"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/super-admin/admin/:adminId/rates"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/super-admin/admin/:adminId/rates/:category"
+                element={
+                  isSuperAdminViewer ? (
+                    <AdminSpecificRateManagement currentUser={currentUser} />
                   ) : (
                     <Navigate to="/login" replace />
                   )
@@ -611,20 +658,6 @@ export default function AdminLayout() {
                 )}
               />
               <Route
-                path="user/:id"
-                element={guardRoute(
-                  canReadUsers,
-                  <UserDetails currentUser={currentUser} />,
-                )}
-              />
-              <Route
-                path="user/:id/edit"
-                element={guardRoute(
-                  canUpdateUsers,
-                  <AddUser currentUser={currentUser} />,
-                )}
-              />
-              <Route
                 path="merchant-list"
                 element={guardRoute(isAdminViewer, <MerchantList />)}
               />
@@ -644,7 +677,10 @@ export default function AdminLayout() {
               />
               <Route
                 path="pos-machine-list"
-                element={guardRoute(isAdminViewer, <PosMachineList />)}
+                element={guardRoute(
+                  isAdminViewer || canViewStockPos,
+                  <PosMachineList currentUser={currentUser} />,
+                )}
               />
               <Route
                 path="create-merchant"

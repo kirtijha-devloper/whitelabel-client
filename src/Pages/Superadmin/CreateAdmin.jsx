@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import {
   UserPlus,
   UserCheck,
-  Users,
   Mail,
   Lock,
   User,
@@ -307,12 +306,54 @@ function CreateAdmin() {
         toast.error('Email address is required');
         return;
       }
-      if (!form.mobile_number?.trim() || form.mobile_number.length !== 10) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        toast.error('Please enter a valid email address');
+        return;
+      }
+      if (!form.mobile_number?.trim() || form.mobile_number.trim().length !== 10) {
         toast.error('Valid 10-digit Indian mobile number is required');
         return;
       }
       if (!form.password || form.password.length < 8) {
         toast.error('Password must be at least 8 characters long');
+        return;
+      }
+      if (!form.gender) {
+        toast.error('Please select gender');
+        return;
+      }
+      if (!form.dob) {
+        toast.error('Date of birth is required');
+        return;
+      }
+      if (!form.address1?.trim()) {
+        toast.error('Address line 1 is required');
+        return;
+      }
+      if (!form.city?.trim()) {
+        toast.error('City is required');
+        return;
+      }
+      if (!form.district?.trim()) {
+        toast.error('District is required');
+        return;
+      }
+      if (!form.state?.trim()) {
+        toast.error('State is required');
+        return;
+      }
+      if (!form.pincode?.trim() || form.pincode.trim().length !== 6) {
+        toast.error('Valid 6-digit Pincode is required');
+        return;
+      }
+      if (!form.aadhar_number?.trim() || form.aadhar_number.trim().length !== 12) {
+        toast.error('Valid 12-digit Aadhaar number is required');
+        return;
+      }
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!form.pan_number?.trim() || !panRegex.test(form.pan_number.trim().toUpperCase())) {
+        toast.error('Valid 10-character PAN number is required (e.g. ABCDE1234F)');
         return;
       }
       if (!form.company_or_shop_name?.trim()) {
@@ -321,6 +362,22 @@ function CreateAdmin() {
       }
       if (!form.domain_name?.trim()) {
         toast.error('Domain Name is required');
+        return;
+      }
+      if (!(form.aadhar_photo instanceof File)) {
+        toast.error('Aadhaar front photo is required');
+        return;
+      }
+      if (!(form.aadhar_back_photo instanceof File)) {
+        toast.error('Aadhaar back photo is required');
+        return;
+      }
+      if (!(form.pan_photo instanceof File)) {
+        toast.error('PAN card photo is required');
+        return;
+      }
+      if (!(form.bank_passbook instanceof File)) {
+        toast.error('Bank passbook document is required');
         return;
       }
     } else {
@@ -340,6 +397,21 @@ function CreateAdmin() {
           toast.error('Invalid email address format');
           return;
         }
+      }
+      if (form.aadhar_number && form.aadhar_number.trim() && form.aadhar_number.trim().length !== 12) {
+        toast.error('Aadhaar number must be exactly 12 digits');
+        return;
+      }
+      if (form.pan_number && form.pan_number.trim()) {
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(form.pan_number.trim().toUpperCase())) {
+          toast.error('PAN number format must be valid (e.g. ABCDE1234F)');
+          return;
+        }
+      }
+      if (form.pincode && form.pincode.trim() && form.pincode.trim().length !== 6) {
+        toast.error('Pincode must be exactly 6 digits');
+        return;
       }
     }
 
@@ -527,7 +599,12 @@ function CreateAdmin() {
       }
     } catch (err) {
       console.error(isEditMode ? 'Error updating admin:' : 'Error creating admin:', err);
-      toast.error(err?.message || (isEditMode ? 'Failed to update Admin.' : 'Failed to create Admin.'));
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        (isEditMode ? 'Failed to update Admin.' : 'Failed to create Admin.');
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -585,40 +662,9 @@ function CreateAdmin() {
           <form
             onSubmit={handleSubmit}
             className="space-y-6"
+            noValidate
           >
 
-            {/* ==========================================
-                ROLE SELECTION
-            ========================================== */}
-
-            <div className="bg-gray-50 rounded-lg p-5">
-
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
-                <Users size={16} />
-                User Role
-              </label>
-
-              <div className="flex gap-6">
-
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
-
-                  <input
-                    type="radio"
-                    name="role"
-                    value="admin"
-                    checked={true}
-                    disabled
-                    onChange={handleChange}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                  />
-
-                  <span>Admin</span>
-
-                </label>
-
-              </div>
-
-            </div>
 
 
             {/* ==========================================

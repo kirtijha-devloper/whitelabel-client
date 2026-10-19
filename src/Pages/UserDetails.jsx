@@ -540,6 +540,22 @@ function UserDetails({ currentUser }) {
                   )}
                 </div>
               )}
+              {(isAdmin || isFranchiseViewer || normalizedCurrentUserRole === "super_franchise" || hasPermission(currentUser, "users.update")) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const editPath = normalizedCurrentUserRole === 'franchise'
+                      ? `/franchise/user/${viewedUserId}/edit`
+                      : normalizedCurrentUserRole === 'super_franchise'
+                        ? `/super-franchise/user/${viewedUserId}/edit`
+                        : `/admin/user/${viewedUserId}/edit`;
+                    navigate(editPath);
+                  }}
+                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+                >
+                  Edit Profile
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"

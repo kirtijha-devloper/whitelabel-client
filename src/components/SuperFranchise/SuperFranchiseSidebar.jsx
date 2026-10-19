@@ -7,12 +7,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
+import { getCompanyLogoUrl } from "../../utils/userAccess";
 
 const SuperFranchiseSidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const currentPath = location.pathname + location.search;
@@ -79,7 +81,7 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
     },
     { name: "Reports", path: "/super-franchise/reports", icon: <FaChartBar /> },
     { name: "Ledger", path: "/super-franchise/ledger", icon: <FaDatabase /> },
-    { name: "Charges", path: "/super-franchise/franchise-charges", icon: <FaMoneyBillWave /> },
+    { name: "Rate Settings", path: "/super-franchise/rate-settings", icon: <FaMoneyBillWave /> },
     { name: "Settlement", path: "/super-franchise/pos-setting", icon: <FaSlidersH /> },
     { name: "Help", path: "/super-franchise/complaint-box", icon: <FaQuestionCircle /> },
     { name: "Setting", path: "/super-franchise/setting", icon: <FaCog /> },
@@ -110,8 +112,17 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           {!isCollapsed && (
-            <Link to="/super-franchise/dashboard" className="text-xl font-bold text-pink-500">
-              <img src={AbheePayLogo} width={150} alt="AbheePay Logo" />
+            <Link to="/super-franchise/dashboard" className="flex items-center">
+              <img
+                src={companyLogoUrl || AbheePayLogo}
+                alt={currentUser?.company?.company_name || "Company Logo"}
+                width={150}
+                className="max-h-12 w-auto object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = AbheePayLogo;
+                }}
+              />
             </Link>
           )}
           <button

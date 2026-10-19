@@ -254,6 +254,21 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
             </div>
           )}
 
+          {/* Super Franchise Pool Limit Display */}
+          {normalizedRole === "super_franchise" && (
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-3 sm:p-4 rounded-xl shadow-sm flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+              <div className="bg-emerald-600 text-white p-2.5 rounded-lg shadow-sm">
+                <Wallet size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-gray-500 font-medium text-xs">Daily Limit Pool</p>
+                <p className="text-emerald-700 font-bold text-lg sm:text-xl leading-tight">
+                  ₹{Number(currentUser?.t0_daily_limit ?? currentUser?.wallet ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Right Section: Date and Day */}
           <div className="bg-gradient-to-br from-indigo-50 to-gray-100 p-3 sm:p-4 rounded-xl shadow-md flex items-center gap-3 sm:gap-4 hover:shadow-lg transition-shadow">
             <Clock size={24} className="text-indigo-600" />

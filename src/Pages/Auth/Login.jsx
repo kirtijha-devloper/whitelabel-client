@@ -2,13 +2,18 @@ import LoginForm from '../../components/Auth/LoginForm';
 import { LiaAngleRightSolid } from "react-icons/lia";
 import PosImage from '../../assets/pos-image.jpg';
 import AbheePayLogo from '../../assets/FORMAT-PNG.png'
+import AnanyaPayLogo from '../../assets/ananyaPay.jpeg'
 import PosSwipe from '../../assets/pos-images/pos-swipe.jpg';
 import PosDesktopAndMobile from '../../assets/pos-images/pos-handshake.jpg';
 import PosMachine from '../../assets/pos-images/pos-machine.jpeg';
 import { ArrowRight } from 'lucide-react';
 import PosVideo from '../../assets/POS Payment.mp4'
+import { useState } from 'react';
 
 const Login = () => {
+  const isAbheePay = typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes("abheepay");
+  const logo = isAbheePay ? AbheePayLogo : AnanyaPayLogo;
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div
@@ -21,9 +26,9 @@ const Login = () => {
         }}
       />
 
-      <div className='absolute lg:top-10 top-4 left-4 lg:left-6 z-20'>
-        <img src={AbheePayLogo} className="w-32 lg:w-48" alt="AbheePay Logo" />
-      </div>
+      {/* <div className='absolute lg:top-10 top-4 left-4 lg:left-6 z-20'>
+        <img src={logo} className="w-32 lg:w-43" alt="AbheePay Logo" />
+      </div> */}
 
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-8">
         <div className="bg-[#cfeded] w-full max-w-4xl rounded-xl overflow-hidden shadow-2xl">

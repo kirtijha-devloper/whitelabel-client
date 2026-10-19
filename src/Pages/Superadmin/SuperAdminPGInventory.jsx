@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 
+
 const SuperAdminPGInventory = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -23,65 +24,9 @@ const SuperAdminPGInventory = () => {
 
   // Mock PG Inventory Data
   const [pgList, setPgList] = useState([
-    {
-      id: "pg-201",
-      mid: "MID-RZP-998201",
-      gateway: "Razorpay PG",
-      title: "Primary Retail HDFC Aggregator",
-      company_name: "AGRO-AXIS Admin Pool",
-      daily_limit: "₹ 50,00,000",
-      status: "active",
-      created_at: "2026-08-10",
-    },
-    {
-      id: "pg-202",
-      mid: "MID-CF-441092",
-      gateway: "Cashfree PG",
-      title: "Instant Payout & Collection Channel",
-      company_name: "Global Pay Solutions",
-      daily_limit: "₹ 1,00,00,000",
-      status: "active",
-      created_at: "2026-08-15",
-    },
-    {
-      id: "pg-203",
-      mid: "MID-WL-112048",
-      gateway: "Worldline",
-      title: "Unallocated Backup Gateway MID",
-      company_name: "Unallocated Stock",
-      daily_limit: "₹ 25,00,000",
-      status: "unallocated",
-      created_at: "2026-08-20",
-    },
-    {
-      id: "pg-204",
-      mid: "MID-HDFC-882103",
-      gateway: "HDFC PG Direct",
-      title: "Corporate Merchant MID Channel",
-      company_name: "Everlife Admin",
-      daily_limit: "Unlimited",
-      status: "active",
-      created_at: "2026-09-01",
-    },
-    {
-      id: "pg-205",
-      mid: "MID-PPE-554201",
-      gateway: "PhonePe PG",
-      title: "Sandbox Testing Channel",
-      company_name: "Internal Sandbox Pool",
-      daily_limit: "₹ 1,00,000",
-      status: "sandbox",
-      created_at: "2026-09-10",
-    },
   ]);
 
   const [formData, setFormData] = useState({
-    mid: "",
-    gateway: "Razorpay PG",
-    title: "",
-    company_name: "AGRO-AXIS Admin Pool",
-    daily_limit: "₹ 50,00,000",
-    status: "unallocated",
   });
 
   const handleAddSubmit = (e) => {
@@ -181,14 +126,14 @@ const SuperAdminPGInventory = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition-all shadow-sm"
           >
-            <FaPlus className="w-4 h-4" /> Add PG MID
+            <FaPlus className="w-4 h-4" /> Add PG MIDs
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* STATS OVERVIEW */}
@@ -203,16 +148,16 @@ const SuperAdminPGInventory = () => {
             {pgList.filter((p) => p.status === "active").length}
           </p>
         </div>
-        <div className="rounded-2xl bg-blue-600 text-white p-5 min-h-[145px]">
-          <p className="text-sm font-semibold">Unallocated MIDs</p>
-          <p className="text-3xl font-bold mt-2">
-            {pgList.filter((p) => p.status === "unallocated").length}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-red-500 text-white p-5 min-h-[145px]">
-          <p className="text-sm font-semibold">Sandbox / Testing</p>
+        <div className="rounded-2xl bg-blue-500 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Assigned</p>
           <p className="text-3xl font-bold mt-2">
             {pgList.filter((p) => p.status === "sandbox").length}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-red-600 text-white p-5 min-h-[145px]">
+          <p className="text-sm font-semibold">Unassigned</p>
+          <p className="text-3xl font-bold mt-2">
+            {pgList.filter((p) => p.status === "unallocated").length}
           </p>
         </div>
       </div>

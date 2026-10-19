@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BASE_URL } from '../constants';
-import { FranchiseAllUsers, MerchantAllUsers } from './FranchiseApi';
+import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers } from './FranchiseApi';
 import { getAuthToken } from '../utils/auth';
 
 const getAuthHeaders = () => {
@@ -17,6 +17,7 @@ const RULE_SCOPES = {
   SUPER_ADMIN_DEFAULT: 'super_admin_default',
   SUPER_ADMIN_ADMIN: 'super_admin_admin',
   ADMIN_DEFAULT: 'admin_default',
+  ADMIN_SUPER_FRANCHISE: 'admin_super_franchise',
   ADMIN_FRANCHISE: 'admin_franchise',
   ADMIN_MERCHANT: 'admin_merchant',
   FRANCHISE_DEFAULT: 'franchise_default',
@@ -275,6 +276,8 @@ const extractRuleRecord = (payload) => {
 const getRuleUserId = (rule) => toNullableNumber(getFirstDefined(rule, ['user_id', 'userId']));
 const getRuleFranchiseId = (rule) =>
   toNullableNumber(getFirstDefined(rule, ['franchaise_id', 'franchise_id', 'franchiseId']));
+const getRuleSuperFranchiseId = (rule) =>
+  toNullableNumber(getFirstDefined(rule, ['super_franchise_id', 'superFranchiseId']));
 const getRawRuleScope = (rule) => {
   const scope = getFirstDefined(rule, ['scope']);
   return typeof scope === 'string' ? scope.trim().toLowerCase() : null;
@@ -283,10 +286,16 @@ const getEntityUserId = (entity) =>
   toNullableNumber(getFirstDefined(entity, ['id', 'merchant_id', 'merchantId', 'user_id', 'userId']));
 const hasMerchantScope = (rule) => getRuleUserId(rule) !== null;
 const hasFranchiseScope = (rule) => getRuleFranchiseId(rule) !== null;
+const hasSuperFranchiseScope = (rule) => getRuleSuperFranchiseId(rule) !== null;
 const isAdminDefaultRule = (rule) => {
   const scope = getRawRuleScope(rule);
   if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT;
-  return !hasMerchantScope(rule) && !hasFranchiseScope(rule);
+  return !hasMerchantScope(rule) && !hasFranchiseScope(rule) && !hasSuperFranchiseScope(rule);
+};
+const isAdminSuperFranchiseRule = (rule) => {
+  const scope = getRawRuleScope(rule);
+  if (scope) return scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE;
+  return hasSuperFranchiseScope(rule);
 };
 const isAdminFranchiseRule = (rule) => {
   const scope = getRawRuleScope(rule);
@@ -314,8 +323,10 @@ const isMerchantRule = (rule) => isAdminMerchantRule(rule) || isFranchiseMerchan
 const getRuleScope = (rule) => {
   const scope = getRawRuleScope(rule);
   if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT) return 'admin';
+  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 'super_franchise';
   if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT) return 'franchise';
   if (scope === RULE_SCOPES.ADMIN_MERCHANT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'merchant';
+  if (isAdminSuperFranchiseRule(rule)) return 'super_franchise';
   if (isMerchantRule(rule)) return 'merchant';
   if (isFranchiseRule(rule)) return 'franchise';
   return 'admin';
@@ -485,6 +496,38 @@ const resolveUpdatedRuleRecord = ({ responseData, currentRule, payload, ruleId, 
   return fallbackRecord;
 };
 
+const mapRuleToSuperFranchiseFormat = (rule, options = {}) => ({
+  id: rule.id,
+  rule_id: rule.id,
+  superFranchiseId: options.superFranchiseId ?? getRuleSuperFranchiseId(rule) ?? null,
+  super_franchise_id: getRuleSuperFranchiseId(rule),
+  method: fromApiPaymentMode(rule.payment_mode),
+  network: fromApiCardBrand(rule.card_brand),
+  card_type: fromApiCardType(rule.card_type),
+  sub_type: rule.sub_type || 'Consumer',
+  card_classification: fromApiCardClassification(rule.card_classification),
+  gst_required: Boolean(rule.gst_required),
+  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
+  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  admin_rate: options.adminRule
+    ? toFiniteNumber(options.adminRule.charge_percent, 0)
+    : isAdminRule(rule)
+      ? toFiniteNumber(rule.charge_percent, 0)
+      : null,
+  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
+  settlement_type: rule.settlement_type || null,
+  company_name: rule.company_name || null,
+  min_amount: toFiniteNumber(rule.min_amount, 0),
+  max_amount: toNullableNumber(rule.max_amount),
+  isInherited: Boolean(options.isInherited),
+  default_rule_id: options.baseRule?.id ?? null,
+  base_rule: options.baseRule || null,
+  original_rule: rule,
+  rule_key: makeRuleKey(rule),
+  source_scope: getRuleScope(rule),
+  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+});
+
 const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   id: rule.id,
   rule_id: rule.id,
@@ -503,6 +546,38 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
     : isAdminRule(rule)
       ? toFiniteNumber(rule.charge_percent, 0)
       : null,
+  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
+  settlement_type: rule.settlement_type || null,
+  company_name: rule.company_name || null,
+  min_amount: toFiniteNumber(rule.min_amount, 0),
+  max_amount: toNullableNumber(rule.max_amount),
+  isInherited: Boolean(options.isInherited),
+  default_rule_id: options.baseRule?.id ?? null,
+  base_rule: options.baseRule || null,
+  original_rule: rule,
+  rule_key: makeRuleKey(rule),
+  source_scope: getRuleScope(rule),
+  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+});
+
+export const mapRuleToAdminFormat = (rule, options = {}) => ({
+  id: rule.id,
+  rule_id: rule.id,
+  adminId: options.adminId ?? rule.user_id ?? null,
+  user_id: options.adminId ?? rule.user_id ?? null,
+  method: fromApiPaymentMode(rule.payment_mode),
+  network: fromApiCardBrand(rule.card_brand),
+  card_type: fromApiCardType(rule.card_type),
+  sub_type: rule.sub_type || 'Consumer',
+  card_classification: fromApiCardClassification(rule.card_classification),
+  gst_required: Boolean(rule.gst_required),
+  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
+  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  merchant_rate: toFiniteNumber(rule.charge_percent, 0),
+  admin_rate: toFiniteNumber(rule.charge_percent, 0),
+  platform_default_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_percent, 0)
+    : toFiniteNumber(rule.charge_percent, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -726,6 +801,60 @@ const buildFranchiseEffectiveRules = (adminRules, franchiseRules, franchiseId) =
         adminRule: adminRule || effectiveRule,
         baseRule: adminRule,
         isInherited: !franchiseRule
+      });
+    })
+    .filter(Boolean)
+    .sort(sortMappedRates);
+};
+
+export const buildAdminEffectiveRules = (defaultRules, adminRules, adminId) => {
+  const resolvedAdminId = toNullableNumber(adminId) ?? adminId ?? null;
+  const defaultByKey = new Map((defaultRules || []).map((rule) => [makeRuleKey(rule), rule]));
+  const adminByKey = new Map((adminRules || []).map((rule) => [makeRuleKey(rule), rule]));
+  const keys = new Set([...defaultByKey.keys(), ...adminByKey.keys()]);
+
+  return [...keys]
+    .map((key) => {
+      const defaultRule = defaultByKey.get(key) || null;
+      const adminRule = adminByKey.get(key) || null;
+      const effectiveRule = adminRule || defaultRule;
+
+      if (!effectiveRule) {
+        return null;
+      }
+
+      return mapRuleToAdminFormat(effectiveRule, {
+        adminId: resolvedAdminId,
+        defaultRule: defaultRule || effectiveRule,
+        baseRule: defaultRule,
+        isInherited: !adminRule,
+      });
+    })
+    .filter(Boolean)
+    .sort(sortMappedRates);
+};
+
+const buildSuperFranchiseEffectiveRules = (adminRules, superFranchiseRules, superFranchiseId) => {
+  const resolvedSuperFranchiseId = toNullableNumber(superFranchiseId) ?? superFranchiseId ?? null;
+  const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
+  const sfByKey = new Map(superFranchiseRules.map((rule) => [makeRuleKey(rule), rule]));
+  const keys = new Set([...adminByKey.keys(), ...sfByKey.keys()]);
+
+  return [...keys]
+    .map((key) => {
+      const adminRule = adminByKey.get(key) || null;
+      const sfRule = sfByKey.get(key) || null;
+      const effectiveRule = sfRule || adminRule;
+
+      if (!effectiveRule) {
+        return null;
+      }
+
+      return mapRuleToSuperFranchiseFormat(effectiveRule, {
+        superFranchiseId: resolvedSuperFranchiseId,
+        adminRule: adminRule || effectiveRule,
+        baseRule: adminRule,
+        isInherited: !sfRule
       });
     })
     .filter(Boolean)
@@ -998,6 +1127,16 @@ const createScopedRuleOverride = async (
     : mappedRate;
 };
 
+export const getSuperFranchises = async () => {
+  try {
+    const res = await SuperFranchiseAllUsers({ limit: 1000 });
+    return res?.data || res || [];
+  } catch (error) {
+    console.error('Error fetching super franchises:', error);
+    return [];
+  }
+};
+
 export const getFranchises = async () => {
   try {
     const res = await FranchiseAllUsers({ limit: 1000 });
@@ -1129,6 +1268,149 @@ export const getUnassignedMerchants = async () => {
   } catch (error) {
     console.error('Error fetching unassigned merchants:', error);
     return [];
+  }
+};
+
+export const getSuperFranchiseRates = async (superFranchiseId, options = {}) => {
+  try {
+    const includeInherited = options?.includeInherited !== false;
+    const defaultRules = await fetchRulesByScopes([
+      RULE_SCOPES.ADMIN_DEFAULT,
+      RULE_SCOPES.SUPER_ADMIN_DEFAULT
+    ]);
+
+    if (!superFranchiseId || superFranchiseId === 'default') {
+      const defaults = defaultRules
+        .map((rule) =>
+          mapRuleToSuperFranchiseFormat(rule, {
+            adminRule: rule,
+            isInherited: false
+          })
+        )
+        .sort(sortMappedRates);
+
+      return defaults;
+    }
+
+    const sfRules = await fetchRulesByScopes(
+      [RULE_SCOPES.ADMIN_SUPER_FRANCHISE],
+      { super_franchise_id: superFranchiseId }
+    );
+    const effectiveRules = includeInherited
+      ? buildSuperFranchiseEffectiveRules(defaultRules, sfRules, superFranchiseId)
+      : sfRules
+        .map((rule) =>
+          mapRuleToSuperFranchiseFormat(rule, {
+            superFranchiseId: Number(superFranchiseId),
+            adminRule: null,
+            baseRule: null,
+            isInherited: false
+          })
+        )
+        .sort(sortMappedRates);
+
+    return effectiveRules;
+  } catch (error) {
+    console.error('Error fetching super franchise rates:', error);
+    return [];
+  }
+};
+
+export const updateSuperFranchiseRate = async (superFranchiseId, rateObject, updates, options = {}) => {
+  try {
+    if (!superFranchiseId || superFranchiseId === 'default') {
+      const payload = buildUpdatePayload(
+        {
+          ...updates,
+          user_id: null,
+          super_franchise_id: null,
+          franchaise_id: null
+        },
+        rateObject?.original_rule
+      );
+      const ruleId = rateObject?.rule_id || rateObject?.id;
+      const response = await axios.put(`${POS_CHARGE_RULES_BASE}/${ruleId}`, payload, getAuthHeaders());
+      const record = resolveUpdatedRuleRecord({
+        responseData: response.data,
+        currentRule: rateObject?.original_rule,
+        payload,
+        ruleId,
+        logEvent: 'super-franchise-rates:update-global',
+        context: { superFranchiseId }
+      });
+
+      return mapRuleToSuperFranchiseFormat(record, {
+        adminRule: record,
+        isInherited: false
+      });
+    }
+
+    if (rateObject.isInherited) {
+      return createScopedRuleOverride(
+        superFranchiseId,
+        rateObject,
+        updates,
+        mapRuleToSuperFranchiseFormat,
+        'superFranchiseId',
+        {
+          user_id: null,
+          super_franchise_id: Number(superFranchiseId),
+          franchaise_id: null
+        }
+      );
+    }
+
+    const currentRule = rateObject?.original_rule;
+    const payload = buildUpdatePayload(
+      {
+        ...updates,
+        user_id: null,
+        super_franchise_id: Number(superFranchiseId),
+        franchaise_id: null
+      },
+      currentRule
+    );
+    const ruleId = currentRule?.id || rateObject?.rule_id || rateObject?.id;
+    const response = await axios.put(`${POS_CHARGE_RULES_BASE}/${ruleId}`, payload, getAuthHeaders());
+    const record = resolveUpdatedRuleRecord({
+      responseData: response.data,
+      currentRule,
+      payload,
+      ruleId,
+      logEvent: 'super-franchise-rates:update-specific',
+      context: { superFranchiseId }
+    });
+
+    return mapRuleToSuperFranchiseFormat(record, {
+      superFranchiseId: Number(superFranchiseId),
+      adminRule: rateObject?.base_rule || null,
+      baseRule: rateObject?.base_rule || null,
+      isInherited: false
+    });
+  } catch (error) {
+    console.error('Error updating super franchise rate:', error);
+    throw error;
+  }
+};
+
+export const getAllSuperFranchiseRates = async (superFranchises) => {
+  try {
+    const allRates = {};
+    const [defaultRules, adminSfRules] = await Promise.all([
+      fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]),
+      fetchRulesByScopes([RULE_SCOPES.ADMIN_SUPER_FRANCHISE])
+    ]);
+
+    for (const sf of superFranchises) {
+      const scopedRules = adminSfRules.filter(
+        (rule) => Number(getRuleSuperFranchiseId(rule)) === Number(sf.id)
+      );
+      allRates[sf.id] = buildSuperFranchiseEffectiveRules(defaultRules, scopedRules, sf.id);
+    }
+    return allRates;
+  } catch (error) {
+    console.error('Error loading super franchise matrix rates:', error);
+    return {};
   }
 };
 
@@ -2071,9 +2353,9 @@ export const deletePosTransactionCharge = async (id) => {
   }
 };
 
-export const listBbpsChargeRules = async () => {
+export const listBbpsChargeRules = async (params = {}) => {
   try {
-    const res = await axios.get(`${BASE_URL}/bbps-cc/charge-rules`, getAuthHeaders());
+    const res = await axios.get(`${BASE_URL}/bbps-cc/charge-rules`, { ...getAuthHeaders(), params });
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Failed to fetch BBPS CC bill payment charge rules');
@@ -2593,6 +2875,366 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
   } catch (error) {
     logRateError('super-franchise-all-merchant-rates:matrix:error', error, { superFranchiseId });
     return {};
+  }
+};
+
+// ── Super Admin Admin-Specific Rate Management Helpers ───────────────────────
+export const fetchPlatformDefaultPosRules = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/defaults?limit=200`, getAuthHeaders());
+    return res.data?.data || [];
+  } catch (error) {
+    console.error('Failed to fetch platform default POS rules:', error);
+    // Fallback to legacy endpoint if super-admin route is unavailable
+    try {
+      const fallback = await axios.get(`${BASE_URL}/pos-charge-rules/list?scope=admin_default&limit=200`, getAuthHeaders());
+      return fallback.data?.data || [];
+    } catch {
+      throw new Error(error.response?.data?.message || 'Failed to fetch platform default POS rules');
+    }
+  }
+};
+
+export const createPlatformDefaultPosRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/pos/defaults`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to create platform default POS rule');
+  }
+};
+
+export const updatePlatformDefaultPosRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/pos/defaults/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to update platform default POS rule');
+  }
+};
+
+export const deletePlatformDefaultPosRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/pos/defaults/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete platform default POS rule');
+  }
+};
+
+export const fetchSuperAdminAdminsPosMatrix = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/admins`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    console.error('Failed to fetch super admin admins POS matrix:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admins rate matrix');
+  }
+};
+
+export const fetchAdminPosRules = async (adminId) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/pos/admin/${adminId}`, getAuthHeaders());
+    return res.data?.overrides || res.data?.data || [];
+  } catch (error) {
+    console.error(`Failed to fetch POS rules for admin ${adminId}:`, error);
+    try {
+      const fallback = await axios.get(`${BASE_URL}/pos-charge-rules/list?user_id=${adminId}&limit=200`, getAuthHeaders());
+      return fallback.data?.data || [];
+    } catch {
+      throw new Error(error.response?.data?.message || 'Failed to fetch admin POS rules');
+    }
+  }
+};
+
+export const createAdminPosRule = async (payload) => {
+  try {
+    const adminId = payload.user_id;
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/pos/admin/${adminId}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to create admin POS rule');
+  }
+};
+
+export const updateAdminPosRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/pos/admin/rule/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || error.response?.data?.errors?.join(', ') || 'Failed to update admin POS rule');
+  }
+};
+
+export const deleteAdminPosRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/pos/admin/rule/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete admin POS rule');
+  }
+};
+
+export const fetchSuperAdminRentalRates = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/rental`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch rental rates');
+  }
+};
+
+export const createSuperAdminRentalRate = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/rental`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create rental rate');
+  }
+};
+
+export const updateSuperAdminRentalRate = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/rental/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update rental rate');
+  }
+};
+
+export const deleteSuperAdminRentalRate = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/rental/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete rental rate');
+  }
+};
+
+export const fetchSuperAdminCcBillRules = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/cc-bill`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch CC bill rules');
+  }
+};
+
+export const createSuperAdminCcBillRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/cc-bill`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create CC bill rule');
+  }
+};
+
+export const updateSuperAdminCcBillRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/cc-bill/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update CC bill rule');
+  }
+};
+
+export const deleteSuperAdminCcBillRule = async (id) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/cc-bill/${id}`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete CC bill rule');
+  }
+};
+
+export const fetchSuperAdminPayoutRules = async (params = {}) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/payout`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch payout rules');
+  }
+};
+
+export const createSuperAdminPayoutRule = async (payload) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/payout`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to create payout rule');
+  }
+};
+
+export const updateSuperAdminPayoutRule = async (id, payload) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/super-admin/rate-settings/payout/${id}`, payload, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update payout rule');
+  }
+};
+
+export const deleteSuperAdminPayoutRule = async (id, params = {}) => {
+  try {
+    const res = await axios.delete(`${BASE_URL}/super-admin/rate-settings/payout/${id}`, {
+      ...getAuthHeaders(),
+      params,
+    });
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to delete payout rule');
+  }
+};
+
+export const getSuperAdminGlobalPosRate = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/super-admin/rate-settings/global-rate`, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch global POS rate');
+  }
+};
+
+export const updateSuperAdminGlobalPosRate = async (percentFee) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/super-admin/rate-settings/global-rate`, {
+      percent_fee: Number(percentFee),
+    }, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to update global POS rate');
+  }
+};
+
+// ── Admin Applicable Charges & User Overrides ───────────────────────────────
+export const fetchMyAdminApplicableCharges = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/service-charge/my-applicable-charges`, getAuthHeaders());
+    const data = res.data?.data || res.data || {};
+    const pos = Array.isArray(data.pos) ? data.pos : [];
+    const pay = Array.isArray(data.payout) ? data.payout : (Array.isArray(data.pay) ? data.pay : []);
+    const ccBill = Array.isArray(data.cc_bill) ? data.cc_bill : (Array.isArray(data.ccBill) ? data.ccBill : []);
+    const rental = data.rental || null;
+
+    return {
+      ...res.data,
+      data: {
+        ...data,
+        pos,
+        payout: pay,
+        pay,
+        cc_bill: ccBill,
+        ccBill,
+        rental,
+        ccBillRate: { configuredRates: ccBill },
+        payRate: { configuredRates: pay },
+      },
+      rental,
+      ccBillRate: { configuredRates: ccBill },
+      payRate: { configuredRates: pay },
+    };
+  } catch (error) {
+    console.error('Failed to fetch admin applicable charges:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admin applicable charges');
+  }
+};
+
+export const fetchApplicableCcBillRulesForUser = async (userId) => {
+  try {
+    const res = await listBbpsChargeRules({ user_id: userId });
+    const rules = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    return {
+      success: true,
+      data: {
+        userRules: rules,
+        rules,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to fetch applicable CC rules for user ${userId}:`, error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch user CC bill rules');
+  }
+};
+
+export const fetchApplicableUserPayoutCharges = async (userId) => {
+  try {
+    const [userRes, applicableRes] = await Promise.all([
+      getUserPayoutChargesByUser(userId).catch(() => ({ data: [] })),
+      fetchMyAdminApplicableCharges().catch(() => null),
+    ]);
+
+    const userRules = Array.isArray(userRes?.data) ? userRes.data : [];
+    const baselineRules = applicableRes?.data?.payout || applicableRes?.data?.pay || [];
+
+    const userMap = new Map();
+    userRules.forEach((ur) => {
+      const key = `${parseFloat(ur.from_amount || 0).toFixed(2)}-${parseFloat(ur.to_amount || 0).toFixed(2)}`;
+      userMap.set(key, ur);
+    });
+
+    const matchedUserIds = new Set();
+    const comparison = [];
+
+    baselineRules.forEach((br) => {
+      const key = `${parseFloat(br.from_amount || 0).toFixed(2)}-${parseFloat(br.to_amount || 0).toFixed(2)}`;
+      const ur = userMap.get(key) || null;
+      if (ur) {
+        matchedUserIds.add(ur.id);
+      }
+      const activeRule = ur || br;
+      const rateType = activeRule.rate_type || 'flat';
+      const effectiveRate = rateType === 'flat' ? `₹${activeRule.rate}` : `${activeRule.rate}%`;
+
+      comparison.push({
+        from_amount: br.from_amount,
+        to_amount: br.to_amount,
+        baselineRule: br,
+        userRule: ur,
+        effectiveRate,
+        source: ur ? 'User Override' : 'Super Admin Baseline',
+        hasOverride: Boolean(ur),
+      });
+    });
+
+    userRules.forEach((ur) => {
+      if (!matchedUserIds.has(ur.id)) {
+        const rateType = ur.rate_type || 'flat';
+        comparison.push({
+          from_amount: ur.from_amount,
+          to_amount: ur.to_amount,
+          baselineRule: null,
+          userRule: ur,
+          effectiveRate: rateType === 'flat' ? `₹${ur.rate}` : `${ur.rate}%`,
+          source: 'User Override',
+          hasOverride: true,
+        });
+      }
+    });
+
+    comparison.sort((a, b) => Number(a.from_amount) - Number(b.from_amount));
+
+    return {
+      success: true,
+      data: {
+        comparison,
+        userRules,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to fetch applicable user payout charges for user ${userId}:`, error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch user payout charges');
   }
 };
 

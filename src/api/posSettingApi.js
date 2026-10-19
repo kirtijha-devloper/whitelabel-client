@@ -53,40 +53,19 @@ export const fetchPosSettings = async () => {
  * Update single customer T0 Daily Limit
  */
 export const updateCustomerT0Limit = async (customerId, t0DailyLimit) => {
-  const token = getAuthToken();
   const numericLimit = t0DailyLimit !== "" && t0DailyLimit !== null ? Number(t0DailyLimit) : null;
 
   try {
-    // 1. Try POS endpoint
-    try {
-      const response = await api.post(
-        "/admin/pos-setting/update-t0-limit",
-        { id: customerId, t0_daily_limit: numericLimit },
-        getAuthHeaders()
-      );
-      return response.data;
-    } catch (err) {
-      // 2. Try PG endpoint
-      try {
-        const pgResp = await api.post(
-          "/admin/pg-setting/updateT0Limit",
-          { id: customerId, t0_daily_limit: numericLimit },
-          getAuthHeaders()
-        );
-        return pgResp.data;
-      } catch (err2) {
-        // 3. Fallback user update route (authorized for both admin and franchise)
-        const userResp = await api.put(
-          `/user/${customerId}`,
-          { t0_daily_limit: numericLimit },
-          getAuthHeaders()
-        );
-        return userResp.data;
-      }
-    }
+    const response = await api.post(
+      "/admin/pos-setting/update-t0-limit",
+      { id: customerId, t0_daily_limit: numericLimit },
+      getAuthHeaders()
+    );
+    return response.data;
   } catch (error) {
-    console.error("Failed to update T0 limit on server:", error);
-    throw error;
+    const backendMessage = error?.response?.data?.message || error?.message || "Failed to update T0 limit";
+    console.error("Failed to update T0 limit on server:", backendMessage);
+    throw new Error(backendMessage);
   }
 };
 

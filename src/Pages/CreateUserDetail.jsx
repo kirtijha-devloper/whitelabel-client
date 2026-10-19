@@ -4,6 +4,7 @@ import { UserPlus, Lock, CheckCircle } from 'lucide-react';
 import { useUserCreation } from '../context/UserCreationContext';
 import StepIndicator from '../components/StepIndicator';
 import { onboardUser } from '../api/FranchiseApi';
+import { normalizeUserRole } from '../utils/userAccess';
 
 const steps = ['Basic Info', 'Address & Documents', 'POS Assignment', 'ChargeSet'];
 
@@ -23,7 +24,12 @@ function CreateUserDetail({ currentUser }) {
         setShowSuccess(true);
         setTimeout(() => {
           setShowSuccess(false);
-          const redirectUrl = currentUser.role === "franchise" ? `/franchise/create-user/pos/${data.id}` : `/admin/create-user/pos/${data.id}`;
+          const normalizedRole = normalizeUserRole(currentUser?.role);
+          const redirectUrl = normalizedRole === "franchise"
+            ? `/franchise/create-user/pos/${data.id}`
+            : normalizedRole === "super_franchise"
+              ? `/super-franchise/create-user/pos/${data.id}`
+              : `/admin/create-user/pos/${data.id}`;
           dispatch({ type: 'NEXT_STEP' });
           navigate(redirectUrl);
         }, 1500);
