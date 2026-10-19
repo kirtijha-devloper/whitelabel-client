@@ -348,6 +348,14 @@ const USER_SERVICE_INLINE_LABELS = {
   mx_payout: "Payout MX",
 };
 
+const EXCLUDED_INLINE_SERVICE_KEYS = new Set([
+  "user_daily_limit",
+  "pos_t0_settlement",
+  "pos_inventory",
+  "qr_inventory",
+  "pg_inventory",
+]);
+
 const MASTER_SERVICE_CONTROLS = [
   { key: "vimo_payout", label: "Vimo" },
   { key: "sevenpay_payout", label: "SevenPay" },
@@ -933,7 +941,7 @@ const UserList = ({
       <div
         className={`inline-grid grid-cols-2 items-start gap-x-5 gap-y-1.5 whitespace-normal ${className}`.trim()}
       >
-        {SERVICE_FLAG_CONFIG.filter((service) => service.key !== "user_daily_limit" && service.key !== "pos_t0_settlement").map((service) => {
+        {SERVICE_FLAG_CONFIG.filter((service) => !EXCLUDED_INLINE_SERVICE_KEYS.has(service.key)).map((service) => {
           const { rawEnabled, isSuperAdminDisabled, isAdminGlobalDisabled, isGloballyBlocked } = getServiceToggleState(row, service.key);
           const isUpdating =
             serviceSettingUpdatingKey === getServiceSettingUpdateKey(row?.id, service.key);
@@ -1703,9 +1711,8 @@ const UserList = ({
       return;
     }
 
-    const isPrimaryAdminUser = isCurrentUserPrimaryAdmin(currentUser);
-    if (!isPrimaryAdminUser && !isSuperFranchiseUser && !isTargetTestUser(user)) {
-      toast.error("Only primary admins and super franchises can log in as their assigned users.");
+    if (!isAdmin && !isSuperFranchiseUser && !isTargetTestUser(user)) {
+      toast.error("Only admins and super franchises can log in as their assigned users.");
       return;
     }
 
@@ -1791,13 +1798,6 @@ const UserList = ({
     const normalizedTargetRole = normalizeUserRole(row?.role);
     if (!normalizedTargetRole) return false;
     if (normalizedTargetRole === "admin") return false;
-
-    const isPrimaryAdminUser = isCurrentUserPrimaryAdmin(currentUser);
-    const isSuperFranchiseUser = normalizedCurrentUserRole === "super_franchise";
-
-    if (!isPrimaryAdminUser && !isSuperFranchiseUser && !isTargetTestUser(row)) {
-      return false;
-    }
 
     if (isAdmin) return true;
     if (isSuperFranchiseUser) {
