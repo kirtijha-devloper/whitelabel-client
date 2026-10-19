@@ -2495,16 +2495,43 @@ export const deleteUserPayoutCharge = async (id) => {
 };
 
 // ── Super Franchise Managed Charge Rules API ────────────────────────────────
+
+// Helper: call the generic /list endpoint (not /list/:audience) which applies
+// role-based scope restrictions server-side.  For super_franchise callers the
+// backend already returns admin_default + all super_franchise-scoped rules.
+const fetchSuperFranchiseListRules = async (extraParams = {}) => {
+  const apiParams = Object.fromEntries(
+    Object.entries({ limit: 2000, ...extraParams })
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+  );
+  const response = await axios.get(`${POS_CHARGE_RULES_BASE}/list`, {
+    ...getAuthHeaders(),
+    params: apiParams,
+  });
+  return extractArrayPayload(response.data);
+};
+
 export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => {
   try {
-    const params = superFranchiseId ? { super_franchise_id: superFranchiseId } : {};
-    const rules = await fetchChargeRulesByAudience('list', params);
+    // A single call to /list is correct here — the backend's listPosChargeRules
+    // already applies role-based WHERE clauses for super_franchise users that
+    // include admin_default and all super_franchise-scoped rules.
+    // Previously the code called /list/list (which doesn't exist as a route)
+    // causing Express to match 'list' as the :id param and return nothing.
+    const allRules = await fetchSuperFranchiseListRules();
 
-    const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default');
+    const adminRules = allRules.filter(
+      r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise'
+    );
+    const sfDefaultRules = allRules.filter(
+      r => r.scope === 'super_franchise_default' &&
+           (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId))
+    );
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
+
+    // Union of keys: all admin baseline rules, with SF overrides layered on top
     const keys = new Set([...adminByKey.keys(), ...sfByKey.keys()]);
 
     return [...keys].map(key => {
@@ -2513,14 +2540,17 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
       const effectiveRule = sfRule || adminRule;
       if (!effectiveRule) return null;
 
-      const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
+      const adminRate = adminRule
+        ? toFiniteNumber(adminRule.charge_percent, 0)
+        : toFiniteNumber(effectiveRule.charge_percent, 0);
+      // If SF has overridden this rule use that rate, otherwise inherit admin rate
       const sfRate = sfRule ? toFiniteNumber(sfRule.charge_percent, 0) : adminRate;
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         superFranchiseId,
         adminRule,
         baseRule: adminRule,
-        isInherited: !sfRule
+        isInherited: !sfRule,
       });
 
       return {
@@ -2531,7 +2561,7 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
         franchise_rate: sfRate,
         super_franchise_rate: sfRate,
         source_scope: sfRule ? 'super_franchise' : 'admin',
-        base_source_scope: adminRule ? 'admin' : mapped.base_source_scope
+        base_source_scope: adminRule ? 'admin' : mapped.base_source_scope,
       };
     }).filter(Boolean).sort(sortMappedRates);
   } catch (error) {
@@ -2611,9 +2641,9 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
 
 export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superFranchiseId) => {
   try {
-    const rules = await fetchChargeRulesByAudience('list', { super_franchise_id: superFranchiseId });
+    const rules = await fetchSuperFranchiseListRules();
     const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default');
+    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise' && Number(r.franchaise_id) === Number(franchiseId));
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
@@ -2722,9 +2752,9 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
 
 export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFranchiseId) => {
   try {
-    const rules = await fetchChargeRulesByAudience('list', { super_franchise_id: superFranchiseId });
+    const rules = await fetchSuperFranchiseListRules();
     const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default');
+    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant' && Number(r.user_id) === Number(merchantId));
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
@@ -2829,9 +2859,9 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
 
 export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, superFranchiseId) => {
   try {
-    const rules = await fetchChargeRulesByAudience('list', { super_franchise_id: superFranchiseId });
+    const rules = await fetchSuperFranchiseListRules();
     const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default');
+    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise');
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
@@ -2885,9 +2915,9 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
 
 export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superFranchiseId) => {
   try {
-    const rules = await fetchChargeRulesByAudience('list', { super_franchise_id: superFranchiseId });
+    const rules = await fetchSuperFranchiseListRules();
     const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default');
+    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant');
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);

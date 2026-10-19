@@ -475,6 +475,7 @@ const UserList = ({
   const canReadUsers = isFranchiseViewer || hasPermission(currentUser, "users.read");
   const canUpdateUsers = isFranchiseViewer || hasPermission(currentUser, "users.update");
   const isSuperFranchiseViewer = normalizedCurrentUserRole === "super_franchise";
+  const isSuperFranchiseUser = isSuperFranchiseViewer;
   const canUseImpersonateLogin = isAdmin || isSuperFranchiseViewer || hasPermission(currentUser, "users.impersonate");
   const canUpdateUserStatus =
     isFranchiseViewer || hasPermission(currentUser, "users.status.update");

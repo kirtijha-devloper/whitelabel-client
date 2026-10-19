@@ -1254,6 +1254,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
 
+    // ── Minimum rate guard: admin cannot charge downstream users less than their own cost ──
+    if (!isSuperAdmin && activeTab !== 'default') {
+      const adminCost = rate.platform_default_rate ?? rate.admin_rate ?? null;
+      const enteredRate = parseFloat(editValue);
+      if (adminCost !== null && !isNaN(enteredRate) && enteredRate < adminCost) {
+        toast.error(
+          `Rate cannot be less than your applicable rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
+        );
+        return;
+      }
+    }
+
     try {
       const updates = {
         chargePercent: editValue
@@ -1481,6 +1493,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
       toast.error('Please enter a charge percentage or flat amount.');
       return;
+    }
+
+    // ── Minimum rate guard: admin cannot charge downstream users less than their own cost ──
+    if (!isSuperAdmin && activeTab !== 'default' && posTxnEditRate) {
+      const adminCost = posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? null;
+      const enteredRate = parseFloat(posTxnEditForm.chargePercent || '0');
+      if (adminCost !== null && !isNaN(enteredRate) && enteredRate < adminCost) {
+        toast.error(
+          `Rate cannot be less than your applicable rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
+        );
+        return;
+      }
     }
     setIsSaving(true);
     try {
@@ -3499,6 +3523,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 </div>
               </div>
               {/* Charge Inputs: Rate (%) and Flat (₹) */}
+              {/* Minimum rate hint — shown when admin is editing a downstream user rate */}
+              {!isSuperAdmin && activeTab !== 'default' && posTxnEditRate && (() => {
+                const minRate = posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? null;
+                return minRate !== null ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <span className="mt-0.5 text-amber-500 shrink-0">⚠</span>
+                    <span>
+                      Your applicable rate for this rule is <strong>{minRate}%</strong>. You must set a rate{' '}
+                      <strong>≥ {minRate}%</strong> to avoid loss.
+                    </span>
+                  </div>
+                ) : null;
+              })()}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3507,7 +3544,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                   <input
                     type="number"
                     step="0.01"
-                    min="0"
+                    min={!isSuperAdmin && activeTab !== 'default' && posTxnEditRate ? (posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? 0) : 0}
                     className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
                     placeholder="e.g. 1.7"
                     value={posTxnEditForm.chargePercent}

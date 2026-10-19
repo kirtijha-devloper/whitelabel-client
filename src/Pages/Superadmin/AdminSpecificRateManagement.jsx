@@ -1097,20 +1097,17 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-gray-900">POS Rate Rules Comparison</span>
+                  <span className="font-bold text-gray-900">POS Rate Rules</span>
                   <span className="text-xs text-gray-500">
-                    Showing {filteredPosRows.length} rule(s) • Platform Defaults remain reference standards
+                    Showing {filteredPosRows.length} rule(s)
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs font-medium">
                   <span className="inline-flex items-center gap-1.5 text-gray-600">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" /> Platform Default
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Overridden
                   </span>
                   <span className="inline-flex items-center gap-1.5 text-gray-600">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Admin Override
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-gray-600">
-                    <span className="h-2 w-2 rounded-full bg-gray-300" /> Inherited Default
+                    <span className="h-2 w-2 rounded-full bg-gray-300" /> Platform Default
                   </span>
                 </div>
               </div>
@@ -1124,14 +1121,8 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                       <th className="py-3.5 px-4">Classification</th>
                       <th className="py-3.5 px-4">Settlement</th>
                       <th className="py-3.5 px-4">Amount Slab</th>
-                      <th className="py-3.5 px-4 bg-blue-50/40 text-blue-900 border-l border-blue-100">
-                        Platform Default Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-emerald-50/40 text-emerald-900 border-l border-emerald-100">
-                        Selected Admin Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-gray-50 text-gray-800 border-l border-gray-200">
-                        Effective Rate
+                      <th className="py-3.5 px-4 text-gray-800">
+                        Applicable Rate
                       </th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
@@ -1139,7 +1130,7 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                   <tbody className="divide-y divide-gray-100 text-gray-700">
                     {filteredPosRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-gray-400">
+                        <td colSpan={7} className="py-12 text-center text-gray-400">
                           No matching POS rate rules found.
                         </td>
                       </tr>
@@ -1183,62 +1174,28 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                           <td className="py-3.5 px-4 text-xs font-mono text-gray-600">
                             ₹{row.min_amount} – {row.max_amount ? `₹${row.max_amount}` : "Max"}
                           </td>
-                          {/* PLATFORM DEFAULT COLUMN */}
-                          <td className="py-3.5 px-4 bg-blue-50/20 border-l border-blue-100 font-mono text-xs">
-                            {row.defaultRule ? (
-                              <div>
-                                <span className="font-bold text-gray-900">{row.defaultRate.toFixed(2)}%</span>
-                                {row.defaultFlat > 0 && (
-                                  <span className="text-gray-500"> + ₹{row.defaultFlat.toFixed(2)}</span>
-                                )}
-                                {row.defaultGst !== null && (
-                                  <span className="block text-[10px] text-gray-500">GST: {row.defaultGst}%</span>
-                                )}
-                                <span className="mt-1 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
-                                  Default
+                          {/* APPLICABLE RATE COLUMN (single, effective rate) */}
+                          <td className="py-3.5 px-4 text-xs font-mono">
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={`rounded-lg px-2.5 py-1 inline-block font-bold ${
+                                  row.isOverridden
+                                    ? "bg-emerald-600 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {row.effectiveRate.toFixed(2)}%
+                                {row.effectiveFlat > 0 ? ` + ₹${row.effectiveFlat}` : ""}
+                              </span>
+                              {row.effectiveGst !== null && (
+                                <span className="text-[10px] text-gray-500">GST: {row.effectiveGst}%</span>
+                              )}
+                              {row.isOverridden && (
+                                <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 w-fit">
+                                  Overridden
                                 </span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic">No Default Rule</span>
-                            )}
-                          </td>
-                          {/* SELECTED ADMIN RATE COLUMN */}
-                          <td className="py-3.5 px-4 bg-emerald-50/20 border-l border-emerald-100 text-xs font-mono">
-                            {row.isOverridden ? (
-                              <div>
-                                <span className="font-bold text-emerald-700 text-sm">{row.adminRate.toFixed(2)}%</span>
-                                {row.adminFlat > 0 && (
-                                  <span className="text-emerald-600 font-semibold"> + ₹{row.adminFlat.toFixed(2)}</span>
-                                )}
-                                {row.adminGst !== null && (
-                                  <span className="block text-[10px] text-emerald-600">GST: {row.adminGst}%</span>
-                                )}
-                                <span className="mt-1 inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                                  Admin Override
-                                </span>
-                              </div>
-                            ) : (
-                              <div>
-                                <span className="text-gray-500 italic">Inherited from default</span>
-                                <span className="block text-gray-700 font-medium">({row.defaultRate.toFixed(2)}%)</span>
-                                <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600">
-                                  Inherited
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          {/* EFFECTIVE RATE COLUMN */}
-                          <td className="py-3.5 px-4 bg-gray-50/50 border-l border-gray-200 text-xs font-mono font-bold">
-                            <span
-                              className={`rounded-lg px-2.5 py-1 inline-block ${
-                                row.isOverridden
-                                  ? "bg-emerald-600 text-white shadow-sm"
-                                  : "bg-gray-200 text-gray-800"
-                              }`}
-                            >
-                              {row.effectiveRate.toFixed(2)}%
-                              {row.effectiveFlat > 0 ? ` + ₹${row.effectiveFlat}` : ""}
-                            </span>
+                              )}
+                            </div>
                           </td>
                           {/* ACTIONS */}
                           <td className="py-3.5 px-4 text-right">
@@ -1281,7 +1238,15 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-900">Payout & Banking Charges Slabs</span>
                   <span className="text-xs text-gray-500">
-                    Showing {filteredPayoutRows.length} slab rule(s) • Inherited from PayoutCharges platform default
+                    Showing {filteredPayoutRows.length} slab rule(s)
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-medium">
+                  <span className="inline-flex items-center gap-1.5 text-gray-600">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Overridden
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-gray-600">
+                    <span className="h-2 w-2 rounded-full bg-gray-300" /> Platform Default
                   </span>
                 </div>
               </div>
@@ -1292,14 +1257,8 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                     <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-600">
                       <th className="py-3.5 px-4">Amount Slab Range</th>
                       <th className="py-3.5 px-4">Service Description</th>
-                      <th className="py-3.5 px-4 bg-blue-50/40 text-blue-900 border-l border-blue-100">
-                        Platform Default Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-emerald-50/40 text-emerald-900 border-l border-emerald-100">
-                        Selected Admin Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-gray-50 text-gray-800 border-l border-gray-200">
-                        Effective Rate
+                      <th className="py-3.5 px-4 text-gray-800">
+                        Applicable Rate
                       </th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
@@ -1307,7 +1266,7 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                   <tbody className="divide-y divide-gray-100 text-gray-700">
                     {filteredPayoutRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-gray-400">
+                        <td colSpan={4} className="py-12 text-center text-gray-400">
                           No payout slab rules found.
                         </td>
                       </tr>
@@ -1320,54 +1279,24 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                           <td className="py-3.5 px-4 text-xs text-gray-600">
                             {row.description}
                           </td>
-                          {/* PLATFORM DEFAULT */}
-                          <td className="py-3.5 px-4 bg-blue-50/20 border-l border-blue-100 font-mono text-xs">
-                            {row.defaultRule ? (
-                              <div>
-                                <span className="font-bold text-gray-900">
-                                  {row.defaultRateType === "flat" ? `₹${row.defaultRate.toFixed(2)}` : `${row.defaultRate.toFixed(2)}%`}
+                          {/* APPLICABLE RATE COLUMN (single, effective rate) */}
+                          <td className="py-3.5 px-4 text-xs font-mono">
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={`rounded-lg px-2.5 py-1 inline-block font-bold ${
+                                  row.isOverridden
+                                    ? "bg-emerald-600 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {row.effectiveRateType === "flat" ? `₹${row.effectiveRate.toFixed(2)} Flat` : `${row.effectiveRate.toFixed(2)}%`}
+                              </span>
+                              {row.isOverridden && (
+                                <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 w-fit">
+                                  Overridden
                                 </span>
-                                <span className="text-gray-500 capitalize"> ({row.defaultRateType})</span>
-                                <span className="mt-1 block w-fit rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
-                                  Default
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic">No Default Slab</span>
-                            )}
-                          </td>
-                          {/* SELECTED ADMIN RATE */}
-                          <td className="py-3.5 px-4 bg-emerald-50/20 border-l border-emerald-100 text-xs font-mono">
-                            {row.isOverridden ? (
-                              <div>
-                                <span className="font-bold text-emerald-700 text-sm">
-                                  {row.adminRateType === "flat" ? `₹${row.adminRate.toFixed(2)}` : `${row.adminRate.toFixed(2)}%`}
-                                </span>
-                                <span className="text-emerald-600 capitalize font-medium"> ({row.adminRateType})</span>
-                                <span className="mt-1 block w-fit rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                                  Admin Override
-                                </span>
-                              </div>
-                            ) : (
-                              <div>
-                                <span className="text-gray-500 italic">Inherited (Default)</span>
-                                <span className="mt-1 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600">
-                                  Inherited
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          {/* EFFECTIVE RATE */}
-                          <td className="py-3.5 px-4 bg-gray-50/50 border-l border-gray-200 text-xs font-mono font-bold">
-                            <span
-                              className={`rounded-lg px-2.5 py-1 inline-block ${
-                                row.isOverridden
-                                  ? "bg-emerald-600 text-white shadow-sm"
-                                  : "bg-gray-200 text-gray-800"
-                              }`}
-                            >
-                              {row.effectiveRateType === "flat" ? `₹${row.effectiveRate.toFixed(2)} Flat` : `${row.effectiveRate.toFixed(2)}%`}
-                            </span>
+                              )}
+                            </div>
                           </td>
                           {/* ACTIONS */}
                           <td className="py-3.5 px-4 text-right">
@@ -1408,7 +1337,15 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-900">BBPS Credit Card Bill Payment Slabs</span>
                   <span className="text-xs text-gray-500">
-                    Showing {filteredCcBillRows.length} slab rule(s) • Inherited from BbpsCcChargeRules platform default
+                    Showing {filteredCcBillRows.length} slab rule(s)
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-medium">
+                  <span className="inline-flex items-center gap-1.5 text-gray-600">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Overridden
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-gray-600">
+                    <span className="h-2 w-2 rounded-full bg-gray-300" /> Platform Default
                   </span>
                 </div>
               </div>
@@ -1419,14 +1356,8 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                     <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-600">
                       <th className="py-3.5 px-4">Amount Slab Range</th>
                       <th className="py-3.5 px-4">Service Description</th>
-                      <th className="py-3.5 px-4 bg-blue-50/40 text-blue-900 border-l border-blue-100">
-                        Platform Default Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-emerald-50/40 text-emerald-900 border-l border-emerald-100">
-                        Selected Admin Rate
-                      </th>
-                      <th className="py-3.5 px-4 bg-gray-50 text-gray-800 border-l border-gray-200">
-                        Effective Rate
+                      <th className="py-3.5 px-4 text-gray-800">
+                        Applicable Rate
                       </th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
@@ -1434,7 +1365,7 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                   <tbody className="divide-y divide-gray-100 text-gray-700">
                     {filteredCcBillRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-gray-400">
+                        <td colSpan={4} className="py-12 text-center text-gray-400">
                           No CC Bill slab rules found.
                         </td>
                       </tr>
@@ -1447,54 +1378,24 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                           <td className="py-3.5 px-4 text-xs text-gray-600">
                             {row.description}
                           </td>
-                          {/* PLATFORM DEFAULT */}
-                          <td className="py-3.5 px-4 bg-blue-50/20 border-l border-blue-100 font-mono text-xs">
-                            {row.defaultRule ? (
-                              <div>
-                                <span className="font-bold text-gray-900">
-                                  {row.defaultRateType === "flat" ? `₹${row.defaultRate.toFixed(2)}` : `${row.defaultRate.toFixed(2)}%`}
+                          {/* APPLICABLE RATE COLUMN (single, effective rate) */}
+                          <td className="py-3.5 px-4 text-xs font-mono">
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={`rounded-lg px-2.5 py-1 inline-block font-bold ${
+                                  row.isOverridden
+                                    ? "bg-emerald-600 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {row.effectiveRateType === "flat" ? `₹${row.effectiveRate.toFixed(2)} Flat` : `${row.effectiveRate.toFixed(2)}%`}
+                              </span>
+                              {row.isOverridden && (
+                                <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 w-fit">
+                                  Overridden
                                 </span>
-                                <span className="text-gray-500 capitalize"> ({row.defaultRateType})</span>
-                                <span className="mt-1 block w-fit rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
-                                  Default
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic">No Default Slab</span>
-                            )}
-                          </td>
-                          {/* SELECTED ADMIN RATE */}
-                          <td className="py-3.5 px-4 bg-emerald-50/20 border-l border-emerald-100 text-xs font-mono">
-                            {row.isOverridden ? (
-                              <div>
-                                <span className="font-bold text-emerald-700 text-sm">
-                                  {row.adminRateType === "flat" ? `₹${row.adminRate.toFixed(2)}` : `${row.adminRate.toFixed(2)}%`}
-                                </span>
-                                <span className="text-emerald-600 capitalize font-medium"> ({row.adminRateType})</span>
-                                <span className="mt-1 block w-fit rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                                  Admin Override
-                                </span>
-                              </div>
-                            ) : (
-                              <div>
-                                <span className="text-gray-500 italic">Inherited (Default)</span>
-                                <span className="mt-1 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600">
-                                  Inherited
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          {/* EFFECTIVE RATE */}
-                          <td className="py-3.5 px-4 bg-gray-50/50 border-l border-gray-200 text-xs font-mono font-bold">
-                            <span
-                              className={`rounded-lg px-2.5 py-1 inline-block ${
-                                row.isOverridden
-                                  ? "bg-emerald-600 text-white shadow-sm"
-                                  : "bg-gray-200 text-gray-800"
-                              }`}
-                            >
-                              {row.effectiveRateType === "flat" ? `₹${row.effectiveRate.toFixed(2)} Flat` : `${row.effectiveRate.toFixed(2)}%`}
-                            </span>
+                              )}
+                            </div>
                           </td>
                           {/* ACTIONS */}
                           <td className="py-3.5 px-4 text-right">
