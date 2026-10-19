@@ -81,7 +81,6 @@ import {
 
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
-import InheritedRatesView from '../components/RateSetting/InheritedRatesView';
 
 const INITIAL_NEW_RATE_FORM = {
   method: 'CARD',
@@ -91,8 +90,8 @@ const INITIAL_NEW_RATE_FORM = {
   settlementType: '',
   minAmount: '0',
   maxAmount: '',
-  chargeType: 'percent', // 'percent' | 'flat'
-  chargeValue: '',
+  chargePercent: '',
+  chargeFlat: '',
   gstRequired: false,
   gstPercent: '18',
   companyName: '',
@@ -127,7 +126,6 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [activeTab, setActiveTab] = useState(effectiveInitialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
   const [viewMode, setViewMode] = useState(effectiveInitialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
   const [specificSettlementFilter, setSpecificSettlementFilter] = useState(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
-  const [hierarchyMode, setHierarchyMode] = useState('downline'); // 'inherited' | 'downline'
 
   useEffect(() => {
     const tabToSet = isSuperAdmin ? 'default' : initialTab;
@@ -1066,16 +1064,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         limit
       });
 
-      if (id === 'default' && data?.rates) {
-        setRates(data.rates);
-        setDefaultPagination((prev) => ({
-          ...prev,
-          ...data.pagination,
-          page: data.pagination?.page ?? prev.page,
-          limit: data.pagination?.limit ?? prev.limit,
-          totalPages: data.pagination?.totalPages ?? prev.totalPages,
-          total: data.pagination?.total ?? prev.total
-        }));
+      if (id === 'default') {
+        const list = Array.isArray(data) ? data : (data?.rates || []);
+        setRates(list);
+        if (data?.pagination) {
+          setDefaultPagination((prev) => ({
+            ...prev,
+            ...data.pagination,
+            page: data.pagination?.page ?? prev.page,
+            limit: data.pagination?.limit ?? prev.limit,
+            totalPages: data.pagination?.totalPages ?? prev.totalPages,
+            total: data.pagination?.total ?? prev.total
+          }));
+        }
       } else {
         setRates(data);
       }
@@ -1299,8 +1300,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleCreateNewRate = async () => {
-    if (!newRateForm.chargeValue) {
-      toast.error(`Please enter a ${newRateForm.chargeType === 'flat' ? 'flat charge amount' : 'charge percentage'}.`);
+    if ((newRateForm.chargePercent === '' || newRateForm.chargePercent === undefined) &&
+        (newRateForm.chargeFlat === '' || newRateForm.chargeFlat === undefined)) {
+      toast.error("Please enter a rate percentage or flat charge amount.");
       return;
     }
     if (showGSTInput && !newRateForm.gstPercent) {
@@ -1317,10 +1319,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         settlement_type: newRateForm.settlementType || null,
         min_amount: newRateForm.minAmount || '0',
         max_amount: newRateForm.maxAmount || null,
-        charge_flat: newRateForm.chargeType === 'flat' ? newRateForm.chargeValue : '0',
+        charge_flat: newRateForm.chargeFlat !== '' && newRateForm.chargeFlat !== null && newRateForm.chargeFlat !== undefined ? String(newRateForm.chargeFlat) : '0',
         gst_required: newRateForm.gstRequired,
         gst_rate: newRateForm.gstRequired ? newRateForm.gstPercent : '0',
-        base_rate: newRateForm.chargeType === 'percent' ? newRateForm.chargeValue : '0',
+        base_rate: newRateForm.chargePercent !== '' && newRateForm.chargePercent !== null && newRateForm.chargePercent !== undefined ? String(newRateForm.chargePercent) : '0',
         company_name: newRateForm.companyName || null
       };
 
@@ -1450,9 +1452,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     setPosTxnEditRate(rate);
     const method = String(rate.method || 'CARD').toUpperCase();
     const isUPI = method === 'UPI';
-    const flatVal = parseFloat(rate.charge_flat ?? 0);
-    const pctVal = parseFloat(getRateValue(rate) ?? 0);
-    const chargeType = flatVal > 0 && pctVal === 0 ? 'flat' : 'percent';
+    const flatVal = rate.charge_flat !== null && rate.charge_flat !== undefined ? String(rate.charge_flat) : '';
+    const pctVal = getRateValue(rate) !== null && getRateValue(rate) !== undefined ? String(getRateValue(rate)) : '';
     setPosTxnEditForm({
       method,
       network: isUPI ? '' : (String(rate.network || 'VISA').toUpperCase()),
@@ -1461,10 +1462,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       settlementType: rate.settlement_type || '',
       minAmount: String(rate.min_amount ?? '0'),
       maxAmount: rate.max_amount !== null && rate.max_amount !== undefined ? String(rate.max_amount) : '',
-      chargeType,
-      chargeValue: chargeType === 'flat' ? String(flatVal) : String(pctVal),
+      chargePercent: pctVal,
+      chargeFlat: flatVal,
       gstRequired: Boolean(rate.gst_required),
-      gstPercent: String(rate.gst_rate ?? '18'),
+      gstPercent: String(rate.gst_rate ?? rate.gst_percent ?? '18'),
       companyName: rate.company_name || '',
     });
     setIsPosTxnEditModalOpen(true);
@@ -1476,8 +1477,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setIsPosTxnEditModalOpen(false);
       return;
     }
-    if (!posTxnEditForm.chargeValue) {
-      toast.error('Please enter a charge amount.');
+    if ((posTxnEditForm.chargePercent === '' || posTxnEditForm.chargePercent === undefined) &&
+        (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
+      toast.error('Please enter a charge percentage or flat amount.');
       return;
     }
     setIsSaving(true);
@@ -1490,11 +1492,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         settlement_type: posTxnEditForm.settlementType || null,
         min_amount: posTxnEditForm.minAmount || '0',
         max_amount: posTxnEditForm.maxAmount || null,
-        charge_flat: posTxnEditForm.chargeType === 'flat' ? posTxnEditForm.chargeValue : '0',
+        charge_flat: posTxnEditForm.chargeFlat !== '' && posTxnEditForm.chargeFlat !== null && posTxnEditForm.chargeFlat !== undefined ? String(posTxnEditForm.chargeFlat) : '0',
         gst_required: posTxnEditForm.gstRequired,
         gst_percent: posTxnEditForm.gstRequired ? posTxnEditForm.gstPercent : '0',
-        chargePercent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
-        charge_percent: posTxnEditForm.chargeType === 'percent' ? posTxnEditForm.chargeValue : '0',
+        chargePercent: posTxnEditForm.chargePercent !== '' && posTxnEditForm.chargePercent !== null && posTxnEditForm.chargePercent !== undefined ? String(posTxnEditForm.chargePercent) : '0',
+        charge_percent: posTxnEditForm.chargePercent !== '' && posTxnEditForm.chargePercent !== null && posTxnEditForm.chargePercent !== undefined ? String(posTxnEditForm.chargePercent) : '0',
         company_name: posTxnEditForm.companyName || null
       };
       if (activeTab === 'default') {
@@ -1525,7 +1527,6 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         await updateMerchantRate(selectedMerchantId, posTxnEditRate, updates);
         toast.success('Rule updated successfully.');
       }
-      toast.success('Rule updated successfully.');
       setIsPosTxnEditModalOpen(false);
       setPosTxnEditRate(null);
       await refreshAfterUpdate();
@@ -2012,7 +2013,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                           : activeTab === 'super_franchise'
                             ? 'Super Franchise Base Rate (%)'
                             : activeTab === 'specific'
-                              ? 'Franchise Base Rate (%)'
+                              ? 'Override Rate (%)'
                               : 'Merchant Base Rate (%)'}
                       </p>
                       {!isPosTxnMode && editingId === rate.id ? (
@@ -2135,7 +2136,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                         : activeTab === 'super_franchise'
                           ? 'Super Franchise Base Rate (%)'
                           : activeTab === 'specific'
-                            ? 'Franchise Base Rate (%)'
+                            ? 'Override Rate (%)'
                             : 'Merchant Base Rate (%)'}
                     </th>
                     {!isReadOnlyDetail && (
@@ -2855,42 +2856,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     <div className="bg-gray-100 min-h-screen">
       <div> {/* Wider for Matrix */}
         <div className="bg-white rounded-lg shadow-sm">
-          {!isSuperAdmin && (
-            <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 rounded-t-lg">
-              <button
-                type="button"
-                onClick={() => setHierarchyMode('inherited')}
-                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                  hierarchyMode === 'inherited'
-                    ? 'border-[#00D3CD] text-[#008c87]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Lock className="h-4 w-4" />
-                <span>Inherited Rates (From Super Admin)</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setHierarchyMode('downline')}
-                className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                  hierarchyMode === 'downline'
-                    ? 'border-[#00D3CD] text-[#008c87]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Sliders className="h-4 w-4" />
-                <span>Set Downline Rates (For Super Franchise)</span>
-              </button>
-            </div>
-          )}
-
-          {!isSuperAdmin && hierarchyMode === 'inherited' ? (
-            <div className="p-4 md:p-6">
-              <InheritedRatesView uplineRoleName="Super Admin" currentRoleName="Admin" />
-            </div>
-          ) : (
-            <>
           {/* Header */}
           <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gray-50/50 rounded-t-lg">
             <div>
@@ -3174,8 +3140,6 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             {activeTab === 'rental' && renderRentalTab()}
             {activeTab === 'cc_bill' && renderCcBillTab()}
           </div>
-            </>
-          )}
         </div>
       </div>
 
@@ -3318,41 +3282,36 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 </div>
               </div>
 
-              {/* Charge Type toggle + single value */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Charge Type</label>
-                <div className="flex rounded overflow-hidden border border-gray-300">
-                  <button
-                    type="button"
-                    onClick={() => setNewRateForm({ ...newRateForm, chargeType: 'percent', chargeValue: '' })}
-                    className={`flex-1 py-2 text-sm font-medium transition ${newRateForm.chargeType === 'percent'
-                        ? 'bg-[#00D3CD] text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                  >
-                    Percentage (%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewRateForm({ ...newRateForm, chargeType: 'flat', chargeValue: '' })}
-                    className={`flex-1 py-2 text-sm font-medium transition ${newRateForm.chargeType === 'flat'
-                        ? 'bg-[#00D3CD] text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                  >
-                    Flat (₹)
-                  </button>
+              {/* Charge Inputs: Rate (%) and Flat (₹) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {activeTab === 'specific' ? 'Override Rate (%)' : activeTab === 'default' ? 'Default Base Rate (%)' : 'Rate (%)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    placeholder="e.g. 1.7"
+                    value={newRateForm.chargePercent}
+                    onChange={(e) => setNewRateForm({ ...newRateForm, chargePercent: e.target.value })}
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={newRateForm.chargeType === 'percent' ? '100' : undefined}
-                  className="w-full mt-2 border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                  placeholder={newRateForm.chargeType === 'percent' ? 'e.g. 1.7' : 'e.g. 10'}
-                  value={newRateForm.chargeValue}
-                  onChange={(e) => setNewRateForm({ ...newRateForm, chargeValue: e.target.value })}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Flat Charge (₹) <span className="text-gray-400 font-normal">optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    placeholder="e.g. 2"
+                    value={newRateForm.chargeFlat}
+                    onChange={(e) => setNewRateForm({ ...newRateForm, chargeFlat: e.target.value })}
+                  />
+                </div>
               </div>
 
               {/* GST Required */}
@@ -3539,41 +3498,36 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                   />
                 </div>
               </div>
-              {/* Charge Type toggle + single value */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Charge Type</label>
-                <div className="flex rounded overflow-hidden border border-gray-300">
-                  <button
-                    type="button"
-                    onClick={() => setPosTxnEditForm({ ...posTxnEditForm, chargeType: 'percent', chargeValue: '' })}
-                    className={`flex-1 py-2 text-sm font-medium transition ${posTxnEditForm.chargeType === 'percent'
-                        ? 'bg-[#00D3CD] text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                  >
-                    Percentage (%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPosTxnEditForm({ ...posTxnEditForm, chargeType: 'flat', chargeValue: '' })}
-                    className={`flex-1 py-2 text-sm font-medium transition ${posTxnEditForm.chargeType === 'flat'
-                        ? 'bg-[#00D3CD] text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                  >
-                    Flat (₹)
-                  </button>
+              {/* Charge Inputs: Rate (%) and Flat (₹) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {activeTab === 'specific' ? 'Override Rate (%)' : activeTab === 'default' ? 'Default Base Rate (%)' : 'Rate (%)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    placeholder="e.g. 1.7"
+                    value={posTxnEditForm.chargePercent}
+                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, chargePercent: e.target.value })}
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={posTxnEditForm.chargeType === 'percent' ? '100' : undefined}
-                  className="w-full mt-2 border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                  placeholder={posTxnEditForm.chargeType === 'percent' ? 'e.g. 1.7' : 'e.g. 10'}
-                  value={posTxnEditForm.chargeValue}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, chargeValue: e.target.value })}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Flat Charge (₹) <span className="text-gray-400 font-normal">optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    placeholder="e.g. 2"
+                    value={posTxnEditForm.chargeFlat}
+                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, chargeFlat: e.target.value })}
+                  />
+                </div>
               </div>
               {/* GST Required */}
               <div>

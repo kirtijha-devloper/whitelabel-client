@@ -410,7 +410,7 @@ const makeRuleKey = (rule) => {
   ].join('|');
 };
 
-const sortMappedRates = (a, b) => {
+export const sortMappedRates = (a, b) => {
   const left = [
     a.method,
     a.network,
@@ -434,6 +434,9 @@ const normalizeRulePayload = (source = {}, overrides = {}) => {
   const paymentMode = toApiPaymentMode(getPreferredValue(source, overrides, ['payment_mode', 'paymentMode', 'method']));
   const cardType = toApiCardType(getPreferredValue(source, overrides, ['card_type', 'cardType']));
   const cardBrand = toApiCardBrand(getPreferredValue(source, overrides, ['card_brand', 'cardBrand', 'network']));
+  const superFranchiseId = toNullableNumber(
+    getPreferredValue(source, overrides, ['super_franchise_id', 'superFranchiseId'])
+  );
   const franchiseId = toNullableNumber(
     getPreferredValue(source, overrides, ['franchaise_id', 'franchise_id', 'franchiseId'])
   );
@@ -451,6 +454,7 @@ const normalizeRulePayload = (source = {}, overrides = {}) => {
 
   return stripUndefined({
     user_id: getPreferredValue(source, overrides, ['user_id', 'userId']) ?? null,
+    super_franchise_id: superFranchiseId,
     franchaise_id: franchiseId,
     payment_mode: paymentMode,
     card_type: cardType,
@@ -1048,6 +1052,7 @@ const createScopedRuleOverride = async (
     ...updates,
     user_id: Number(userId),
     ...extraScope,
+    ...(extraScope && 'user_id' in extraScope ? { user_id: extraScope.user_id } : {}),
     is_active: true
   };
 
@@ -1221,9 +1226,9 @@ export const getUnassignedMerchants = async () => {
       ...getAuthHeaders(),
       params: { page: 1, limit }
     });
-    
+
     const payload = firstResponse?.data;
-    
+
     const extractMerchants = (data) => {
       return (
         data?.data?.merchants ||
@@ -1271,13 +1276,33 @@ export const getUnassignedMerchants = async () => {
   }
 };
 
+export const fetchBaseDefaultRules = async () => {
+  try {
+    const applicableRes = await fetchMyAdminApplicableCharges();
+    const posRules = applicableRes?.data?.pos || [];
+    if (posRules.length > 0) {
+      return posRules.map((r) => ({
+        ...r,
+        charge_percent: r.charge_percent,
+        charge_flat: r.charge_flat,
+        scope: r.is_override ? 'super_admin_admin' : 'super_admin_default',
+      }));
+    }
+  } catch (err) {
+    logRateWarn('Failed to fetch admin applicable charges for base defaults', err);
+  }
+
+  const superAdminDefaults = await fetchRulesByScopes([RULE_SCOPES.SUPER_ADMIN_DEFAULT]);
+  if (superAdminDefaults.length > 0) {
+    return superAdminDefaults;
+  }
+  return await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT]);
+};
+
 export const getSuperFranchiseRates = async (superFranchiseId, options = {}) => {
   try {
     const includeInherited = options?.includeInherited !== false;
-    const defaultRules = await fetchRulesByScopes([
-      RULE_SCOPES.ADMIN_DEFAULT,
-      RULE_SCOPES.SUPER_ADMIN_DEFAULT
-    ]);
+    const defaultRules = await fetchBaseDefaultRules();
 
     if (!superFranchiseId || superFranchiseId === 'default') {
       const defaults = defaultRules
@@ -1397,7 +1422,7 @@ export const getAllSuperFranchiseRates = async (superFranchises) => {
   try {
     const allRates = {};
     const [defaultRules, adminSfRules] = await Promise.all([
-      fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]),
+      fetchBaseDefaultRules(),
       fetchRulesByScopes([RULE_SCOPES.ADMIN_SUPER_FRANCHISE])
     ]);
 
@@ -1418,12 +1443,46 @@ export const getFranchiseRates = async (franchiseId, options = {}) => {
   try {
     logRateInfo('franchise-rates:load:start', { franchiseId });
     const includeInherited = options?.includeInherited !== false;
-    const defaultRules = await fetchRulesByScopes([
-      RULE_SCOPES.ADMIN_DEFAULT,
-      RULE_SCOPES.SUPER_ADMIN_DEFAULT
-    ]);
+    const defaultRules = await fetchBaseDefaultRules();
 
     if (!franchiseId || franchiseId === 'default') {
+      try {
+        const applicableRes = await fetchMyAdminApplicableCharges();
+        const posRules = applicableRes?.data?.pos || [];
+        if (posRules.length > 0) {
+          const defaults = posRules
+            .map((r) => {
+              const scopeName = r.is_override ? 'super_admin_admin' : 'super_admin_default';
+              const mapped = mapRuleToAdminFormat({
+                ...r,
+                scope: scopeName
+              }, {
+                isInherited: !r.is_override,
+              });
+              mapped.scope = scopeName;
+              mapped.source_scope = scopeName;
+              mapped.isInherited = !r.is_override;
+              return mapped;
+            })
+            .sort(sortMappedRates);
+
+          if (options.paginate) {
+            return {
+              rates: defaults,
+              pagination: {
+                total: defaults.length,
+                page: options.page ?? 1,
+                limit: options.limit ?? 100,
+                totalPages: 1
+              }
+            };
+          }
+          return defaults;
+        }
+      } catch (err) {
+        logRateWarn('Failed to fetch admin applicable charges, falling back to scope rules', err);
+      }
+
       if (options.paginate) {
         const { rules, pagination } = await fetchChargeRules(
           {
@@ -1728,7 +1787,7 @@ export const getAllFranchiseRates = async (franchises) => {
   try {
     const allRates = {};
     const [defaultRules, adminFranchiseRules] = await Promise.all([
-      fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]),
+      fetchBaseDefaultRules(),
       fetchRulesByScopes([RULE_SCOPES.ADMIN_FRANCHISE])
     ]);
 
@@ -1760,7 +1819,7 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
 
     if (!merchantId || merchantId === 'default') {
       if (franchiseId === null) {
-        const defaultRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]);
+        const defaultRules = await fetchBaseDefaultRules();
         const defaults = defaultRules
           .map((rule) =>
             mapRuleToMerchantFormat(rule, {
@@ -1783,7 +1842,7 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
       }
 
       const [adminRules, franchiseRules] = await Promise.all([
-        fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE], { franchaise_id: franchiseId }),
+        fetchRulesByScopes([RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE], { franchaise_id: franchiseId }),
         fetchRulesByScopes([RULE_SCOPES.FRANCHISE_DEFAULT], { franchaise_id: franchiseId })
       ]);
       const defaults = buildMerchantEffectiveRules(adminRules, franchiseRules, [], 'default', franchiseId);
@@ -1799,9 +1858,9 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
     }
 
     const adminRules = franchiseId === null
-      ? await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT])
+      ? await fetchBaseDefaultRules()
       : await fetchRulesByScopes(
-        [RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE],
+        [RULE_SCOPES.SUPER_ADMIN_DEFAULT, RULE_SCOPES.ADMIN_FRANCHISE],
         { franchaise_id: franchiseId }
       );
     const franchiseRules = franchiseId === null
@@ -2082,7 +2141,7 @@ export const getAllMerchantRates = async (merchants, scope = {}) => {
   try {
     const allRates = {};
     const franchiseIdFromScope = getEntityFranchiseId(scope, null);
-    const defaultRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT]);
+    const defaultRules = await fetchBaseDefaultRules();
     const adminFranchiseRules = franchiseIdFromScope === null
       ? []
       : await fetchRulesByScopes(
