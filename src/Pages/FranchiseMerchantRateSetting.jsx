@@ -58,6 +58,21 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   const [editValue, setEditValue] = useState("");
   const [validationError, setValidationError] = useState("");
 
+  const [matrixRowsPerPage, setMatrixRowsPerPage] = useState(20);
+  const [matrixPage, setMatrixPage] = useState(1);
+  const [detailReadOnly, setDetailReadOnly] = useState(false);
+
+  const getEntityPhone = (entity) => entity?.phone || entity?.mobile_number || entity?.mobile || "N/A";
+  const getEntityDisplayId = (entity) =>
+    entity?.custom_id ||
+    entity?.abheepay_id ||
+    entity?.abheepayId ||
+    entity?.display_id ||
+    entity?.displayId ||
+    entity?.user_id ||
+    entity?.userId ||
+    (entity?.id ? `ID #${entity.id}` : "N/A");
+
   const currentFranchiseId = currentUser?.id || 1;
   const currentUserId = currentUser?.id || 1;
   const getMerchantIdentifier = (entity) => {
@@ -144,6 +159,10 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     setValidationError("");
     setSelectedComboPopup(null);
   }, [settlementFilter]);
+
+  useEffect(() => {
+    setMatrixPage(1);
+  }, [searchTerm, activeTab, viewMode]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -247,6 +266,21 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     }
   };
 
+  const handleViewDetail = (item) => {
+    const itemId = getMerchantIdentifier(item);
+    if (itemId === null) {
+      toast.error(`${activeTab === "franchise" ? "Franchise" : "Merchant"} ID is missing.`);
+      return;
+    }
+    if (activeTab === "franchise") {
+      setSelectedFranchiseId(itemId);
+    } else {
+      setSelectedMerchantId(itemId);
+    }
+    setDetailReadOnly(true);
+    setViewMode("detail");
+  };
+
   const handleEditDetail = (item) => {
     const itemId = getMerchantIdentifier(item);
     if (itemId === null) {
@@ -258,6 +292,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     } else {
       setSelectedMerchantId(itemId);
     }
+    setDetailReadOnly(false);
     setViewMode("detail");
   };
 
@@ -265,6 +300,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     setSelectedMerchantId("");
     setSelectedFranchiseId("");
     setViewMode("matrix");
+    setDetailReadOnly(false);
     fetchInitialData();
   };
 
@@ -456,339 +492,222 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     const filteredEntities = entityList.filter((entity) => {
       const entityId = getMerchantIdentifier(entity);
       const entityName = String(entity?.name || "").toLowerCase();
-      const entityPhone = String(entity?.phone || "");
+      const entityDisplayId = String(getEntityDisplayId(entity) || "").toLowerCase();
+      const entityPhone = String(getEntityPhone(entity) || "").toLowerCase();
       const normalizedSearchTerm = searchTerm.toLowerCase();
 
       return (
         entityName.includes(normalizedSearchTerm) ||
         String(entityId ?? "").includes(searchTerm) ||
-        entityPhone.includes(searchTerm)
+        entityDisplayId.includes(normalizedSearchTerm) ||
+        entityPhone.includes(normalizedSearchTerm)
       );
     });
 
-    const filteredColumns = defaultColumnStructure.filter(matchesSettlementFilter);
-    const groupedColumns = buildGroupedColumns(filteredColumns);
-    const selectedGroup = selectedComboGroupKey
-      ? groupedColumns.find((group) => group.key === selectedComboGroupKey)
-      : null;
-    const displayedMatrixColumns = !compactColumnMode
-      ? filteredColumns
-      : selectedGroup
-        ? selectedGroup.columns
-        : groupedColumns;
-    const emptySettlementMessage = settlementFilter === "all"
-      ? "No rate combos found."
-      : "No rate combos found for the selected settlement.";
+    const searchPlaceholder = isFranchiseTab
+      ? "Search Franchise by Name, ID, or Phone..."
+      : "Search Merchant by Name, ID, or Phone...";
+
+    const emptyStateMessage = isFranchiseTab
+      ? "No franchises found."
+      : "No merchants found.";
+
+    const totalFilteredEntities = filteredEntities.length;
+    const totalMatrixPages = Math.max(1, Math.ceil(totalFilteredEntities / matrixRowsPerPage));
+    const currentMatrixPage = Math.min(matrixPage, totalMatrixPages);
+    const matrixStartIndex = (currentMatrixPage - 1) * matrixRowsPerPage;
+    const matrixEndIndex = matrixStartIndex + matrixRowsPerPage;
+    const paginatedEntities = filteredEntities.slice(matrixStartIndex, matrixEndIndex);
+    const pageWindowStart = Math.max(1, currentMatrixPage - 2);
+    const pageWindowEnd = Math.min(totalMatrixPages, pageWindowStart + 4);
+    const visibleMatrixPages = [];
+
+    for (let pageNumber = Math.max(1, pageWindowEnd - 4); pageNumber <= pageWindowEnd; pageNumber += 1) {
+      visibleMatrixPages.push(pageNumber);
+    }
 
     return (
       <div className="w-full pb-4">
-        <div className="bg-white border-b border-gray-200 px-4 py-4 shadow-sm space-y-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+        {/* Controls Bar */}
+        <div className="p-4 bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="w-full md:max-w-md">
               <input
                 type="text"
-                placeholder={isFranchiseTab ? "Search Franchise by Name, ID, or Phone..." : "Search Merchant by Name, ID, or Phone..."}
-                className="w-full md:min-w-[320px] md:max-w-md px-4 py-2 border border-gray-300 rounded-md focus:ring-[#00D3CD] focus:border-[#00D3CD]"
+                placeholder={searchPlaceholder}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#00D3CD] focus:border-[#00D3CD]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <div className="w-full md:w-56">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Settlement</label>
-                <select
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-[#00D3CD]"
-                  value={settlementFilter}
-                  onChange={(e) => setSettlementFilter(e.target.value)}
-                >
-                  <option value="today_settlement">Today Settlement</option>
-                  <option value="next_day_settlement">Next Day Settlement</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setCompactColumnMode((prev) => !prev)}
-              className="inline-flex items-center justify-center rounded-md border border-[#00D3CD] bg-white px-4 py-2 text-sm font-medium text-[#0f766e] hover:bg-[#ecfdf5]"
-            >
-              {compactColumnMode ? 'Expanded columns' : 'Collapsed combos'}
-            </button>
-          </div>
-          <div className="rounded-lg border border-[#d1f2ef] bg-[#f2fbf9] px-4 py-3 text-sm text-[#0f766e]">
-            <p className="font-semibold">Matrix mode</p>
-            <p className="mt-1">
-              {compactColumnMode
-                ? 'Columns are grouped by network + method to reduce horizontal width. Use the detail view for individual combos.'
-                : 'Full combo mode shows every rate combination separately.'}
-            </p>
+            <div className="w-full md:w-auto">
+              <label className="block text-sm font-medium text-gray-600 mb-1">Rows</label>
+              <select
+                value={matrixRowsPerPage}
+                onChange={(e) => {
+                  setMatrixRowsPerPage(Number(e.target.value));
+                  setMatrixPage(1);
+                }}
+                className="w-full md:w-28 px-3 py-2 border border-gray-300 rounded-md focus:ring-[#00D3CD] focus:border-[#00D3CD]"
+              >
+                {[10, 20, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        {selectedGroup && (
-          <div className="bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-semibold">Showing combos for:</p>
-                <p>{selectedGroup.network} {selectedGroup.method} — {selectedGroup.columns.length} combos</p>
-              </div>
-              <button
-                type="button"
-                onClick={clearSelectedComboGroup}
-                className="rounded-md border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-              >
-                Show all groups
-              </button>
-            </div>
-          </div>
-        )}
-        {displayedMatrixColumns.length === 0 ? (
-          <div className="px-4 py-6">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
-              {emptySettlementMessage}
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="block md:hidden px-3 py-3 space-y-3">
-              {filteredEntities.map((entity) => {
-                const entityId = getMerchantIdentifier(entity);
-                const entityRates = (matrixData[entityId] || []).filter(matchesSettlementFilter);
-                return (
-                  <div key={entityId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-[#4e73df]">{entity.name}</p>
-                        <p className="text-xs text-gray-500">ID: {entityId}</p>
-                        <p className="text-xs text-gray-500">Ph: {entity.phone || "N/A"}</p>
-                      </div>
-                      <button
-                        onClick={() => handleEditDetail(entity)}
-                        className="rounded-md border border-blue-100 px-2.5 py-1 text-xs font-semibold text-[#4e73df] hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {filteredColumns.map((attr, idx) => {
-                        const rate = findMatchingRate(entityRates, attr);
-                        const rateVal = isFranchiseTab ? (rate?.franchise_rate ?? rate?.merchant_rate) : rate?.merchant_rate;
-                        return (
-                          <div
-                            key={`entity-rate-${entityId}-${attr.rule_key || idx}`}
-                            className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
-                          >
-                            <p className="text-[11px] font-medium leading-4 text-gray-600">
-                              {attr.network} {attr.method}
-                            </p>
-                            <p className="max-w-[65%] text-[10px] leading-4 text-gray-400">{getRateMetaLine(attr)}</p>
-                            <span className="rounded-full bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-white">
-                              {rate && rateVal !== undefined && rateVal !== null ? `${formatRateValue(rateVal)}%` : "-"}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+        {/* Mobile View */}
+        <div className="block md:hidden p-4 space-y-3">
+          {paginatedEntities.map((entity) => {
+            const entityId = getMerchantIdentifier(entity);
+            return (
+              <div key={entityId} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#4e73df]">{entity.name}</p>
                   </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      onClick={() => handleViewDetail(entity)}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleEditDetail(entity)}
+                      className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded border border-gray-100 bg-gray-50 p-2">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-500">User ID</p>
+                    <p className="mt-1 text-sm font-medium text-gray-900">{getEntityDisplayId(entity)}</p>
+                  </div>
+                  <div className="rounded border border-gray-100 bg-gray-50 p-2">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-500">Phone</p>
+                    <p className="mt-1 text-sm font-medium text-gray-900">{getEntityPhone(entity)}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {paginatedEntities.length === 0 && (
+            <div className="rounded border border-gray-200 bg-white p-4 text-sm text-gray-500 text-center">
+              {emptyStateMessage}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 border-collapse">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                  {isFranchiseTab ? "FRANCHISE" : "MERCHANT"}
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                  USER ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                  PHONE
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                  ACTION
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paginatedEntities.map((entity) => {
+                const entityId = getMerchantIdentifier(entity);
+                return (
+                  <tr key={entityId} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <span className="text-sm font-semibold text-[#4e73df]">{entity.name}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                      {getEntityDisplayId(entity)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {getEntityPhone(entity)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => handleViewDetail(entity)}
+                          className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleEditDetail(entity)}
+                          className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1855e4] shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
-
-              {filteredEntities.length === 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-center text-sm text-gray-500">
-                  {isFranchiseTab ? "No franchises found." : "No merchants found."}
-                </div>
+              {paginatedEntities.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                    {emptyStateMessage}
+                  </td>
+                </tr>
               )}
-            </div>
+            </tbody>
+          </table>
+        </div>
 
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 border-collapse">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 border-b border-gray-200">
-                      {isFranchiseTab ? "Franchise" : "Merchant"}
-                    </th>
-                    {displayedMatrixColumns.map((group, idx) => {
-                      const isGrouped = compactColumnMode && !selectedComboGroupKey;
-                      const title = `${group.network}`;
-                      const subtitle = group.method;
-                      return (
-                        <th
-                          key={`col-${isGrouped ? `${group.key}` : group.rule_key || idx}`}
-                          className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 min-w-[180px]"
-                        >
-                          {title} <br />
-                          <span className="text-[10px] text-gray-400">{subtitle}</span>
-                          {isGrouped && (
-                            <div className="mt-1 text-[10px] normal-case text-gray-400">
-                              {group.columns.length} combos
-                            </div>
-                          )}
-                          {!isGrouped && (
-                            <div className="mt-1 text-[10px] normal-case text-gray-400">{getRateMetaLine(group)}</div>
-                          )}
-                        </th>
-                      );
-                    })}
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredEntities.map((entity) => {
-                    const entityId = getMerchantIdentifier(entity);
-                    const entityRates = (matrixData[entityId] || []).filter(matchesSettlementFilter);
-                    return (
-                      <tr key={entityId} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                          <div className="flex flex-col">
-                            <span className="text-base font-semibold text-[#4e73df]">{entity.name}</span>
-                            <span className="text-xs text-gray-500">ID: {entityId}</span>
-                            <span className="text-xs text-gray-500">Ph: {entity.phone || "N/A"}</span>
-                          </div>
-                        </td>
-                        {displayedMatrixColumns.map((group, idx) => {
-                          const isGrouped = compactColumnMode && !selectedComboGroupKey;
-                          const cellValue = isGrouped
-                            ? getCompactCellValue(entityRates, group)
-                            : (() => {
-                                const rate = findMatchingRate(entityRates, group);
-                                const rateVal = isFranchiseTab ? (rate?.franchise_rate ?? rate?.merchant_rate) : rate?.merchant_rate;
-                                return rate && rateVal !== undefined && rateVal !== null ? `${formatRateValue(rateVal)}%` : "-";
-                              })();
-                          return (
-                            <td key={`cell-${entityId}-${isGrouped ? group.key : group.rule_key || idx}`} className="px-4 py-4 whitespace-nowrap text-sm text-center text-gray-700">
-                              {isGrouped ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const matchedRates = group.columns
-                                      .map((column) => findMatchingRate(entityRates, column))
-                                      .filter(Boolean);
-                                    openComboPopup(entity, group, matchedRates);
-                                  }}
-                                  className="rounded-md border border-[#e2e8f0] bg-white px-3 py-1 text-xs font-semibold text-[#2563eb] hover:bg-[#eff6ff]"
-                                >
-                                  {cellValue}
-                                </button>
-                              ) : (
-                                cellValue
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium">
-                          <button
-                            onClick={() => handleEditDetail(entity)}
-                            className="text-[#4e73df] hover:text-blue-800 font-semibold"
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-        {selectedComboPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-              <div className="flex flex-col gap-3 border-b px-6 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-lg font-semibold text-gray-900">{selectedComboPopup.group.network} {selectedComboPopup.group.method}</p>
-                  <p className="text-sm text-gray-500">{selectedComboPopup.group.columns.length} combo rates for {selectedComboPopup.entity?.name || selectedComboPopup.merchant?.name}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeComboPopup}
-                  className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                <div className="grid gap-4 md:grid-cols-4 mb-4">
-                  <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-600">Method</label>
-                    <select
-                      value={comboPopupMethod}
-                      onChange={(e) => setComboPopupMethod(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#00D3CD] focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
-                    >
-                      <option value="">All Methods</option>
-                      {Array.from(new Set((selectedComboPopup?.rates || []).map((rate) => rate.method || ""))).filter(Boolean).map((method) => (
-                        <option key={method} value={method}>{method}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-600">Brand</label>
-                    <select
-                      value={comboPopupNetwork}
-                      onChange={(e) => setComboPopupNetwork(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#00D3CD] focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
-                    >
-                      <option value="">All Brands</option>
-                      {Array.from(new Set((selectedComboPopup?.rates || []).map((rate) => rate.network || ""))).filter(Boolean).map((network) => (
-                        <option key={network} value={network}>{network}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-600">Classification</label>
-                    <select
-                      value={comboPopupClassification}
-                      onChange={(e) => setComboPopupClassification(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#00D3CD] focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
-                    >
-                      <option value="">All Classifications</option>
-                      {Array.from(new Set((selectedComboPopup?.rates || []).map((rate) => rate.card_classification || ""))).filter(Boolean).map((classification) => (
-                        <option key={classification} value={classification}>{classification}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {filteredComboRates.length > 0 ? filteredComboRates.map((rate) => (
-                    <div key={rate.rule_key || rate.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-sm font-semibold text-gray-900">{rate.method || 'CARD'} | {rate.network || 'VISA'} | {rate.card_classification || 'ANY'}</p>
-                      <div className="mt-3 space-y-2 text-sm text-gray-600">
-                        <div className="flex justify-between">
-                          <span>{isFranchiseTab ? "Franchise Rate" : "Merchant Rate"}</span>
-                          <span className="font-semibold text-gray-900">
-                            {formatRateValue(isFranchiseTab ? (rate.franchise_rate ?? rate.merchant_rate) : rate.merchant_rate)}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Admin Rate</span>
-                          <span className="font-semibold text-gray-900">{formatRateValue(getAdminRateValue(rate))}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>GST</span>
-                          <span className="font-semibold text-gray-900">{formatGstValue(rate)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Profit Margin</span>
-                          <span className="font-semibold text-gray-900">{calculateMargin(getEditableRateValue(rate), getAdminRateValue(rate))}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Settlement</span>
-                          <span className="font-semibold text-gray-900">{rate.settlement_type || 'N/A'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
-                      No combo rates available for this group.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Pagination */}
+        <div className="flex flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:justify-between border-t border-gray-200">
+          <p className="text-sm text-gray-600">
+            {totalFilteredEntities > 0
+              ? `Showing ${matrixStartIndex + 1}-${Math.min(matrixEndIndex, totalFilteredEntities)} of ${totalFilteredEntities}`
+              : "Showing 0 results"}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMatrixPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentMatrixPage <= 1}
+              className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 disabled:opacity-50 hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            {visibleMatrixPages.map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => setMatrixPage(pageNumber)}
+                className={`px-3 py-1.5 rounded-md border text-sm ${
+                  currentMatrixPage === pageNumber
+                    ? "border-[#00D3CD] bg-[#00D3CD] text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {pageNumber}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setMatrixPage((prev) => Math.min(totalMatrixPages, prev + 1))}
+              disabled={currentMatrixPage >= totalMatrixPages}
+              className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 disabled:opacity-50 hover:bg-gray-50"
+            >
+              Next
+            </button>
           </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -1056,7 +975,17 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                         %
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-center space-x-2">
-                        {editingId === rate.id ? (
+                        {detailReadOnly ? (
+                          <button
+                            onClick={() => {
+                              setDetailReadOnly(false);
+                              handleEdit(rate);
+                            }}
+                            className="bg-[#1855e4] px-3 py-1 rounded text-white transition-colors hover:bg-blue-700 text-xs font-semibold shadow-sm"
+                          >
+                            Edit
+                          </button>
+                        ) : editingId === rate.id ? (
                           <>
                             <button
                               onClick={() => handleUpdate(rate)}
@@ -1108,20 +1037,20 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
       <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-            {isSuperFranchise ? "Set Downline Charges (For Franchise & Merchants)" : "POS charges for you and your merchant"}
+            POS Transaction Charges
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             {isSuperFranchise
-              ? "Review non-editable Admin inherited rates and configure pricing for your downline."
-              : "Set Merchant Rates and View Profit Margins"}
+              ? "Default, franchise and merchant POS transaction charge settings."
+              : "Default and merchant POS transaction charge settings."}
           </p>
         </div>
         {viewMode === "detail" && (activeTab === "specific" || activeTab === "franchise") && (
           <button
             onClick={handleBackToMatrix}
-            className="w-full md:w-auto flex items-center justify-center text-gray-600 hover:text-gray-900 font-medium bg-white border border-gray-200 px-4 py-2 rounded shadow-sm"
+            className="w-full md:w-auto flex items-center justify-center text-gray-600 hover:text-gray-900 font-medium bg-white border border-gray-200 px-4 py-2 rounded shadow-sm hover:bg-gray-50 transition"
           >
-            &larr; Back to Matrix View
+            &larr; Back to List View
           </button>
         )}
       </div>
@@ -1137,7 +1066,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
             setViewMode("detail");
           }}
         >
-          {isSuperFranchise ? "Network Default Rates (For Franchise)" : "Default Rates"}
+          {isSuperFranchise ? "Default POS Rates (Inherited)" : "Default POS Rates"}
         </button>
         {isSuperFranchise && (
           <button
@@ -1150,7 +1079,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
               setSelectedFranchiseId("");
             }}
           >
-            Specific Franchise Rates (Matrix)
+            Franchise Specific Rates
           </button>
         )}
         <button
@@ -1163,7 +1092,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
             setSelectedMerchantId("");
           }}
         >
-          Specific Merchant Rates (Matrix)
+          {isSuperFranchise ? "Merchant Specific Rates" : "Specific Merchant Rates"}
         </button>
       </div>
 
@@ -1173,12 +1102,24 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
         {activeTab === "franchise" && viewMode === "matrix" && renderMatrix()}
         {activeTab === "franchise" && viewMode === "detail" && (
           <div>
-            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
-              <span className="font-semibold text-blue-800">Franchise:</span>
-              <span className="ml-2 text-blue-900">{selectedFranchise?.name || "Unknown"}</span>
-              {selectedFranchise?.phone && (
-                <span className="ml-3 text-xs text-blue-700">({selectedFranchise.phone})</span>
-              )}
+            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-blue-800">Franchise:</span>
+                <span className="font-bold text-blue-900">{selectedFranchise?.name || "Unknown"}</span>
+                <span className="text-xs text-blue-700">({getEntityDisplayId(selectedFranchise)} | {getEntityPhone(selectedFranchise)})</span>
+                {detailReadOnly && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-xs bg-slate-100 border border-slate-300 text-slate-700 font-medium">
+                    View Only
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleBackToMatrix}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+              >
+                ← Back to List View
+              </button>
             </div>
             {renderDetailTable()}
           </div>
@@ -1186,12 +1127,24 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
         {activeTab === "specific" && viewMode === "matrix" && renderMatrix()}
         {activeTab === "specific" && viewMode === "detail" && (
           <div>
-            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
-              <span className="font-semibold text-blue-800">Merchant:</span>
-              <span className="ml-2 text-blue-900">{selectedMerchant?.name || "Unknown"}</span>
-              {selectedMerchant?.phone && (
-                <span className="ml-3 text-xs text-blue-700">({selectedMerchant.phone})</span>
-              )}
+            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-blue-800">Merchant:</span>
+                <span className="font-bold text-blue-900">{selectedMerchant?.name || "Unknown"}</span>
+                <span className="text-xs text-blue-700">({getEntityDisplayId(selectedMerchant)} | {getEntityPhone(selectedMerchant)})</span>
+                {detailReadOnly && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-xs bg-slate-100 border border-slate-300 text-slate-700 font-medium">
+                    View Only
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleBackToMatrix}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+              >
+                ← Back to List View
+              </button>
             </div>
             {renderDetailTable()}
           </div>

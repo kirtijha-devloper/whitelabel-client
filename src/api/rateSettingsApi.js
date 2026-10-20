@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BASE_URL } from '../constants';
-import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers } from './FranchiseApi';
+import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, AllUsers } from './FranchiseApi';
 import { getAuthToken } from '../utils/auth';
 
 const getAuthHeaders = () => {
@@ -1152,8 +1152,33 @@ export const getSuperFranchises = async () => {
 
 export const getFranchises = async () => {
   try {
-    const res = await FranchiseAllUsers({ limit: 1000 });
-    return res?.data || res || [];
+    let list = [];
+    try {
+      const res = await FranchiseAllUsers({ limit: 1000 });
+      list = extractArrayPayload(res);
+    } catch {
+      // ignore
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const fallbackRes = await AllUsers({ role: 'franchise', limit: 1000 });
+        list = extractArrayPayload(fallbackRes);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const fallbackRes2 = await AllUsers({ role: 'franchaise', limit: 1000 });
+        list = extractArrayPayload(fallbackRes2);
+      } catch {
+        // ignore
+      }
+    }
+
+    return Array.isArray(list) ? list : [];
   } catch (error) {
     console.error('Error fetching franchises:', error);
     return [];
@@ -1220,6 +1245,19 @@ export const getMerchants = async (franchiseId) => {
     if (franchiseId) {
       merchants = merchants.filter((merchant) => getEntityFranchiseId(merchant) === Number(franchiseId));
     }
+
+    if (!Array.isArray(merchants) || merchants.length === 0) {
+      try {
+        const fallbackRes = await AllUsers({ role: 'merchant', limit: 1000, ...(franchiseId ? { franchise_id: franchiseId } : {}) });
+        const fallbackList = extractArrayPayload(fallbackRes);
+        if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+          merchants = fallbackList;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     return merchants;
   } catch (error) {
     console.error('Error fetching merchants:', error);
