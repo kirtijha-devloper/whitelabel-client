@@ -24,8 +24,9 @@ import InheritedRatesView from "../components/RateSetting/InheritedRatesView";
 const DEFAULT_SETTLEMENT_FILTER = "today_settlement";
 
 const FranchiseMerchantRateSetting = ({ currentUser }) => {
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase().replace(/[-_]/g, '');
   const isSuperFranchise =
-    currentUser?.role === "super_franchise" ||
+    normalizedRole === "superfranchise" ||
     (typeof window !== "undefined" && window.location.pathname.includes("/super-franchise"));
 
 
@@ -93,15 +94,22 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   };
   const hasEditableGst = (rate) => rate?.gst_required || rate?.gst_rate !== null && rate?.gst_rate !== undefined;
   const getAdminRateValue = (rate) => Number(rate?.admin_rate ?? rate?.base_rate ?? 0);
-  const getValidationTarget = (rate) => Number(rate?.admin_rate ?? rate?.base_rate ?? 0);
+  const getValidationTarget = (rate) => {
+    if (activeTab === "default") {
+      return Number(rate?.admin_rate ?? rate?.base_rate ?? 0);
+    }
+    return Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
+  };
   const getValidationMessage = (rate) => {
     if (activeTab === "default") {
       return (isSuperFranchise ? "Super Franchise default rate" : "Franchise default rate") + " must be\ngreater than or equal to rate set by admin";
     }
     if (activeTab === "franchise") {
-      return "Franchise rate must be\ngreater than or equal to rate set by admin";
+      return "Franchise rate must be\ngreater than or equal to Super Franchise default rate";
     }
-    return "Merchant rate must be\ngreater than or equal to rate set by admin";
+    return isSuperFranchise
+      ? "Merchant rate must be\ngreater than or equal to Super Franchise default rate"
+      : "Merchant rate must be\ngreater than or equal to rate set by franchise";
   };
   const getBaseRateLabel = () => "Rate Set By Admin (%)";
   const getEditableRateValue = (rate) => {
@@ -115,11 +123,12 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   return rate.merchant_rate ?? rate.franchise_rate ?? rate.base_rate;
 };
   const normalizeSettlementValue = (value) => String(value ?? "").trim().toLowerCase();
-  const matchesSettlementFilter = (rate) => (
-    settlementFilter === "all"
-      ? true
-      : normalizeSettlementValue(rate?.settlement_type) === settlementFilter
-  );
+  const matchesSettlementFilter = (rate) => {
+    if (settlementFilter === "all") return true;
+    const rateSettlement = normalizeSettlementValue(rate?.settlement_type);
+    if (!rateSettlement || rateSettlement === "any" || rateSettlement === "all") return true;
+    return rateSettlement === settlementFilter;
+  };
   const formatSettlementLabel = (value) => {
     const normalizedValue = normalizeSettlementValue(value);
     if (normalizedValue === "today_settlement") return "Today Settlement";
