@@ -607,9 +607,21 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Card Brand / Type</th>
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Classification</th>
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Settlement</th>
-                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Admin Base Rate (%)</th>
-                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Super Franchise Rate (%)</th>
-                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Margin (%)</th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase bg-gray-100/80 border-x">
+                            <div className="flex items-center justify-center gap-1">
+                              <Lock className="w-3 h-3 text-gray-500" />
+                              <span>Inherited Rate (Admin) (%)</span>
+                            </div>
+                            <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-indigo-700 uppercase bg-indigo-50/60 border-r">
+                            <div>Set Downline Charge (%)</div>
+                            <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-emerald-800 uppercase bg-emerald-50/40 border-r">
+                            <div>Profit Margin (%)</div>
+                            <span className="text-[10px] font-normal normal-case text-emerald-600 block">Downline - Inherited</span>
+                          </th>
                           <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Status</th>
                           <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Action</th>
                         </tr>
@@ -631,10 +643,13 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">{rate.card_classification || "ANY"}</td>
                               <td className="px-4 py-3 text-sm text-gray-600 font-mono">{rate.settlement_type || "Standard"}</td>
-                              <td className="px-4 py-3 text-center text-sm font-semibold text-gray-500 bg-gray-50">
-                                {adminRateVal}%
+                              <td className="px-4 py-3 text-center text-sm font-semibold bg-gray-50/80 border-x">
+                                <span className="inline-flex items-center gap-1 font-semibold text-gray-800 bg-gray-200/70 px-2.5 py-1 rounded border border-gray-300">
+                                  <Lock className="w-3 h-3 text-gray-500" />
+                                  {adminRateVal}%
+                                </span>
                               </td>
-                              <td className="px-4 py-3 text-center text-sm">
+                              <td className="px-4 py-3 text-center text-sm bg-indigo-50/20 border-r">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -649,7 +664,7 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-center text-sm font-bold text-blue-600">
+                              <td className="px-4 py-3 text-center text-sm font-bold text-emerald-600 bg-emerald-50/10 border-r">
                                 {marginVal}%
                               </td>
                               <td className="px-4 py-3 text-center">

@@ -101,17 +101,19 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     return Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
   };
   const getValidationMessage = (rate) => {
+    const minTarget = getValidationTarget(rate);
+    const minTargetDisplay = Number.isFinite(minTarget) ? `${minTarget.toFixed(2)}%` : "inherited rate";
     if (activeTab === "default") {
-      return (isSuperFranchise ? "Super Franchise default rate" : "Franchise default rate") + " must be\ngreater than or equal to rate set by admin";
+      return (isSuperFranchise ? "Downline default charge" : "Franchise default rate") + ` must be ≥ Inherited rate (${minTargetDisplay})`;
     }
     if (activeTab === "franchise") {
-      return "Franchise rate must be\ngreater than or equal to Super Franchise default rate";
+      return `Franchise charge must be ≥ Inherited rate (${minTargetDisplay})`;
     }
     return isSuperFranchise
-      ? "Merchant rate must be\ngreater than or equal to Super Franchise default rate"
-      : "Merchant rate must be\ngreater than or equal to rate set by franchise";
+      ? `Merchant charge must be ≥ Inherited rate (${minTargetDisplay})`
+      : `Merchant rate must be ≥ Inherited rate (${minTargetDisplay})`;
   };
-  const getBaseRateLabel = () => "Rate Set By Admin (%)";
+  const getBaseRateLabel = () => "Inherited Rate (From Admin) (%)";
   const getEditableRateValue = (rate) => {
   if (activeTab === "default") {
     // For default rates, prioritize overrides, then base, finally admin_rate as fallback
@@ -278,11 +280,11 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     setValidationError("");
   };
 
-  const handleChange = (e, baseRate) => {
+  const handleChange = (e, baseRate, rate) => {
     const val = e.target.value;
     setEditValue(val);
     if (Number(val) < Number(baseRate)) {
-      setValidationError(getValidationMessage({}));
+      setValidationError(getValidationMessage(rate || { base_rate: baseRate, admin_rate: baseRate }));
     } else {
       setValidationError("");
     }
@@ -355,7 +357,8 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   };
 
   const calculateMargin = (merchantRate, baseRate) => {
-    if (!baseRate && activeTab === "default") return "-";
+    if (baseRate === undefined || baseRate === null || baseRate === "" || isNaN(Number(baseRate))) return "-";
+    if (merchantRate === undefined || merchantRate === null || merchantRate === "" || isNaN(Number(merchantRate))) return "-";
     return (Number(merchantRate) - Number(baseRate)).toFixed(2);
   };
 
@@ -854,55 +857,68 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       </div>
                     </div>
 
-                    <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
-                      <p className="text-[11px] text-gray-500">{getBaseRateLabel(rate)}</p>
-                      <p className="text-sm font-semibold text-gray-900">{formatRateValue(getAdminRateValue(rate))}%</p>
+                    <div className="mt-2 rounded-lg bg-gray-100/70 border border-gray-200/80 px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-600 flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-gray-500" />
+                          Inherited Rate (Admin)
+                        </p>
+                        <p className="text-[10px] text-gray-500">Non-Editable Base</p>
+                      </div>
+                      <span className="text-sm font-bold text-gray-800">{formatRateValue(getAdminRateValue(rate))}%</span>
                     </div>
 
-                    <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
-                      <p className="text-[11px] text-gray-500">
-                        {activeTab === "default"
-                          ? (isSuperFranchise ? "Super Franchise Default Rate (%)" : "Default Merchant Rate (%)")
-                          : activeTab === "franchise"
-                          ? "Franchise Rate (%)"
-                          : "Merchant Rate (%)"}
+                    <div className="mt-2 rounded-lg bg-indigo-50/50 border border-indigo-100 px-3 py-2">
+                      <p className="text-[11px] font-semibold text-indigo-900">
+                        {isSuperFranchise
+                          ? (activeTab === "default"
+                              ? "Set Downline Charge (Default) (%)"
+                              : activeTab === "franchise"
+                              ? "Set Franchise Charge (%)"
+                              : "Set Merchant Charge (%)")
+                          : (activeTab === "default"
+                              ? "Default Merchant Rate (%)"
+                              : "Merchant Rate (%)")}
                       </p>
                       {editingId === rate.id ? (
                         <div className="mt-1">
                           <input
                             type="number"
                             step="0.01"
+                            min={getValidationTarget(rate)}
                             className={`w-full rounded border px-2 py-1.5 text-sm focus:ring-2 focus:border-transparent ${
-                              validationError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-[#00D3CD]"
+                              validationError ? "border-red-500 focus:ring-red-500" : "border-[#00D3CD] focus:ring-[#00D3CD]"
                             }`}
                             value={editValue}
-                            onChange={(e) => handleChange(e, getValidationTarget(rate))}
+                            onChange={(e) => handleChange(e, getValidationTarget(rate), rate)}
                           />
-                          {validationError && <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500">{validationError}</div>}
+                          {validationError && <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500 font-medium">{validationError}</div>}
                         </div>
-                        ) : (
-                          <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                          {formatRateValue(getEditableRateValue(rate))}%
-                          {rate.isInherited && (activeTab === "specific" || activeTab === "franchise") && (
-                            <span className="ml-1 text-xs text-gray-400 italic">(Default)</span>
+                      ) : (
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-sm font-bold text-gray-900">
+                            {formatRateValue(getEditableRateValue(rate))}%
+                          </p>
+                          {rate.isInherited ? (
+                            <span className="text-[10px] text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded">
+                              Default
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                              Configured
+                            </span>
                           )}
-                        </p>
+                        </div>
                       )}
                     </div>
 
-                    {hasEditableGst(rate) && (
-                      <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
-                        <p className="text-[11px] text-gray-500">GST (%)</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatGstValue(rate)}</p>
+                    <div className="mt-2 rounded-lg bg-emerald-50/50 border border-emerald-100 px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold text-emerald-800">Profit Margin (%)</p>
+                        <p className="text-[10px] text-emerald-600">Downline - Inherited</p>
                       </div>
-                    )}
-
-                    {(activeTab === "specific" || activeTab === "franchise") && (
-                      <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
-                        <p className="text-[11px] text-gray-500">Profit Margin (%)</p>
-                        <p className="text-sm font-semibold text-gray-900">{marginValue}</p>
-                      </div>
-                    )}
+                      <p className="text-sm font-bold text-emerald-600">{marginValue}</p>
+                    </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {editingId === rate.id ? (
@@ -924,16 +940,14 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           </button>
                         </>
                       ) : (
-                        <>
-                          <button
-                            onClick={() => handleEdit(rate)}
-                            className="col-span-2 rounded bg-[#4e73df] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
-                          >
-                            Edit
-                          </button>
-                    </>
-                  )}
-                </div>
+                        <button
+                          onClick={() => handleEdit(rate)}
+                          className="col-span-2 rounded bg-[#4e73df] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+                        >
+                          Edit Downline Charge
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -948,70 +962,100 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Network</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classification</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Settlement</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GST (%)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate Set By Admin (%)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {activeTab === "default"
-                        ? (isSuperFranchise ? "Super Franchise Default Rate (%)" : "Default Merchant Rate (%)")
-                        : activeTab === "franchise"
-                        ? "Franchise Rate (%)"
-                        : "Merchant Rate (%)"}
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Network</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classification</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Settlement</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GST (%)</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-x border-gray-200">
+                      <div className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-gray-500" />
+                        <span>Inherited Rate (Admin) (%)</span>
+                      </div>
+                      <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
                     </th>
-                    {(activeTab === "specific" || activeTab === "franchise") && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit Margin (%)</th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider bg-indigo-50/60 border-r border-indigo-100">
+                      <div>
+                        {isSuperFranchise
+                          ? (activeTab === "default"
+                              ? "Set Downline Charge (Default) (%)"
+                              : activeTab === "franchise"
+                              ? "Set Franchise Charge (%)"
+                              : "Set Merchant Charge (%)")
+                          : (activeTab === "default"
+                              ? "Default Merchant Rate (%)"
+                              : "Merchant Rate (%)")}
+                      </div>
+                      <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50/40 border-r border-emerald-100">
+                      <span>Profit Margin (%)</span>
+                      <span className="text-[10px] font-normal normal-case text-emerald-600 block">Downline - Inherited</span>
+                    </th>
+                    <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRates.map((rate) => (
                     <tr key={rate.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{rate.method}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{rate.network}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">{rate.company_name || "—"}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rate.card_classification || "ANY"}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatSettlementLabel(rate.settlement_type)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{rate.method}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-900">{rate.network}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">{rate.company_name || "—"}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">{rate.card_classification || "ANY"}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">{formatSettlementLabel(rate.settlement_type)}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatGstValue(rate)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatRateValue(getAdminRateValue(rate))}%</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-5 py-4 whitespace-nowrap text-sm bg-gray-50/80 border-x border-gray-200">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-gray-800 bg-gray-200/70 px-2.5 py-1 rounded border border-gray-300">
+                          <Lock className="w-3 h-3 text-gray-500" />
+                          {formatRateValue(getAdminRateValue(rate))}%
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-900 bg-indigo-50/20 border-r border-indigo-100">
                         {editingId === rate.id ? (
                           <div>
                             <input
                               type="number"
                               step="0.01"
-                              className={`border rounded px-2 py-1 w-24 focus:ring-2 focus:border-transparent ${
-                                validationError ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-[#00D3CD]"
+                              min={getValidationTarget(rate)}
+                              className={`border rounded px-2.5 py-1 w-28 font-semibold focus:ring-2 focus:border-transparent ${
+                                validationError ? "border-red-500 focus:ring-red-500" : "border-[#00D3CD] focus:ring-[#00D3CD]"
                               }`}
                               value={editValue}
-                              onChange={(e) => handleChange(e, getValidationTarget(rate))}
+                              onChange={(e) => handleChange(e, getValidationTarget(rate), rate)}
                             />
-                            {validationError && <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500">{validationError}</div>}
+                            {validationError && (
+                              <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500 font-medium">
+                                {validationError}
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <span>
-                            {formatRateValue(getEditableRateValue(rate))}%{" "}
-                            {rate.isInherited && (activeTab === "specific" || activeTab === "franchise") && (
-                              <span className="text-xs text-gray-400 italic">(Default)</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">
+                              {formatRateValue(getEditableRateValue(rate))}%
+                            </span>
+                            {rate.isInherited ? (
+                              <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded">
+                                Default
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                                Configured
+                              </span>
                             )}
-                          </span>
+                          </div>
                         )}
                       </td>
-                      {(activeTab === "specific" || activeTab === "franchise") && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                          {editingId === rate.id
-                            ? calculateMargin(editValue, getAdminRateValue(rate))
-                            : calculateMargin(getEditableRateValue(rate), getAdminRateValue(rate))}
-                          %
-                        </td>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-emerald-600 bg-emerald-50/10 border-r border-emerald-100">
+                        {editingId === rate.id
+                          ? calculateMargin(editValue, getAdminRateValue(rate))
+                          : calculateMargin(getEditableRateValue(rate), getAdminRateValue(rate))}
+                        %
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-center space-x-2">
                         {editingId === rate.id ? (
                           <>
                             <button
@@ -1033,17 +1077,17 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                         ) : (
                           <button
                             onClick={() => handleEdit(rate)}
-                            className="bg-[#4e73df] px-3 py-1 rounded text-white transition-colors hover:bg-blue-600"
+                            className="bg-[#4e73df] px-3 py-1 rounded text-white transition-colors hover:bg-blue-600 text-xs font-semibold"
                           >
                             Edit
                           </button>
                         )}
                       </td>
-                  </tr>
+                    </tr>
                   ))}
                   {filteredRates.length === 0 && (
                     <tr>
-                      <td colSpan={activeTab === "default" ? 8 : 9} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                         {emptyStateMessage}
                       </td>
                     </tr>
@@ -1057,101 +1101,102 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     );
   };
 
-  // The unified page content (used by both super franchise directly, and franchise when in 'downline' mode)
+  // The unified page content (used by both super franchise and franchise when in 'downline' mode)
   const renderDownlineContent = () => (
     <>
       {/* Header */}
-          <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-                {isSuperFranchise ? "POS charges for your franchises and merchants" : "POS charges for you and your merchant"}
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {isSuperFranchise ? "Set Franchise & Merchant Rates and View Profit Margins" : "Set Merchant Rates and View Profit Margins"}
-              </p>
+      <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+            {isSuperFranchise ? "Set Downline Charges (For Franchise & Merchants)" : "POS charges for you and your merchant"}
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">
+            {isSuperFranchise
+              ? "Review non-editable Admin inherited rates and configure pricing for your downline."
+              : "Set Merchant Rates and View Profit Margins"}
+          </p>
+        </div>
+        {viewMode === "detail" && (activeTab === "specific" || activeTab === "franchise") && (
+          <button
+            onClick={handleBackToMatrix}
+            className="w-full md:w-auto flex items-center justify-center text-gray-600 hover:text-gray-900 font-medium bg-white border border-gray-200 px-4 py-2 rounded shadow-sm"
+          >
+            &larr; Back to Matrix View
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="grid grid-cols-1 md:flex border-b border-gray-200">
+        <button
+          className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
+            activeTab === "default" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => {
+            setActiveTab("default");
+            setViewMode("detail");
+          }}
+        >
+          {isSuperFranchise ? "Network Default Rates (For Franchise)" : "Default Rates"}
+        </button>
+        {isSuperFranchise && (
+          <button
+            className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
+              activeTab === "franchise" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => {
+              setActiveTab("franchise");
+              setViewMode("matrix");
+              setSelectedFranchiseId("");
+            }}
+          >
+            Specific Franchise Rates (Matrix)
+          </button>
+        )}
+        <button
+          className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
+            activeTab === "specific" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => {
+            setActiveTab("specific");
+            setViewMode("matrix");
+            setSelectedMerchantId("");
+          }}
+        >
+          Specific Merchant Rates (Matrix)
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-0">
+        {activeTab === "default" && renderDetailTable()}
+        {activeTab === "franchise" && viewMode === "matrix" && renderMatrix()}
+        {activeTab === "franchise" && viewMode === "detail" && (
+          <div>
+            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+              <span className="font-semibold text-blue-800">Franchise:</span>
+              <span className="ml-2 text-blue-900">{selectedFranchise?.name || "Unknown"}</span>
+              {selectedFranchise?.phone && (
+                <span className="ml-3 text-xs text-blue-700">({selectedFranchise.phone})</span>
+              )}
             </div>
-            {viewMode === "detail" && (activeTab === "specific" || activeTab === "franchise") && (
-              <button
-                onClick={handleBackToMatrix}
-                className="w-full md:w-auto flex items-center justify-center text-gray-600 hover:text-gray-900 font-medium bg-white border border-gray-200 px-4 py-2 rounded shadow-sm"
-              >
-                &larr; Back to Matrix View
-              </button>
-            )}
+            {renderDetailTable()}
           </div>
-
-          {/* Tabs */}
-          <div className="grid grid-cols-1 md:flex border-b border-gray-200">
-            <button
-              className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
-                activeTab === "default" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => {
-                setActiveTab("default");
-                setViewMode("detail");
-              }}
-            >
-              Default Rates
-            </button>
-            {isSuperFranchise && (
-              <button
-                className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
-                  activeTab === "franchise" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => {
-                  setActiveTab("franchise");
-                  setViewMode("matrix");
-                  setSelectedFranchiseId("");
-                }}
-              >
-                Specific Franchise Rates (Matrix)
-              </button>
-            )}
-            <button
-              className={`px-4 md:px-6 py-3 text-left md:text-center font-medium text-sm focus:outline-none ${
-                activeTab === "specific" ? "border-b-2 border-[#00D3CD] text-[#00D3CD]" : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => {
-                setActiveTab("specific");
-                setViewMode("matrix");
-                setSelectedMerchantId("");
-              }}
-            >
-              Specific Merchant Rates (Matrix)
-            </button>
+        )}
+        {activeTab === "specific" && viewMode === "matrix" && renderMatrix()}
+        {activeTab === "specific" && viewMode === "detail" && (
+          <div>
+            <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
+              <span className="font-semibold text-blue-800">Merchant:</span>
+              <span className="ml-2 text-blue-900">{selectedMerchant?.name || "Unknown"}</span>
+              {selectedMerchant?.phone && (
+                <span className="ml-3 text-xs text-blue-700">({selectedMerchant.phone})</span>
+              )}
+            </div>
+            {renderDetailTable()}
           </div>
-
-          {/* Content */}
-          <div className="p-0">
-            {activeTab === "default" && renderDetailTable()}
-            {activeTab === "franchise" && viewMode === "matrix" && renderMatrix()}
-            {activeTab === "franchise" && viewMode === "detail" && (
-              <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
-                  <span className="font-semibold text-blue-800">Franchise:</span>
-                  <span className="ml-2 text-blue-900">{selectedFranchise?.name || "Unknown"}</span>
-                  {selectedFranchise?.phone && (
-                    <span className="ml-3 text-xs text-blue-700">({selectedFranchise.phone})</span>
-                  )}
-                </div>
-                {renderDetailTable()}
-              </div>
-            )}
-            {activeTab === "specific" && viewMode === "matrix" && renderMatrix()}
-            {activeTab === "specific" && viewMode === "detail" && (
-              <div>
-                <div className="px-4 md:px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center">
-                  <span className="font-semibold text-blue-800">Merchant:</span>
-                  <span className="ml-2 text-blue-900">{selectedMerchant?.name || "Unknown"}</span>
-                  {selectedMerchant?.phone && (
-                    <span className="ml-3 text-xs text-blue-700">({selectedMerchant.phone})</span>
-                  )}
-                </div>
-                {renderDetailTable()}
-              </div>
-            )}
-          </div>
-
+        )}
+      </div>
     </>
   );
 
@@ -1160,45 +1205,39 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
       <div className="w-full md:max-w-[95%] md:mx-auto">
         <div className="bg-white rounded-xl md:rounded-lg shadow-sm md:shadow-lg overflow-hidden">
 
-          {/* For super franchise: show unified page directly (no inherited/downline split) */}
-          {isSuperFranchise ? (
-            renderDownlineContent()
+          {/* Top-Level Tabs: Inherited Rates (From Admin) vs Set Downline Rates */}
+          <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setHierarchyMode("inherited")}
+              className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                hierarchyMode === "inherited"
+                  ? "border-[#00D3CD] text-[#008c87]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Lock className="h-4 w-4" />
+              <span>Inherited Rates (From Admin)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHierarchyMode("downline")}
+              className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
+                hierarchyMode === "downline"
+                  ? "border-[#00D3CD] text-[#008c87]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <span>{isSuperFranchise ? "Set Downline Rates (For Franchise & Merchants)" : "Set Merchant Rates"}</span>
+            </button>
+          </div>
+
+          {hierarchyMode === "inherited" ? (
+            <div className="p-4 md:p-6">
+              <InheritedRatesView uplineRoleName="Admin" currentRoleName={isSuperFranchise ? "Super Franchise" : "Franchise"} />
+            </div>
           ) : (
-            /* For franchise users: show inherited vs downline tabs */
-            <>
-              <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setHierarchyMode("inherited")}
-                  className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                    hierarchyMode === "inherited"
-                      ? "border-[#00D3CD] text-[#008c87]"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  <Lock className="h-4 w-4" />
-                  <span>Inherited Rates (From Admin)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHierarchyMode("downline")}
-                  className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                    hierarchyMode === "downline"
-                      ? "border-[#00D3CD] text-[#008c87]"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  <span>Set Merchant Rates</span>
-                </button>
-              </div>
-              {hierarchyMode === "inherited" ? (
-                <div className="p-4 md:p-6">
-                  <InheritedRatesView uplineRoleName="Admin" currentRoleName="Franchise" />
-                </div>
-              ) : (
-                renderDownlineContent()
-              )}
-            </>
+            renderDownlineContent()
           )}
 
         </div>
