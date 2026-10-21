@@ -48,7 +48,8 @@ export default function PosSetting({ currentUser }) {
   const fileInputRef = useRef(null);
 
   const userRole = normalizeUserRole(currentUser?.role);
-  const isAdmin = userRole === "admin";
+  const isSuperAdmin = userRole === "super_admin";
+  const isAdmin = userRole === "admin" || isSuperAdmin;
   const isEmployee = userRole === "employee";
   const isSuperFranchise = userRole === "super_franchise";
   const isFranchise = userRole === "franchise";
@@ -520,7 +521,20 @@ export default function PosSetting({ currentUser }) {
     const map = new Map();
     rawUsersList.forEach((u) => {
       const uRole = normalizeUserRole(u.role);
-      if (uRole !== "franchise") return;
+      if (
+        uRole === "admin" ||
+        uRole === "superadmin" ||
+        uRole === "super_admin" ||
+        uRole === "subadmin" ||
+        uRole === "employee" ||
+        uRole === "staff" ||
+        uRole === "super_franchise"
+      ) {
+        return;
+      }
+      const parentFranchiseId = getParentFranchiseId(u);
+      // Only include child franchises or direct merchants without a sub-franchise
+      if (uRole !== "franchise" && parentFranchiseId) return;
       const sfId =
         u?.super_franchise_id ??
         u?.superFranchiseId ??
@@ -612,7 +626,8 @@ export default function PosSetting({ currentUser }) {
           return !sfId;
         }
         const parentId = getParentFranchiseId(u);
-        return parentId === null;
+        const sfId = u?.super_franchise_id ?? u?.superFranchiseId ?? u?.super_franchise_details?.id ?? null;
+        return parentId === null && !sfId;
       });
     }
 
@@ -673,11 +688,17 @@ export default function PosSetting({ currentUser }) {
 
       // If cust is a super_franchise, check if any of its child franchises match search
       if (!matchesSearch && term && roleStr === "super_franchise") {
-        const childFranchises = superFranchiseChildrenMap.get(String(cust.id)) || [];
-        matchesSearch = childFranchises.some((f) => {
-          const fName = String(f.name || f.full_name || f.business_name || "").toLowerCase();
-          const fUser = String(f.username || f.mobile_number || f.mobile || f.email || "").toLowerCase();
-          return fName.includes(term) || fUser.includes(term);
+        const childUsers = superFranchiseChildrenMap.get(String(cust.id)) || [];
+        matchesSearch = childUsers.some((child) => {
+          const cName = String(child.name || child.full_name || child.business_name || "").toLowerCase();
+          const cUser = String(child.username || child.mobile_number || child.mobile || child.email || "").toLowerCase();
+          if (cName.includes(term) || cUser.includes(term)) return true;
+          const grandChildMerchants = franchiseMerchantsMap.get(String(child.id)) || [];
+          return grandChildMerchants.some((gm) => {
+            const gmName = String(gm.name || gm.full_name || gm.business_name || "").toLowerCase();
+            const gmUser = String(gm.username || gm.mobile_number || gm.mobile || gm.email || "").toLowerCase();
+            return gmName.includes(term) || gmUser.includes(term);
+          });
         });
       }
 
@@ -1800,8 +1821,25 @@ export default function PosSetting({ currentUser }) {
       )
     );
 
-    const childRoleLabel = isSuperFranchiseRole ? "Franchises" : "Merchants";
-    const childSingularLabel = isSuperFranchiseRole ? "Franchise" : "Merchant";
+    const sfHasFranchises = isSuperFranchiseRole && childUsers.some((c) => normalizeUserRole(c.role) === "franchise");
+    const sfHasMerchants = isSuperFranchiseRole && childUsers.some((c) => {
+      const r = normalizeUserRole(c.role);
+      return r === "merchant" || r === "user";
+    });
+    const childRoleLabel = isSuperFranchiseRole
+      ? sfHasFranchises && sfHasMerchants
+        ? "Franchises and Merchants"
+        : sfHasMerchants
+          ? "Merchants"
+          : "Franchises"
+      : "Merchants";
+    const childSingularLabel = isSuperFranchiseRole
+      ? sfHasFranchises && !sfHasMerchants
+        ? "Franchise"
+        : sfHasMerchants && !sfHasFranchises
+          ? "Merchant"
+          : "Account"
+      : "Merchant";
     const roleBadgeLabel = isSuperFranchiseRole ? "SUPER FRANCHISE" : isFranchiseRole ? "FRANCHISE" : user.role || normRole;
 
     return (

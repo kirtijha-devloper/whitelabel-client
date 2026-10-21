@@ -26,6 +26,7 @@ import {
   deleteBbpsChargeRule,
 } from "../api/rateSettingsApi";
 import PayoutRateSettings from "./PayoutRateSettings";
+import CcBillRateSettings from "./CcBillRateSettings";
 
 const normalizeTab = (tab, isSuperAdmin = false) => {
   if (!tab) return "pos_rental";
@@ -84,8 +85,9 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
     return Array.isArray(merchantsData.data) ? merchantsData.data : [];
   }, [merchantsData]);
 
-  // POS Rental state — Admin: two independent cards (franchise rate + standalone merchant rate) + Super Admin: admin rate
+  // POS Rental state — Admin: independent cards (super franchise rate + franchise rate + standalone merchant rate) + Super Admin: admin rate
   const [adminRateForm, setAdminRateForm] = useState({ amount: "", status: "active" });
+  const [superFranchiseRateForm, setSuperFranchiseRateForm] = useState({ amount: "", status: "active" });
   const [franchiseRateForm, setFranchiseRateForm] = useState({ amount: "", status: "active" });
   const [merchantRateForm, setMerchantRateForm] = useState({ amount: "", status: "active" });
 
@@ -351,6 +353,10 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
     () => rentalRates.find((r) => r.target_user_type === "admin") ?? null,
     [rentalRates]
   );
+  const superFranchiseRate = useMemo(
+    () => rentalRates.find((r) => r.target_user_type === "super_franchise") ?? null,
+    [rentalRates]
+  );
   const franchiseRate = useMemo(
     () => rentalRates.find((r) => r.target_user_type === "franchise") ?? null,
     [rentalRates]
@@ -365,6 +371,12 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
       setAdminRateForm({ amount: parseFloat(adminRate.amount) || "", status: adminRate.status || "active" });
     }
   }, [adminRate?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (superFranchiseRate) {
+      setSuperFranchiseRateForm({ amount: parseFloat(superFranchiseRate.amount) || "", status: superFranchiseRate.status || "active" });
+    }
+  }, [superFranchiseRate?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (franchiseRate) {
@@ -464,6 +476,35 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this POS transaction charge?")) {
       deletePosTxnMutation.mutate(id);
+    }
+  };
+
+  const handleSaveSuperFranchiseRate = (e) => {
+    e.preventDefault();
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot configure super franchise rental rates.");
+      return;
+    }
+    const amount = parseFloat(superFranchiseRateForm.amount);
+    if (!superFranchiseRateForm.amount || !Number.isFinite(amount) || amount <= 0) {
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+    if (superFranchiseRate) {
+      updateRentalMutation.mutate({ id: superFranchiseRate.id, payload: { amount, status: superFranchiseRateForm.status } });
+    } else {
+      createRentalMutation.mutate({ amount, status: superFranchiseRateForm.status, type: "pos", target_user_type: "super_franchise" });
+    }
+  };
+
+  const handleDeleteSuperFranchiseRate = () => {
+    if (isSuperAdmin) {
+      toast.error("Unauthorized: Super Admin cannot delete super franchise rental rates.");
+      return;
+    }
+    if (!superFranchiseRate?.id) return;
+    if (window.confirm("Are you sure you want to delete this super franchise rental rate?")) {
+      deleteRentalMutation.mutate(superFranchiseRate.id);
     }
   };
 
@@ -780,9 +821,65 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
                   </div>
                 )}
 
-                {/* Rate for Franchises & Rate for Standalone Merchants - Admin only */}
+                {/* Rate for Super Franchises, Franchises & Standalone Merchants - Admin only */}
                 {!isSuperAdmin && (
                   <>
+                    {/* Rate for Super Franchises */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm">
+                      <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Super Franchises</h2>
+                      <p className="text-sm text-gray-500 mb-4">Charged to all super franchise accounts every 30 days</p>
+                      <form onSubmit={handleSaveSuperFranchiseRate} className="flex flex-col md:flex-row items-end gap-4">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                          <input
+                            type="number"
+                            value={superFranchiseRateForm.amount}
+                            onChange={(e) =>
+                              setSuperFranchiseRateForm((p) => ({ ...p, amount: e.target.value.replace(/[-+eE]/g, "") }))
+                            }
+                            onKeyDown={(e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault()}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="500"
+                            min="0.01"
+                            step="0.01"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            value={superFranchiseRateForm.status}
+                            onChange={(e) => setSuperFranchiseRateForm((p) => ({ ...p, status: e.target.value }))}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={createRentalMutation.isPending || updateRentalMutation.isPending}
+                            className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {createRentalMutation.isPending || updateRentalMutation.isPending ? (
+                              <span className="flex items-center gap-1"><Loader2 className="animate-spin" size={14} /> Saving...</span>
+                            ) : superFranchiseRate ? "Update" : "Create"}
+                          </button>
+                          {superFranchiseRate && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteSuperFranchiseRate}
+                              disabled={deleteRentalMutation.isPending}
+                              className="px-5 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </div>
+
                     {/* Rate for Franchises */}
                     <div className="bg-white p-4 rounded-xl shadow-sm">
                       <h2 className="text-lg font-semibold text-gray-800 mb-1">Rate for Franchises</h2>
@@ -1221,150 +1318,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
         )}
 
         {/* CC Bill Pay Charge Rules */}
-        {activeTab === "bbps_cc" && (
-          <div className="space-y-6">
-            <div className="bg-white p-4 rounded-xl shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                {bbpsEditingId ? "Edit CC Bill Pay Charge Rule" : "Create CC Bill Pay Charge Rule"}
-              </h2>
-              <form onSubmit={handleCreateOrUpdateBbpsRule} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">From Amount (₹)</label>
-                    <input
-                      type="number"
-                      value={bbpsForm.from_amount}
-                      onChange={(e) => setBbpsForm({ ...bbpsForm, from_amount: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      placeholder="0"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">To Amount (₹)</label>
-                    <input
-                      type="number"
-                      value={bbpsForm.to_amount}
-                      onChange={(e) => setBbpsForm({ ...bbpsForm, to_amount: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      placeholder="499"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rate</label>
-                    <input
-                      type="text"
-                      value={bbpsForm.rate}
-                      onChange={(e) => setBbpsForm({ ...bbpsForm, rate: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      placeholder="20"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rate Type</label>
-                    <select
-                      value={bbpsForm.rate_type}
-                      onChange={(e) => setBbpsForm({ ...bbpsForm, rate_type: e.target.value })}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="flat">Flat</option>
-                      <option value="percentage">Percentage</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="bbps-active"
-                    checked={bbpsForm.is_active}
-                    onChange={(e) => setBbpsForm({ ...bbpsForm, is_active: e.target.checked })}
-                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                  />
-                  <label htmlFor="bbps-active" className="text-sm font-medium text-gray-700">
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={createBbpsRuleMutation.isPending || updateBbpsRuleMutation.isPending}
-                    className="w-full md:w-auto px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {(createBbpsRuleMutation.isPending || updateBbpsRuleMutation.isPending) ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={16} /> Saving...
-                      </div>
-                    ) : (
-                      bbpsEditingId ? "Update Rule" : "Save Rule"
-                    )}
-                  </button>
-                  {bbpsEditingId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBbpsEditingId(null);
-                        setBbpsForm({
-                          from_amount: "",
-                          to_amount: "",
-                          rate: "",
-                          rate_type: "flat",
-                          is_active: true,
-                        });
-                      }}
-                      className="w-full md:w-auto px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                    >
-                      Cancel Edit
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">CC Bill Pay Charge Rules</h2>
-              {bbpsLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="animate-spin h-8 w-8 text-indigo-600" />
-                </div>
-              ) : bbpsError ? (
-                <p className="text-red-600">Failed to load CC bill pay charge rules.</p>
-              ) : bbpsRules.length === 0 ? (
-                <p className="text-gray-500">No charge rules found.</p>
-              ) : (
-                <>
-                  <div className="md:hidden space-y-3">
-                    {bbpsRules.map((rule) => (
-                      <div key={rule.id} className="rounded-xl border border-gray-100 p-4 shadow-sm">
-                        <p className="text-sm font-medium text-gray-900">Amount Range</p>
-                        <p className="text-sm text-gray-700">From: ₹{rule.from_amount} — To: ₹{rule.to_amount}</p>
-                        <p className="text-sm text-gray-700">Rate: {rule.rate} ({rule.rate_type})</p>
-                        <div className="flex gap-3 pt-3">
-                          <button onClick={() => handleEditBbpsRule(rule)} className="text-[#00D3CD] hover:text-[#00b8b3] text-sm font-medium">Edit</button>
-                          <button onClick={() => handleDeleteBbpsRule(rule)} className="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="hidden md:block">
-                    <Table
-                      columns={bbpsColumns}
-                      data={bbpsRules}
-                      actions={[
-                        { label: "Edit", onClick: handleEditBbpsRule },
-                        { label: "Delete", onClick: handleDeleteBbpsRule },
-                      ]}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        {activeTab === "bbps_cc" && <CcBillRateSettings isSuperAdmin={isSuperAdmin} />}
         {activeTab === "payout" && <PayoutRateSettings isSuperAdmin={isSuperAdmin} />}
       </div>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar theme="light" />
