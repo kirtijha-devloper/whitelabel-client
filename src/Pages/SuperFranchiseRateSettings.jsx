@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Lock, Sliders } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Loader from "../components/Loader";
 import Table from "../components/Table";
-import InheritedRatesView from "../components/RateSetting/InheritedRatesView";
 import {
   getSuperFranchiseManagedDefaultRates,
   updateSuperFranchiseManagedDefaultRate,
@@ -28,9 +27,6 @@ const DEFAULT_SETTLEMENT_FILTER = "today_settlement";
 const SuperFranchiseRateSettings = ({ currentUser }) => {
   const queryClient = useQueryClient();
   const currentSfId = currentUser?.id || 1;
-
-  // Sub-page Hierarchy: 'inherited' | 'downline'
-  const [hierarchyMode, setHierarchyMode] = useState("downline");
 
   // Main Tabs: 'pos_rules' | 'pos_rental'
   const [mainTab, setMainTab] = useState("pos_rules");
@@ -303,43 +299,10 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Rate Settings</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Review your inherited rates from Admin and configure downstream pricing for Franchise.
+            Configure downstream pricing for Franchise and Merchants.
           </p>
         </div>
 
-        {/* Top-Level Sub-Pages: Inherited Rates vs Set Downline Rates */}
-        <div className="flex border-b border-gray-200 bg-white rounded-t-xl px-4 md:px-6 pt-3 gap-6 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setHierarchyMode("inherited")}
-            className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-              hierarchyMode === "inherited"
-                ? "border-[#00D3CD] text-[#008c87]"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Lock className="h-4 w-4" />
-            <span>Inherited Rates (From Admin)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setHierarchyMode("downline")}
-            className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-              hierarchyMode === "downline"
-                ? "border-[#00D3CD] text-[#008c87]"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Sliders className="h-4 w-4" />
-            <span>Set Downline Rates (For Franchise)</span>
-          </button>
-        </div>
-
-        {hierarchyMode === "inherited" ? (
-          <InheritedRatesView uplineRoleName="Admin" currentRoleName="Super Franchise" />
-        ) : (
-          <>
         {/* Top-Level Tabs for Downline */}
         <div className="bg-white rounded-xl shadow-md p-2 flex space-x-2">
           <button
@@ -610,7 +573,7 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                           <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase bg-gray-100/80 border-x">
                             <div className="flex items-center justify-center gap-1">
                               <Lock className="w-3 h-3 text-gray-500" />
-                              <span>Inherited Rate (Admin) (%)</span>
+                              <span>Inherited Rate (%)</span>
                             </div>
                             <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
                           </th>
@@ -825,8 +788,6 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
               </form>
             </div>
           </div>
-        )}
-          </>
         )}
       </div>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar theme="light" />

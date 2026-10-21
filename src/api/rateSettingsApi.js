@@ -18,6 +18,9 @@ const RULE_SCOPES = {
   SUPER_ADMIN_ADMIN: 'super_admin_admin',
   ADMIN_DEFAULT: 'admin_default',
   ADMIN_SUPER_FRANCHISE: 'admin_super_franchise',
+  SUPER_FRANCHISE_DEFAULT: 'super_franchise_default',
+  SUPER_FRANCHISE_FRANCHISE: 'super_franchise_franchise',
+  SUPER_FRANCHISE_MERCHANT: 'super_franchise_merchant',
   ADMIN_FRANCHISE: 'admin_franchise',
   ADMIN_MERCHANT: 'admin_merchant',
   FRANCHISE_DEFAULT: 'franchise_default',
@@ -296,7 +299,7 @@ const hasFranchiseScope = (rule) => getRuleFranchiseId(rule) !== null;
 const hasSuperFranchiseScope = (rule) => getRuleSuperFranchiseId(rule) !== null;
 const isAdminDefaultRule = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT;
+  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN;
   return !hasMerchantScope(rule) && !hasFranchiseScope(rule) && !hasSuperFranchiseScope(rule);
 };
 const isAdminSuperFranchiseRule = (rule) => {
@@ -329,7 +332,7 @@ const isFranchiseRule = (rule) => isFranchiseDefaultRule(rule);
 const isMerchantRule = (rule) => isAdminMerchantRule(rule) || isFranchiseMerchantRule(rule);
 const getRuleScope = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT) return 'admin';
+  if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 'admin';
   if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 'super_franchise';
   if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT) return 'franchise';
   if (scope === RULE_SCOPES.ADMIN_MERCHANT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'merchant';
@@ -555,9 +558,11 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   base_rate: toFiniteNumber(rule.charge_percent, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : isAdminRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
+    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+      ? toFiniteNumber(rule.admin_rate, 0)
+      : isAdminRule(rule)
+        ? toFiniteNumber(rule.charge_percent, 0)
+        : toFiniteNumber(rule.charge_percent, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -623,9 +628,11 @@ const mapRuleToMerchantFormat = (rule, options = {}) => ({
     : toFiniteNumber(rule.charge_percent, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : isAdminRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
+    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+      ? toFiniteNumber(rule.admin_rate, 0)
+      : isAdminRule(rule)
+        ? toFiniteNumber(rule.charge_percent, 0)
+        : toFiniteNumber(rule.charge_percent, 0),
   franchise_rate: options.franchiseRule
     ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
     : isFranchiseRule(rule)
@@ -755,11 +762,29 @@ const fetchRulesByScopes = async (scopes = [], params = {}) => {
   return Array.from(ruleMap.values());
 };
 
+const isUplineRule = (rule) => {
+  const scope = getRawRuleScope(rule);
+  return (
+    isAdminDefaultRule(rule) ||
+    isAdminFranchiseRule(rule) ||
+    scope === 'super_franchise_franchise' ||
+    scope === 'super_franchise_default' ||
+    scope === RULE_SCOPES.SUPER_FRANCHISE_FRANCHISE ||
+    scope === RULE_SCOPES.SUPER_FRANCHISE_DEFAULT ||
+    scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE
+  );
+};
+
 const getAdminAudienceRulePriority = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.ADMIN_MERCHANT) return 2;
-  if (getRuleFranchiseId(rule) !== null || getRuleUserId(rule) !== null) return 2;
-  return 1;
+  if (scope === 'super_franchise_franchise' || scope === RULE_SCOPES.SUPER_FRANCHISE_FRANCHISE) return 6;
+  if (scope === 'super_franchise_default' || scope === RULE_SCOPES.SUPER_FRANCHISE_DEFAULT) return 5;
+  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 4;
+  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.ADMIN_MERCHANT) return 3;
+  if (getRuleFranchiseId(rule) !== null || getRuleUserId(rule) !== null) return 3;
+  if (scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 2;
+  if (scope === RULE_SCOPES.ADMIN_DEFAULT) return 1;
+  return 0; // SUPER_ADMIN_DEFAULT
 };
 
 const getMerchantRulePriority = (rule) => {
@@ -1616,7 +1641,7 @@ export const getFranchiseManagedDefaultRates = async (franchiseId) => {
     ]);
 
     return buildFranchiseManagedDefaultRates(
-      adminRules.filter((rule) => isAdminDefaultRule(rule) || isAdminFranchiseRule(rule)),
+      adminRules.filter(isUplineRule),
       franchiseOwnedRules.filter((rule) => isFranchiseDefaultRule(rule) || isFranchiseMerchantRule(rule)),
       franchiseId
     );
@@ -1980,7 +2005,7 @@ export const getFranchiseManagedMerchantRates = async (merchantId, franchiseId) 
     ]);
 
     return buildFranchiseManagedMerchantRates(
-      adminRules.filter((rule) => isAdminDefaultRule(rule) || isAdminFranchiseRule(rule)),
+      adminRules.filter(isUplineRule),
       franchiseOwnedRules.filter((rule) => isFranchiseDefaultRule(rule) || isFranchiseMerchantRule(rule)),
       merchantId,
       franchiseId
@@ -2272,7 +2297,7 @@ export const getFranchiseManagedAllMerchantRates = async (merchants, franchiseId
       }
 
       allRates[merchantId] = buildFranchiseManagedMerchantRates(
-        adminRules.filter((rule) => isAdminDefaultRule(rule) || isAdminFranchiseRule(rule)),
+        adminRules.filter(isUplineRule),
         franchiseOwnedRules.filter((rule) => isFranchiseDefaultRule(rule) || isFranchiseMerchantRule(rule)),
         merchantId,
         franchiseId
@@ -2656,8 +2681,8 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         superFranchiseId,
-        adminRule,
-        baseRule: adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: adminRule || effectiveRule,
         isInherited: !sfRule,
       });
 
@@ -2796,8 +2821,8 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         franchiseId: Number(franchiseId),
         superFranchiseId: Number(superFranchiseId),
-        adminRule,
-        baseRule: sfDefaultRule || adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: sfDefaultRule || adminRule || effectiveRule,
         isInherited: !sfFranchiseRule
       });
       return {
@@ -2937,8 +2962,8 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
       const mapped = mapRuleToMerchantFormat(effectiveRule, {
         merchantId: Number(merchantId),
         superFranchiseId: Number(superFranchiseId),
-        adminRule,
-        baseRule: sfDefaultRule || adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: sfDefaultRule || adminRule || effectiveRule,
         isInherited: !sfMerchantRule
       });
       return {
@@ -3079,8 +3104,8 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
         const mapped = mapRuleToFranchiseFormat(effectiveRule, {
           franchiseId: Number(fId),
           superFranchiseId: Number(superFranchiseId),
-          adminRule,
-          baseRule: sfDefaultRule || adminRule,
+          adminRule: adminRule || effectiveRule,
+          baseRule: sfDefaultRule || adminRule || effectiveRule,
           isInherited: !sfFranchiseRule
         });
         return {
@@ -3139,8 +3164,8 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
         const mapped = mapRuleToMerchantFormat(effectiveRule, {
           merchantId: Number(mId),
           superFranchiseId: Number(superFranchiseId),
-          adminRule,
-          baseRule: sfDefaultRule || adminRule,
+          adminRule: adminRule || effectiveRule,
+          baseRule: sfDefaultRule || adminRule || effectiveRule,
           isInherited: !sfMerchantRule
         });
         return {
