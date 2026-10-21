@@ -28,8 +28,7 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
   const menuItems = [
     { name: "Dashboard", path: "/super-franchise/dashboard", icon: <FaCube /> },
     { name: "Create User", path: "/super-franchise/create-user", icon: <FaUserPlus /> },
-    { name: "User List", path: "/super-franchise/franchise-list", icon: <FaUsers /> },
-    // { name: "Merchant List", path: "/super-franchise/list", icon: <FaUserPlus /> },
+    { name: "User List", path: "/super-franchise/list", icon: <FaUsers /> },
     { name: "Stock POS", path: "/super-franchise/stock-pos", icon: <FaBox /> },
     {
       name: "Payout-X",

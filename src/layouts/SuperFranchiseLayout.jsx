@@ -121,8 +121,9 @@ export default function SuperFranchiseLayout() {
               <Route path="create-user/pos/:id" element={<CreateUserPosDetails currentUser={currentUser} />} />
               <Route path="create-user/charge-set/:id" element={<CreateChargeSet currentUser={currentUser} />} />
               <Route path="user/:id" element={<UserDetails currentUser={currentUser} />} />
+              <Route path="list" element={<UserList currentUser={currentUser} title="User List" />} />
+              <Route path="user-list" element={<UserList currentUser={currentUser} title="User List" />} />
               <Route path="franchise-list" element={<UserList currentUser={currentUser} roleFilter="franchise" title="Franchise List" />} />
-              <Route path="list" element={<UserList currentUser={currentUser} roleFilter="merchant" title="Merchant List" />} />
               <Route path="merchant-list" element={<UserList currentUser={currentUser} roleFilter="merchant" title="Merchant List" />} />
 
               <Route
