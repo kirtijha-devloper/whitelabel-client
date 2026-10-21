@@ -1,4 +1,4 @@
-import { Loader2, X } from 'lucide-react';
+import { ArrowLeft, Loader2, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -25,7 +25,7 @@ const extractPagination = (payload) => {
     return payload?.pagination || payload?.data?.pagination || {};
 };
 
-const AssignToFranchise = ({ returnPath, assignmentType = "franchise" }) => {
+const AssignToFranchise = ({ returnPath, assignmentType = "franchise", fallbackPath }) => {
     const navigate = useNavigate();
     const isAdminAssignment = assignmentType === "admin";
     const [selectedMachines, setSelectedMachines] = useState([]);
@@ -142,6 +142,20 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise" }) => {
         },
     });
 
+    const handleBack = () => {
+        if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+        } else if (fallbackPath) {
+            navigate(fallbackPath);
+        } else if (isAdminAssignment) {
+            navigate("/super-admin/inventory");
+        } else if (returnPath) {
+            navigate(returnPath);
+        } else {
+            navigate("/super-admin/inventory");
+        }
+    };
+
     const handleAssignPos = () => {
         if (selectedMachines.length === 0) {
             alert("Please select at least one POS machine");
@@ -234,9 +248,21 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise" }) => {
 
     return (
         <div className="p-6 max-w-4xl mx-auto bg-white rounded-xl shadow-md space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">
-                Assign POS Machines to {isAdminAssignment ? "Admin" : "Franchise"}
-            </h2>
+            <div className="space-y-3">
+                <button
+                    type="button"
+                    onClick={handleBack}
+                    className="group inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00D3CD]"
+                    aria-label="Back"
+                >
+                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+                    <span>Back</span>
+                </button>
+
+                <h2 className="text-2xl font-semibold text-gray-900">
+                    Assign POS Machines to {isAdminAssignment ? "Admin" : "Franchise"}
+                </h2>
+            </div>
 
             {/* Franchise Selection */}
             <div>
