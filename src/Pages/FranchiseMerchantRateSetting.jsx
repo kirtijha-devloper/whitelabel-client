@@ -19,7 +19,6 @@ import {
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
 import { Lock } from "lucide-react";
-import InheritedRatesView from "../components/RateSetting/InheritedRatesView";
 
 const DEFAULT_SETTLEMENT_FILTER = "today_settlement";
 
@@ -29,9 +28,6 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     normalizedRole === "superfranchise" ||
     (typeof window !== "undefined" && window.location.pathname.includes("/super-franchise"));
 
-
-  // Sub-page hierarchy for franchise users only (not used for super franchise)
-  const [hierarchyMode, setHierarchyMode] = useState("downline");
 
   const [activeTab, setActiveTab] = useState("default"); // 'default', 'franchise', or 'specific'
   const [viewMode, setViewMode] = useState("detail"); // 'matrix' or 'detail'
@@ -1066,7 +1062,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
             setViewMode("detail");
           }}
         >
-          {isSuperFranchise ? "Default POS Rates (Inherited)" : "Default POS Rates"}
+          Default POS Rates
         </button>
         {isSuperFranchise && (
           <button
@@ -1157,42 +1153,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     <div className="bg-gray-100 min-h-screen">
       <div className="w-full md:max-w-[95%] md:mx-auto">
         <div className="bg-white rounded-xl md:rounded-lg shadow-sm md:shadow-lg overflow-hidden">
-
-          {/* Top-Level Tabs: Inherited Rates (From Admin) vs Set Downline Rates */}
-          <div className="flex border-b border-gray-200 bg-white px-4 md:px-6 pt-3 gap-6 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setHierarchyMode("inherited")}
-              className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                hierarchyMode === "inherited"
-                  ? "border-[#00D3CD] text-[#008c87]"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Lock className="h-4 w-4" />
-              <span>Inherited Rates (From Admin)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setHierarchyMode("downline")}
-              className={`flex items-center gap-2 pb-3.5 border-b-2 font-semibold text-sm transition-all ${
-                hierarchyMode === "downline"
-                  ? "border-[#00D3CD] text-[#008c87]"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <span>{isSuperFranchise ? "Set Downline Rates (For Franchise & Merchants)" : "Set Merchant Rates"}</span>
-            </button>
-          </div>
-
-          {hierarchyMode === "inherited" ? (
-            <div className="p-4 md:p-6">
-              <InheritedRatesView uplineRoleName="Admin" currentRoleName={isSuperFranchise ? "Super Franchise" : "Franchise"} />
-            </div>
-          ) : (
-            renderDownlineContent()
-          )}
-
+          {renderDownlineContent()}
         </div>
       </div>
     </div>
