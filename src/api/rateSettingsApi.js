@@ -289,7 +289,7 @@ const hasFranchiseScope = (rule) => getRuleFranchiseId(rule) !== null;
 const hasSuperFranchiseScope = (rule) => getRuleSuperFranchiseId(rule) !== null;
 const isAdminDefaultRule = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT;
+  if (scope) return scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN;
   return !hasMerchantScope(rule) && !hasFranchiseScope(rule) && !hasSuperFranchiseScope(rule);
 };
 const isAdminSuperFranchiseRule = (rule) => {
@@ -322,7 +322,7 @@ const isFranchiseRule = (rule) => isFranchiseDefaultRule(rule);
 const isMerchantRule = (rule) => isAdminMerchantRule(rule) || isFranchiseMerchantRule(rule);
 const getRuleScope = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT) return 'admin';
+  if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 'admin';
   if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 'super_franchise';
   if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT) return 'franchise';
   if (scope === RULE_SCOPES.ADMIN_MERCHANT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'merchant';
@@ -547,9 +547,11 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   base_rate: toFiniteNumber(rule.charge_percent, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : isAdminRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
+    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+      ? toFiniteNumber(rule.admin_rate, 0)
+      : isAdminRule(rule)
+        ? toFiniteNumber(rule.charge_percent, 0)
+        : toFiniteNumber(rule.charge_percent, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -615,9 +617,11 @@ const mapRuleToMerchantFormat = (rule, options = {}) => ({
     : toFiniteNumber(rule.charge_percent, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : isAdminRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
+    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+      ? toFiniteNumber(rule.admin_rate, 0)
+      : isAdminRule(rule)
+        ? toFiniteNumber(rule.charge_percent, 0)
+        : toFiniteNumber(rule.charge_percent, 0),
   franchise_rate: options.franchiseRule
     ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
     : isFranchiseRule(rule)
@@ -749,9 +753,12 @@ const fetchRulesByScopes = async (scopes = [], params = {}) => {
 
 const getAdminAudienceRulePriority = (rule) => {
   const scope = getRawRuleScope(rule);
-  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.ADMIN_MERCHANT) return 2;
-  if (getRuleFranchiseId(rule) !== null || getRuleUserId(rule) !== null) return 2;
-  return 1;
+  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 4;
+  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.ADMIN_MERCHANT) return 3;
+  if (getRuleFranchiseId(rule) !== null || getRuleUserId(rule) !== null) return 3;
+  if (scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 2;
+  if (scope === RULE_SCOPES.ADMIN_DEFAULT) return 1;
+  return 0; // SUPER_ADMIN_DEFAULT
 };
 
 const getMerchantRulePriority = (rule) => {
@@ -2513,16 +2520,14 @@ const fetchSuperFranchiseListRules = async (extraParams = {}) => {
 
 export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => {
   try {
-    // A single call to /list is correct here — the backend's listPosChargeRules
-    // already applies role-based WHERE clauses for super_franchise users that
-    // include admin_default and all super_franchise-scoped rules.
-    // Previously the code called /list/list (which doesn't exist as a route)
-    // causing Express to match 'list' as the :id param and return nothing.
     const allRules = await fetchSuperFranchiseListRules();
 
-    const adminRules = allRules.filter(
-      r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise'
+    let adminRules = allRules.filter(
+      r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin'
     );
+    if (adminRules.length === 0) {
+      adminRules = await fetchBaseDefaultRules();
+    }
     const sfDefaultRules = allRules.filter(
       r => r.scope === 'super_franchise_default' &&
            (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId))
@@ -2548,8 +2553,8 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         superFranchiseId,
-        adminRule,
-        baseRule: adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: adminRule || effectiveRule,
         isInherited: !sfRule,
       });
 
@@ -2642,7 +2647,10 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
 export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superFranchiseId) => {
   try {
     const rules = await fetchSuperFranchiseListRules();
-    const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
+    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
+    if (adminRules.length === 0) {
+      adminRules = await fetchBaseDefaultRules();
+    }
     const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise' && Number(r.franchaise_id) === Number(franchiseId));
 
@@ -2665,8 +2673,8 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         franchiseId: Number(franchiseId),
         superFranchiseId: Number(superFranchiseId),
-        adminRule,
-        baseRule: sfDefaultRule || adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: sfDefaultRule || adminRule || effectiveRule,
         isInherited: !sfFranchiseRule
       });
       return {
@@ -2753,7 +2761,10 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
 export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFranchiseId) => {
   try {
     const rules = await fetchSuperFranchiseListRules();
-    const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
+    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
+    if (adminRules.length === 0) {
+      adminRules = await fetchBaseDefaultRules();
+    }
     const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant' && Number(r.user_id) === Number(merchantId));
 
@@ -2776,8 +2787,8 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
       const mapped = mapRuleToMerchantFormat(effectiveRule, {
         merchantId: Number(merchantId),
         superFranchiseId: Number(superFranchiseId),
-        adminRule,
-        baseRule: sfDefaultRule || adminRule,
+        adminRule: adminRule || effectiveRule,
+        baseRule: sfDefaultRule || adminRule || effectiveRule,
         isInherited: !sfMerchantRule
       });
       return {
@@ -2860,7 +2871,10 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
 export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, superFranchiseId) => {
   try {
     const rules = await fetchSuperFranchiseListRules();
-    const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
+    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
+    if (adminRules.length === 0) {
+      adminRules = await fetchBaseDefaultRules();
+    }
     const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise');
 
@@ -2890,8 +2904,8 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
         const mapped = mapRuleToFranchiseFormat(effectiveRule, {
           franchiseId: Number(fId),
           superFranchiseId: Number(superFranchiseId),
-          adminRule,
-          baseRule: sfDefaultRule || adminRule,
+          adminRule: adminRule || effectiveRule,
+          baseRule: sfDefaultRule || adminRule || effectiveRule,
           isInherited: !sfFranchiseRule
         });
         return {
@@ -2916,7 +2930,10 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
 export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superFranchiseId) => {
   try {
     const rules = await fetchSuperFranchiseListRules();
-    const adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise');
+    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
+    if (adminRules.length === 0) {
+      adminRules = await fetchBaseDefaultRules();
+    }
     const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
     const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant');
 
@@ -2946,8 +2963,8 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
         const mapped = mapRuleToMerchantFormat(effectiveRule, {
           merchantId: Number(mId),
           superFranchiseId: Number(superFranchiseId),
-          adminRule,
-          baseRule: sfDefaultRule || adminRule,
+          adminRule: adminRule || effectiveRule,
+          baseRule: sfDefaultRule || adminRule || effectiveRule,
           isInherited: !sfMerchantRule
         });
         return {

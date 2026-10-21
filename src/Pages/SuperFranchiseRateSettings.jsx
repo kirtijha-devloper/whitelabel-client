@@ -214,10 +214,11 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
 
   const normalizeSettlementValue = (value) => String(value ?? "").trim().toLowerCase();
 
-  const matchesSettlementFilter = (rate) =>
-    settlementFilter === "all"
-      ? true
-      : normalizeSettlementValue(rate?.settlement_type) === settlementFilter;
+  const matchesSettlementFilter = (rate) => {
+    if (settlementFilter === "all") return true;
+    const rateSettlement = normalizeSettlementValue(rate?.settlement_type);
+    return rateSettlement === settlementFilter || rateSettlement === "any" || !rateSettlement;
+  };
 
   const calculateMargin = (sfRate, adminRate) => {
     if (!adminRate && adminRate !== 0) return "-";

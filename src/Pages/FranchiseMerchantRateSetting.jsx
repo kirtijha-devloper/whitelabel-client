@@ -110,16 +110,16 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     return rate.merchant_rate ?? rate.franchise_rate ?? rate.super_franchise_rate ?? rate.base_rate ?? rate.admin_rate;
   }
   if (activeTab === "franchise") {
-    return rate.franchise_rate ?? rate.merchant_rate ?? rate.base_rate;
+    return rate.franchise_rate ?? rate.merchant_rate ?? rate.base_rate ?? rate.admin_rate;
   }
-  return rate.merchant_rate ?? rate.franchise_rate ?? rate.base_rate;
+  return rate.merchant_rate ?? rate.franchise_rate ?? rate.base_rate ?? rate.admin_rate;
 };
   const normalizeSettlementValue = (value) => String(value ?? "").trim().toLowerCase();
-  const matchesSettlementFilter = (rate) => (
-    settlementFilter === "all"
-      ? true
-      : normalizeSettlementValue(rate?.settlement_type) === settlementFilter
-  );
+  const matchesSettlementFilter = (rate) => {
+    if (settlementFilter === "all") return true;
+    const rateSettlement = normalizeSettlementValue(rate?.settlement_type);
+    return rateSettlement === settlementFilter || rateSettlement === "any" || !rateSettlement;
+  };
   const formatSettlementLabel = (value) => {
     const normalizedValue = normalizeSettlementValue(value);
     if (normalizedValue === "today_settlement") return "Today Settlement";
