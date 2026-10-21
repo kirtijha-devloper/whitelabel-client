@@ -781,7 +781,9 @@ const SuperAdminPOSInventory = () => {
                 {companyOptions.length}
               </span>
             </span>
-            <button
+
+            {/* ---- no need add to company  current */}
+           {/* } <button
               type="button"
               onClick={() => {
                 setShowCompanyListModal(false);
@@ -790,7 +792,7 @@ const SuperAdminPOSInventory = () => {
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-600 hover:text-cyan-700"
             >
               <FaPlus className="text-[10px]" /> Add New Company
-            </button>
+            </button> */}
           </div>
 
           {companyOptions.length > 5 && (
