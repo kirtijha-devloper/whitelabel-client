@@ -236,7 +236,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   // ── Rental State ─────────────────────────────────────────────────────────────
   const [rentalList, setRentalList] = useState([]);
   const [loadingRental, setLoadingRental] = useState(false);
-  const [rentalForm, setRentalForm] = useState({ franchise_rate: '', merchant_rate: '', is_active: true });
+  const [rentalForm, setRentalForm] = useState({ super_franchise_rate: '', franchise_rate: '', merchant_rate: '', is_active: true });
   const [isSavingRental, setIsSavingRental] = useState(false);
 
   const methodOptions = ["CARD", "UPI"];
@@ -635,11 +635,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         return;
       }
 
-      const [applicableChargesRes, defaultRulesRes, merchantsRes, franchisesRes] = await Promise.all([
+      const [applicableChargesRes, defaultRulesRes, merchantsRes, franchisesRes, superFranchisesRes] = await Promise.all([
         fetchMyAdminApplicableCharges().catch(() => null),
         listBbpsChargeRules({ user_id: 'default' }).catch(() => ({ data: [] })),
         MerchantAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
         FranchiseAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
+        SuperFranchiseAllUsers({ page: 1, limit: 1000 }).catch(() => ({ data: [] })),
       ]);
 
       const cc = applicableChargesRes?.data?.ccBillRate || applicableChargesRes?.ccBillRate || applicableChargesRes?.data?.cc_bill || applicableChargesRes?.data?.ccBill;
@@ -649,9 +650,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       const defRules = Array.isArray(defaultRulesRes?.data) ? defaultRulesRes.data : Array.isArray(defaultRulesRes) ? defaultRulesRes : [];
       setCompanyDefaultCcRules(defRules);
 
+      const sfList = (Array.isArray(superFranchisesRes?.data) ? superFranchisesRes.data : Array.isArray(superFranchisesRes) ? superFranchisesRes : []).map(sf => ({ ...sf, userType: 'Super Franchise' }));
       const mList = (Array.isArray(merchantsRes?.data) ? merchantsRes.data : Array.isArray(merchantsRes) ? merchantsRes : []).map(m => ({ ...m, userType: 'Merchant' }));
       const fList = (Array.isArray(franchisesRes?.data) ? franchisesRes.data : Array.isArray(franchisesRes) ? franchisesRes : []).map(f => ({ ...f, userType: 'Franchise' }));
-      setCcUsers([...fList, ...mList]);
+      setCcUsers([...sfList, ...fList, ...mList]);
     } catch (err) {
       console.error('Failed to load CC Bill data', err);
     } finally {
@@ -945,8 +947,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       if (rows.length > 0) {
         const item = rows[0];
         setRentalForm({
-          franchise_rate: item.amount ?? item.franchise_rate ?? '',
-          merchant_rate: item.merchant_rate ?? '',
+          super_franchise_rate: item.super_franchise_rate ?? rows.find(r => r.target_user_type === 'super_franchise')?.amount ?? '',
+          franchise_rate: item.franchise_rate ?? rows.find(r => r.target_user_type === 'franchise')?.amount ?? item.amount ?? '',
+          merchant_rate: item.merchant_rate ?? rows.find(r => r.target_user_type === 'merchant')?.amount ?? '',
           is_active: item.status === 'active' || item.is_active === true,
         });
       }
@@ -980,6 +983,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       }
 
       const payload = {
+        super_franchise_rate: parseFloat(rentalForm.super_franchise_rate || 0),
         franchise_rate: parseFloat(rentalForm.franchise_rate || 0),
         merchant_rate: parseFloat(rentalForm.merchant_rate || 0),
         status: rentalForm.is_active ? 'active' : 'inactive',
@@ -2472,10 +2476,10 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             <div>
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <User className="w-5 h-5 text-blue-600" />
-                User-Specific CC Bill Overrides (Merchants & Franchises)
+                User-Specific CC Bill Overrides (Super Franchises, Franchises & Merchants)
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Configure customized CC bill charges for specific merchants or franchises in your company.
+                Configure customized CC bill charges for specific super franchises, franchises, or merchants in your company.
               </p>
             </div>
             {selectedCcUserId && (
@@ -2491,7 +2495,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
           {/* User Selector */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Select User (Franchise or Merchant)</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Select User (Super Franchise, Franchise, or Merchant)</label>
               <select
                 className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
                 value={selectedCcUserId}
@@ -2815,6 +2819,19 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             </div>
           ) : (
             <form onSubmit={handleSaveRental} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Super Franchise Monthly Rental (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 400"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent outline-none"
+                  value={rentalForm.super_franchise_rate}
+                  onChange={(e) => setRentalForm({ ...rentalForm, super_franchise_rate: e.target.value })}
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Franchise Monthly Rental (₹)</label>
                 <input

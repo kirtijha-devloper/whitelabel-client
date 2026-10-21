@@ -391,9 +391,10 @@ const fromApiCardType = (value) => {
 };
 
 const fromApiCardBrand = (value) => {
-  const token = normalizeToken(value);
+  // Use normalizeKeyToken to strip underscores/hyphens so MASTER_CARD and MASTERCARD both map to the same label
+  const token = normalizeKeyToken(value);
   if (!token) return 'ALL';
-  return CARD_BRAND_LABELS[token] || String(value).trim().toUpperCase();
+  return CARD_BRAND_LABELS[token] || token;
 };
 
 const fromApiCardClassification = (value) => {
@@ -404,10 +405,10 @@ const fromApiCardClassification = (value) => {
 
 const makeRuleKey = (rule) => {
   const minAmount = toFiniteNumber(rule?.min_amount ?? rule?.from_amount, 0);
-  const maxAmount = (rule?.max_amount === null || rule?.max_amount === undefined || rule?.max_amount === '') &&
-    (rule?.to_amount === null || rule?.to_amount === undefined || rule?.to_amount === '')
-    ? 'OPEN'
-    : String(rule?.max_amount ?? rule?.to_amount);
+  // Parse max_amount to a number first so "500.00" and 500 both produce "500" — preventing duplicate keys
+  const rawMax = rule?.max_amount ?? rule?.to_amount;
+  const parsedMax = toNullableNumber(rawMax);
+  const maxAmount = parsedMax === null ? 'OPEN' : String(parsedMax);
 
   return [
     normalizeKeyToken(rule?.payment_mode || rule?.method),
@@ -2666,7 +2667,7 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
 
     const keys = new Set([...adminByKey.keys(), ...sfByKey.keys()]);
 
-    return [...keys].map(key => {
+    const results = [...keys].map(key => {
       const adminRule = adminByKey.get(key) || null;
       const sfRule = sfByKey.get(key) || null;
       const effectiveRule = sfRule || adminRule;
@@ -2698,8 +2699,19 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
         source_scope: sfRule ? 'super_franchise' : 'admin',
         base_source_scope: adminRule ? 'admin' : mapped.base_source_scope,
         isInherited: !sfRule,
+        _ruleKey: key,
       };
-    }).filter(Boolean).sort(sortMappedRates);
+    }).filter(Boolean);
+
+    // Safety dedup: keep the most specific rule per key dimension
+    const finalMap = new Map();
+    const priority = (r) => r.source_scope === 'super_franchise' ? 2 : 1;
+    results.forEach(r => {
+      const existing = finalMap.get(r._ruleKey);
+      if (!existing || priority(r) >= priority(existing)) finalMap.set(r._ruleKey, r);
+    });
+
+    return [...finalMap.values()].map(r => { const { _ruleKey, ...rest } = r; return rest; }).sort(sortMappedRates);
   } catch (error) {
     logRateError('super-franchise-managed-rates:load:error', error, { superFranchiseId });
     return [];
@@ -2797,17 +2809,23 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
   try {
     const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
 
-    const sfFranchiseRules = (allRules || []).filter(
-      r => (r.scope === 'super_franchise_franchise' || (Number(getRuleFranchiseId(r)) === Number(franchiseId) && getRuleUserId(r) === null)) &&
-           (!superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId))
-    );
+    // Only include rules that are specifically for THIS franchise (check franchiseId in all cases)
+    const sfFranchiseRules = (allRules || []).filter(r => {
+      const matchesFranchise = Number(getRuleFranchiseId(r)) === Number(franchiseId);
+      const matchesSfId = !superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId);
+      const isFranchiseScoped =
+        (r.scope === 'super_franchise_franchise' && matchesFranchise) ||
+        (matchesFranchise && getRuleUserId(r) === null);
+      return isFranchiseScoped && matchesSfId;
+    });
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
     const sfFranchiseByKey = new Map(sfFranchiseRules.map(r => [makeRuleKey(r), r]));
+    // Union of keys — after makeRuleKey normalization, same dimensions = same key = 1 entry
     const keys = new Set([...adminByKey.keys(), ...sfDefaultByKey.keys(), ...sfFranchiseByKey.keys()]);
 
-    return [...keys].map(key => {
+    const results = [...keys].map(key => {
       const adminRule = adminByKey.get(key) || null;
       const sfDefaultRule = sfDefaultByKey.get(key) || null;
       const sfFranchiseRule = sfFranchiseByKey.get(key) || null;
@@ -2836,9 +2854,20 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
         super_franchise_rate: sfDefaultRate,
         source_scope: sfFranchiseRule ? 'super_franchise_franchise' : sfDefaultRule ? 'super_franchise' : 'admin',
         base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
-        isInherited: !sfFranchiseRule
+        isInherited: !sfFranchiseRule,
+        _ruleKey: key,
       };
-    }).filter(Boolean).sort(sortMappedRates);
+    }).filter(Boolean);
+
+    // Final safety dedup: if somehow 2 entries share the same rule key, keep the most specific one
+    const finalMap = new Map();
+    const priority = (r) => r.source_scope === 'super_franchise_franchise' ? 3 : r.source_scope === 'super_franchise' ? 2 : 1;
+    results.forEach(r => {
+      const existing = finalMap.get(r._ruleKey);
+      if (!existing || priority(r) >= priority(existing)) finalMap.set(r._ruleKey, r);
+    });
+
+    return [...finalMap.values()].map(r => { const { _ruleKey, ...rest } = r; return rest; }).sort(sortMappedRates);
   } catch (error) {
     logRateError('super-franchise-franchise-rates:load:error', error, { franchiseId, superFranchiseId });
     return [];
@@ -2938,17 +2967,22 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
   try {
     const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
 
-    const sfMerchantRules = (allRules || []).filter(
-      r => (r.scope === 'super_franchise_merchant' || Number(getRuleUserId(r)) === Number(merchantId)) &&
-           (!superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId))
-    );
+    // Only include rules specifically for this merchant
+    const sfMerchantRules = (allRules || []).filter(r => {
+      const matchesMerchant = Number(getRuleUserId(r)) === Number(merchantId);
+      const matchesSfId = !superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId);
+      const isMerchantScoped =
+        (r.scope === 'super_franchise_merchant' && matchesMerchant) ||
+        matchesMerchant;
+      return isMerchantScoped && matchesSfId;
+    });
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
     const sfMerchantByKey = new Map(sfMerchantRules.map(r => [makeRuleKey(r), r]));
     const keys = new Set([...adminByKey.keys(), ...sfDefaultByKey.keys(), ...sfMerchantByKey.keys()]);
 
-    return [...keys].map(key => {
+    const results = [...keys].map(key => {
       const adminRule = adminByKey.get(key) || null;
       const sfDefaultRule = sfDefaultByKey.get(key) || null;
       const sfMerchantRule = sfMerchantByKey.get(key) || null;
@@ -2975,9 +3009,20 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
         merchant_rate: effectiveRateVal,
         source_scope: sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise' : 'admin',
         base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
-        isInherited: !sfMerchantRule
+        isInherited: !sfMerchantRule,
+        _ruleKey: key,
       };
-    }).filter(Boolean).sort(sortMappedRates);
+    }).filter(Boolean);
+
+    // Safety dedup: keep the most specific rule per key dimension
+    const finalMap = new Map();
+    const priority = (r) => r.source_scope === 'super_franchise_merchant' ? 3 : r.source_scope === 'super_franchise' ? 2 : 1;
+    results.forEach(r => {
+      const existing = finalMap.get(r._ruleKey);
+      if (!existing || priority(r) >= priority(existing)) finalMap.set(r._ruleKey, r);
+    });
+
+    return [...finalMap.values()].map(r => { const { _ruleKey, ...rest } = r; return rest; }).sort(sortMappedRates);
   } catch (error) {
     logRateError('super-franchise-merchant-rates:load:error', error, { merchantId, superFranchiseId });
     return [];

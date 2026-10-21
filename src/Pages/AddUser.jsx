@@ -475,10 +475,12 @@ function AddUser({ currentUser }) {
       }
 
       const redirectUrl = isFranchiseUser
-        ? "/franchise/list" : isSuperFranchiseUser ? "/super-franchise/franchise-list"
-        : normalizeUserRole(submissionFormData.role) === "employee"
-          ? "/admin/employee-list"
-          : "/admin/list";
+        ? "/franchise/list"
+        : isSuperFranchiseUser
+          ? (normalizeUserRole(submissionFormData.role) === "merchant" ? "/super-franchise/merchant-list" : "/super-franchise/list")
+          : normalizeUserRole(submissionFormData.role) === "employee"
+            ? "/admin/employee-list"
+            : "/admin/list";
       dispatch({ type: "RESET" });
       setSelectedMachines([]);
       setSearchTerm("");

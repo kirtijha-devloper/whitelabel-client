@@ -526,7 +526,11 @@ const UserList = ({
   const normalizedQueryRole = roleFromQuery === "franchise" ? "franchaise" : roleFromQuery;
   const initialRole = lockedRole || normalizedQueryRole || "";
 
-  const adminIdParam = isAdmin && currentUser?.id ? currentUser.id : undefined;
+  const adminIdParam = isAdmin && currentUser?.id
+    ? currentUser.id
+    : (isSuperFranchiseViewer && (currentUser?.admin_id || currentUser?.adminId)
+      ? (currentUser.admin_id || currentUser.adminId)
+      : undefined);
 
   // Query for all users (default list)
   const [allUsersParams, setAllUsersParams] = useState({
@@ -574,18 +578,25 @@ const UserList = ({
 
   // Strict Admin Isolation Guard: Ensure only this Admin's downline is displayed
   const filterByAdminOwnership = (users) => {
-    if (!isAdmin || !currentUser?.id) return users;
-    const currentAdminId = Number(currentUser.id);
+    if (!currentUser?.id) return users;
+    const targetAdminId = isAdmin
+      ? Number(currentUser.id)
+      : (isSuperFranchiseViewer && (currentUser?.admin_id || currentUser?.adminId)
+          ? Number(currentUser.admin_id || currentUser.adminId)
+          : null);
+
+    if (!targetAdminId) return users;
+
     return users.filter((u) => {
       // Exclude other admin accounts
       const uRole = normalizeUserRole(u.role);
-      if (uRole === 'admin' && Number(u.id) !== currentAdminId) {
+      if (uRole === 'admin' && Number(u.id) !== targetAdminId) {
         return false;
       }
       // If user has admin_id, ensure it belongs to this admin
       const uAdminId = u.admin_id ?? u.adminId;
       if (uAdminId !== undefined && uAdminId !== null) {
-        return Number(uAdminId) === currentAdminId;
+        return Number(uAdminId) === targetAdminId;
       }
       return true;
     });
