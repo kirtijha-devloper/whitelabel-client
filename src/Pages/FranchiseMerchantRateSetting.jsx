@@ -104,13 +104,8 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     return "Base Rate";
   };
   const hasEditableGst = (rate) => rate?.gst_required || rate?.gst_rate !== null && rate?.gst_rate !== undefined;
-  const getAdminRateValue = (rate) => Number(rate?.admin_rate ?? rate?.base_rate ?? 0);
-  const getValidationTarget = (rate) => {
-    if (activeTab === "default") {
-      return Number(rate?.admin_rate ?? rate?.base_rate ?? 0);
-    }
-    return Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
-  };
+  const getAdminRateValue = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
+  const getValidationTarget = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
   const getValidationMessage = (rate) => {
     const minTarget = getValidationTarget(rate);
     const minTargetDisplay = Number.isFinite(minTarget) ? `${minTarget.toFixed(2)}%` : "inherited rate";
@@ -124,7 +119,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
       ? `Merchant charge must be ≥ Inherited rate (${minTargetDisplay})`
       : `Merchant rate must be ≥ Inherited rate (${minTargetDisplay})`;
   };
-  const getBaseRateLabel = () => "Inherited Rate (From Admin) (%)";
+  const getBaseRateLabel = () => "Inherited Rate (%)";
   const getEditableRateValue = (rate) => {
   if (activeTab === "default") {
     // For default rates, prioritize overrides, then base, finally admin_rate as fallback
@@ -776,7 +771,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       <div>
                         <p className="text-[11px] font-semibold text-gray-600 flex items-center gap-1">
                           <Lock className="w-3 h-3 text-gray-500" />
-                          Inherited Rate (Admin)
+                          Inherited Rate
                         </p>
                         <p className="text-[10px] text-gray-500">Non-Editable Base</p>
                       </div>
@@ -886,7 +881,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                     <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-x border-gray-200">
                       <div className="flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Inherited Rate (Admin) (%)</span>
+                        <span>Inherited Rate (%)</span>
                       </div>
                       <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
                     </th>
