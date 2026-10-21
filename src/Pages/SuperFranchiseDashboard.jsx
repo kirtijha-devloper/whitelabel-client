@@ -108,7 +108,7 @@ export default function SuperFranchiseDashboard({ dashboardData: propDashboardDa
       title: "Merchant List",
       count: merchants.count || 0,
       subtitle: "Active retail merchants",
-      link: "/super-franchise/list",
+      link: "/super-franchise/merchant-list",
       icon: Users,
       iconBox: "bg-purple-50 text-purple-600 border border-purple-100",
       hoverBorder: "hover:border-purple-300",

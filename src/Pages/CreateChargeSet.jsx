@@ -67,7 +67,7 @@ const CreateChargeSet = ({currentUser}) => {
   const redirectUrl = normalizedRole === "franchise"
     ? '/franchise/list'
     : normalizedRole === "super_franchise"
-      ? '/super-franchise/franchise-list'
+      ? '/super-franchise/list'
       : '/admin/list';
 
   const handleComplete = () => {
