@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BASE_URL } from '../constants';
-import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers } from './FranchiseApi';
+import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, AllUsers } from './FranchiseApi';
 import { getAuthToken } from '../utils/auth';
 
 const getAuthHeaders = () => {
@@ -255,7 +255,14 @@ const extractPaginationPayload = (payload, fallbackPage = 1, fallbackLimit = 100
 };
 
 const extractRuleRecord = (payload) => {
-  const candidates = [payload?.record, payload?.rule, payload?.data, payload];
+  const candidates = [
+    payload?.record,
+    payload?.rule,
+    payload?.data?.record,
+    payload?.data?.rule,
+    payload?.data,
+    payload
+  ];
   return candidates.find((candidate) => {
     if (!candidate || Array.isArray(candidate) || typeof candidate !== 'object') return false;
 
@@ -393,14 +400,15 @@ const fromApiCardClassification = (value) => {
 };
 
 const makeRuleKey = (rule) => {
-  const minAmount = toFiniteNumber(rule?.min_amount, 0);
-  const maxAmount = rule?.max_amount === null || rule?.max_amount === undefined || rule?.max_amount === ''
+  const minAmount = toFiniteNumber(rule?.min_amount ?? rule?.from_amount, 0);
+  const maxAmount = (rule?.max_amount === null || rule?.max_amount === undefined || rule?.max_amount === '') &&
+    (rule?.to_amount === null || rule?.to_amount === undefined || rule?.to_amount === '')
     ? 'OPEN'
-    : String(rule.max_amount);
+    : String(rule?.max_amount ?? rule?.to_amount);
 
   return [
-    normalizeKeyToken(rule?.payment_mode),
-    normalizeKeyToken(rule?.card_brand),
+    normalizeKeyToken(rule?.payment_mode || rule?.method),
+    normalizeKeyToken(rule?.card_brand || rule?.network),
     normalizeKeyToken(rule?.card_type),
     normalizeKeyToken(rule?.card_classification),
     normalizeKeyToken(rule?.settlement_type),
@@ -450,7 +458,7 @@ const normalizeRulePayload = (source = {}, overrides = {}) => {
     : sourceGstRequired !== undefined
       ? Boolean(sourceGstRequired)
       : cardClassification === 'BUSINESS';
-  const maxAmountValue = getPreferredValue(source, overrides, ['max_amount', 'maxAmount']);
+  const maxAmountValue = getPreferredValue(source, overrides, ['max_amount', 'maxAmount', 'to_amount', 'toAmount']);
 
   return stripUndefined({
     user_id: getPreferredValue(source, overrides, ['user_id', 'userId']) ?? null,
@@ -462,10 +470,10 @@ const normalizeRulePayload = (source = {}, overrides = {}) => {
     card_classification: cardClassification,
     settlement_type: getPreferredValue(source, overrides, ['settlement_type', 'settlementType']) ?? null,
     company_name: getPreferredValue(source, overrides, ['company_name', 'companyName']) ?? null,
-    min_amount: toFiniteNumber(getPreferredValue(source, overrides, ['min_amount', 'minAmount']), 0),
+    min_amount: toFiniteNumber(getPreferredValue(source, overrides, ['min_amount', 'minAmount', 'from_amount', 'fromAmount']), 0),
     max_amount: maxAmountValue === undefined ? null : toNullableNumber(maxAmountValue),
     charge_percent: toFiniteNumber(getPreferredValue(source, overrides, ['charge_percent', 'chargePercent', 'base_rate', 'merchant_rate']), 0),
-    charge_flat: toFiniteNumber(getPreferredValue(source, overrides, ['charge_flat', 'chargeFlat']), 0),
+    charge_flat: toFiniteNumber(getPreferredValue(source, overrides, ['charge_flat', 'chargeFlat', 'flat_fee', 'flatFee']), 0),
     gst_required: gstRequired,
     gst_percent: gstRequired
       ? toFiniteNumber(getPreferredValue(source, overrides, ['gst_percent', 'gstPercent', 'gst_rate', 'gstRate']), 18)
@@ -1151,8 +1159,33 @@ export const getSuperFranchises = async () => {
 
 export const getFranchises = async () => {
   try {
-    const res = await FranchiseAllUsers({ limit: 1000 });
-    return res?.data || res || [];
+    let list = [];
+    try {
+      const res = await FranchiseAllUsers({ limit: 1000 });
+      list = extractArrayPayload(res);
+    } catch {
+      // ignore
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const fallbackRes = await AllUsers({ role: 'franchise', limit: 1000 });
+        list = extractArrayPayload(fallbackRes);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const fallbackRes2 = await AllUsers({ role: 'franchaise', limit: 1000 });
+        list = extractArrayPayload(fallbackRes2);
+      } catch {
+        // ignore
+      }
+    }
+
+    return Array.isArray(list) ? list : [];
   } catch (error) {
     console.error('Error fetching franchises:', error);
     return [];
@@ -1219,6 +1252,19 @@ export const getMerchants = async (franchiseId) => {
     if (franchiseId) {
       merchants = merchants.filter((merchant) => getEntityFranchiseId(merchant) === Number(franchiseId));
     }
+
+    if (!Array.isArray(merchants) || merchants.length === 0) {
+      try {
+        const fallbackRes = await AllUsers({ role: 'merchant', limit: 1000, ...(franchiseId ? { franchise_id: franchiseId } : {}) });
+        const fallbackList = extractArrayPayload(fallbackRes);
+        if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+          merchants = fallbackList;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     return merchants;
   } catch (error) {
     console.error('Error fetching merchants:', error);
@@ -2503,40 +2549,103 @@ export const deleteUserPayoutCharge = async (id) => {
 
 // ── Super Franchise Managed Charge Rules API ────────────────────────────────
 
-// Helper: call the generic /list endpoint (not /list/:audience) which applies
-// role-based scope restrictions server-side.  For super_franchise callers the
-// backend already returns admin_default + all super_franchise-scoped rules.
+// Helper: Fetch super franchise baseline rules from upline admin AND existing SF overrides
+export const fetchSuperFranchiseBaseAndDefaultRules = async (superFranchiseId) => {
+  let adminRules = [];
+  let sfRules = [];
+
+  // 1. Primary source: Fetch inherited baseline POS charges from Admin via /service-charge/my-applicable-charges
+  try {
+    const applicableRes = await fetchMyAdminApplicableCharges();
+    const posRules = applicableRes?.data?.pos || [];
+    if (posRules.length > 0) {
+      adminRules = posRules.map((r, idx) => ({
+        id: r.id || `inherited-pos-${idx}`,
+        rule_id: r.id || null,
+        payment_mode: r.payment_mode || r.method || 'CARD',
+        card_brand: r.card_brand || r.network || 'ALL',
+        card_type: r.card_type || 'ANY',
+        card_classification: r.card_classification || 'ANY',
+        settlement_type: r.settlement_type || null,
+        company_name: r.company_name || null,
+        min_amount: toFiniteNumber(r.min_amount ?? r.from_amount, 0),
+        max_amount: toNullableNumber(r.max_amount ?? r.to_amount),
+        charge_percent: toFiniteNumber(r.charge_percent ?? r.base_rate ?? r.rate, 0),
+        charge_flat: toFiniteNumber(r.charge_flat ?? r.flat_fee, 0),
+        gst_required: Boolean(r.gst_required),
+        gst_percent: toFiniteNumber(r.gst_percent ?? r.gst_rate, 18),
+        scope: 'admin_default',
+        is_active: r.is_active !== false,
+      }));
+    }
+  } catch (err) {
+    logRateWarn('Failed to fetch admin applicable charges for super franchise base defaults', err);
+  }
+
+  // 2. Fetch list of all POS rules from server (includes admin rules + SF created rules)
+  try {
+    const listRules = await fetchSuperFranchiseListRules();
+    if (Array.isArray(listRules) && listRules.length > 0) {
+      if (adminRules.length === 0) {
+        adminRules = listRules.filter(
+          r => isAdminDefaultRule(r) || isAdminSuperFranchiseRule(r) || r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default'
+        );
+      }
+      sfRules = listRules;
+    }
+  } catch (err) {
+    logRateWarn('Failed to fetch list rules for super franchise', err);
+  }
+
+  // 3. Fallback for admin rules if still empty
+  if (adminRules.length === 0) {
+    try {
+      const audienceAdminRules = await fetchChargeRulesByAudience('admin');
+      if (audienceAdminRules.length > 0) {
+        adminRules = audienceAdminRules;
+      } else {
+        adminRules = await fetchRulesByScopes([RULE_SCOPES.ADMIN_DEFAULT, RULE_SCOPES.SUPER_ADMIN_DEFAULT]);
+      }
+    } catch (err) {
+      logRateWarn('Failed fallback fetch for admin rules', err);
+    }
+  }
+
+  // 4. Identify Super Franchise default rules (rules without merchant/franchise id)
+  const sfDefaultRules = sfRules.filter(r => {
+    const isSfScope = r.scope === 'super_franchise_default' ||
+      (!hasMerchantScope(r) && !hasFranchiseScope(r) && hasSuperFranchiseScope(r));
+    const matchesSfId = !superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId);
+    return isSfScope && matchesSfId;
+  });
+
+  return { adminRules, sfDefaultRules, allRules: sfRules };
+};
+
 const fetchSuperFranchiseListRules = async (extraParams = {}) => {
   const apiParams = Object.fromEntries(
     Object.entries({ limit: 2000, ...extraParams })
       .filter(([, v]) => v !== undefined && v !== null && v !== '')
   );
-  const response = await axios.get(`${POS_CHARGE_RULES_BASE}/list`, {
-    ...getAuthHeaders(),
-    params: apiParams,
-  });
-  return extractArrayPayload(response.data);
+  try {
+    const response = await axios.get(`${POS_CHARGE_RULES_BASE}/list`, {
+      ...getAuthHeaders(),
+      params: apiParams,
+    });
+    return extractArrayPayload(response.data);
+  } catch (err) {
+    logRateWarn('Failed to fetch POS charge rules list', err);
+    return [];
+  }
 };
 
 export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => {
   try {
-    const allRules = await fetchSuperFranchiseListRules();
-
-    let adminRules = allRules.filter(
-      r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin'
-    );
-    if (adminRules.length === 0) {
-      adminRules = await fetchBaseDefaultRules();
-    }
-    const sfDefaultRules = allRules.filter(
-      r => r.scope === 'super_franchise_default' &&
-           (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId))
-    );
+    const { adminRules, sfDefaultRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
 
-    // Union of keys: all admin baseline rules, with SF overrides layered on top
     const keys = new Set([...adminByKey.keys(), ...sfByKey.keys()]);
 
     return [...keys].map(key => {
@@ -2546,10 +2655,11 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
       if (!effectiveRule) return null;
 
       const adminRate = adminRule
-        ? toFiniteNumber(adminRule.charge_percent, 0)
-        : toFiniteNumber(effectiveRule.charge_percent, 0);
-      // If SF has overridden this rule use that rate, otherwise inherit admin rate
-      const sfRate = sfRule ? toFiniteNumber(sfRule.charge_percent, 0) : adminRate;
+        ? toFiniteNumber(adminRule.charge_percent ?? adminRule.base_rate, 0)
+        : toFiniteNumber(effectiveRule.charge_percent ?? effectiveRule.base_rate, 0);
+      const sfRate = sfRule
+        ? toFiniteNumber(sfRule.charge_percent ?? sfRule.base_rate, adminRate)
+        : adminRate;
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         superFranchiseId,
@@ -2560,6 +2670,8 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
 
       return {
         ...mapped,
+        id: sfRule?.id || adminRule?.id || mapped.id || key,
+        rule_id: sfRule?.id || null,
         admin_rate: adminRate,
         base_rate: adminRate,
         merchant_rate: sfRate,
@@ -2567,6 +2679,7 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
         super_franchise_rate: sfRate,
         source_scope: sfRule ? 'super_franchise' : 'admin',
         base_source_scope: adminRule ? 'admin' : mapped.base_source_scope,
+        isInherited: !sfRule,
       };
     }).filter(Boolean).sort(sortMappedRates);
   } catch (error) {
@@ -2577,20 +2690,24 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
 
 export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, rateObject, updates) => {
   try {
-    if (rateObject.isInherited) {
+    const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
+    const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
+    const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+
+    if (isInherited) {
       const payloadOverrides = {
         ...updates,
+        charge_percent: inputCharge,
         user_id: null,
         franchaise_id: null,
         super_franchise_id: Number(superFranchiseId),
         is_active: true
       };
-      const sourceRule = rateObject?.original_rule || rateObject?.base_rule;
+      const sourceRule = rateObject?.original_rule || rateObject?.base_rule || rateObject;
       const payload = normalizeRulePayload(sourceRule, payloadOverrides);
       const response = await axios.post(POS_CHARGE_RULES_BASE, payload, getAuthHeaders());
-      const record = extractRuleRecord(response.data);
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newSfRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent ?? updates?.charge_percent, 0);
+      const record = extractRuleRecord(response.data) || { ...payload, id: response.data?.id };
+      const newSfRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
 
       const mapped = mapRuleToFranchiseFormat(record, {
         superFranchiseId: Number(superFranchiseId),
@@ -2600,17 +2717,29 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
       });
       return {
         ...mapped,
+        id: record?.id || rateObject?.id,
+        rule_id: record?.id,
         admin_rate: adminRate,
         base_rate: adminRate,
         merchant_rate: newSfRate,
         franchise_rate: newSfRate,
         super_franchise_rate: newSfRate,
         source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        base_source_scope: 'admin',
+        isInherited: false
       };
     } else {
-      const ruleId = rateObject?.rule_id || rateObject?.id;
-      const payload = buildUpdatePayload({ ...updates, user_id: null, franchaise_id: null, super_franchise_id: Number(superFranchiseId) }, rateObject?.original_rule);
+      const ruleId = Number(rateObject?.rule_id || rateObject?.id);
+      const payload = buildUpdatePayload(
+        {
+          ...updates,
+          charge_percent: inputCharge,
+          user_id: null,
+          franchaise_id: null,
+          super_franchise_id: Number(superFranchiseId)
+        },
+        rateObject?.original_rule || rateObject
+      );
       const response = await axios.put(`${POS_CHARGE_RULES_BASE}/${ruleId}`, payload, getAuthHeaders());
       const record = resolveUpdatedRuleRecord({
         responseData: response.data,
@@ -2618,9 +2747,8 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
         payload,
         ruleId,
         logEvent: 'super-franchise-rates:update-default'
-      });
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newSfRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent ?? updates?.charge_percent, 0);
+      }) || { ...payload, id: ruleId };
+      const newSfRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
       const mapped = mapRuleToFranchiseFormat(record, {
         superFranchiseId: Number(superFranchiseId),
         adminRule: rateObject?.base_rule || null,
@@ -2629,13 +2757,16 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
       });
       return {
         ...mapped,
+        id: ruleId,
+        rule_id: ruleId,
         admin_rate: adminRate,
         base_rate: adminRate,
         merchant_rate: newSfRate,
         franchise_rate: newSfRate,
         super_franchise_rate: newSfRate,
         source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        base_source_scope: 'admin',
+        isInherited: false
       };
     }
   } catch (error) {
@@ -2646,13 +2777,12 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
 
 export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superFranchiseId) => {
   try {
-    const rules = await fetchSuperFranchiseListRules();
-    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
-    if (adminRules.length === 0) {
-      adminRules = await fetchBaseDefaultRules();
-    }
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
-    const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise' && Number(r.franchaise_id) === Number(franchiseId));
+    const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
+
+    const sfFranchiseRules = (allRules || []).filter(
+      r => (r.scope === 'super_franchise_franchise' || (Number(getRuleFranchiseId(r)) === Number(franchiseId) && getRuleUserId(r) === null)) &&
+           (!superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId))
+    );
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
@@ -2668,7 +2798,7 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
 
       const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
       const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
-      const effectiveRateVal = toFiniteNumber(effectiveRule.charge_percent, 0);
+      const effectiveRateVal = sfFranchiseRule ? toFiniteNumber(sfFranchiseRule.charge_percent, sfDefaultRate) : sfDefaultRate;
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         franchiseId: Number(franchiseId),
@@ -2679,13 +2809,16 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
       });
       return {
         ...mapped,
+        id: sfFranchiseRule?.id || sfDefaultRule?.id || adminRule?.id || mapped.id || key,
+        rule_id: sfFranchiseRule?.id || null,
         admin_rate: adminRate,
         base_rate: sfDefaultRate,
         merchant_rate: effectiveRateVal,
         franchise_rate: effectiveRateVal,
         super_franchise_rate: sfDefaultRate,
         source_scope: sfFranchiseRule ? 'super_franchise_franchise' : sfDefaultRule ? 'super_franchise' : 'admin',
-        base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin'
+        base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
+        isInherited: !sfFranchiseRule
       };
     }).filter(Boolean).sort(sortMappedRates);
   } catch (error) {
@@ -2696,20 +2829,25 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
 
 export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rateObject, updates, superFranchiseId) => {
   try {
-    if (rateObject.isInherited) {
+    const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
+    const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
+    const baseRate = rateObject?.base_rate ?? adminRate;
+    const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+
+    if (isInherited) {
       const payloadOverrides = {
         ...updates,
+        charge_percent: inputCharge,
         user_id: null,
         franchaise_id: Number(franchiseId),
         super_franchise_id: Number(superFranchiseId),
         is_active: true
       };
-      const sourceRule = rateObject?.original_rule || rateObject?.base_rule;
+      const sourceRule = rateObject?.original_rule || rateObject?.base_rule || rateObject;
       const payload = normalizeRulePayload(sourceRule, payloadOverrides);
       const response = await axios.post(POS_CHARGE_RULES_BASE, payload, getAuthHeaders());
-      const record = extractRuleRecord(response.data);
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent, 0);
+      const record = extractRuleRecord(response.data) || { ...payload, id: response.data?.id };
+      const newRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
       const mapped = mapRuleToFranchiseFormat(record, {
         franchiseId: Number(franchiseId),
         superFranchiseId: Number(superFranchiseId),
@@ -2719,21 +2857,38 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
       });
       return {
         ...mapped,
+        id: record?.id || rateObject?.id,
+        rule_id: record?.id,
         admin_rate: adminRate,
-        base_rate: adminRate,
+        base_rate: baseRate,
         merchant_rate: newRate,
         franchise_rate: newRate,
-        super_franchise_rate: newRate,
-        source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        super_franchise_rate: baseRate,
+        source_scope: 'super_franchise_franchise',
+        base_source_scope: 'super_franchise',
+        isInherited: false
       };
     } else {
-      const ruleId = rateObject?.rule_id || rateObject?.id;
-      const payload = buildUpdatePayload({ ...updates, user_id: null, franchaise_id: Number(franchiseId), super_franchise_id: Number(superFranchiseId) }, rateObject?.original_rule);
+      const ruleId = Number(rateObject?.rule_id || rateObject?.id);
+      const payload = buildUpdatePayload(
+        {
+          ...updates,
+          charge_percent: inputCharge,
+          user_id: null,
+          franchaise_id: Number(franchiseId),
+          super_franchise_id: Number(superFranchiseId)
+        },
+        rateObject?.original_rule || rateObject
+      );
       const response = await axios.put(`${POS_CHARGE_RULES_BASE}/${ruleId}`, payload, getAuthHeaders());
-      const record = resolveUpdatedRuleRecord({ responseData: response.data, currentRule: rateObject?.original_rule, payload, ruleId, logEvent: 'super-franchise-rates:update-franchise' });
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent, 0);
+      const record = resolveUpdatedRuleRecord({
+        responseData: response.data,
+        currentRule: rateObject?.original_rule,
+        payload,
+        ruleId,
+        logEvent: 'super-franchise-rates:update-franchise'
+      }) || { ...payload, id: ruleId };
+      const newRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
       const mapped = mapRuleToFranchiseFormat(record, {
         franchiseId: Number(franchiseId),
         superFranchiseId: Number(superFranchiseId),
@@ -2743,13 +2898,16 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
       });
       return {
         ...mapped,
+        id: ruleId,
+        rule_id: ruleId,
         admin_rate: adminRate,
-        base_rate: adminRate,
+        base_rate: baseRate,
         merchant_rate: newRate,
         franchise_rate: newRate,
-        super_franchise_rate: newRate,
-        source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        super_franchise_rate: baseRate,
+        source_scope: 'super_franchise_franchise',
+        base_source_scope: 'super_franchise',
+        isInherited: false
       };
     }
   } catch (error) {
@@ -2760,13 +2918,12 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
 
 export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFranchiseId) => {
   try {
-    const rules = await fetchSuperFranchiseListRules();
-    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
-    if (adminRules.length === 0) {
-      adminRules = await fetchBaseDefaultRules();
-    }
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
-    const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant' && Number(r.user_id) === Number(merchantId));
+    const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
+
+    const sfMerchantRules = (allRules || []).filter(
+      r => (r.scope === 'super_franchise_merchant' || Number(getRuleUserId(r)) === Number(merchantId)) &&
+           (!superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId))
+    );
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
@@ -2782,7 +2939,7 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
 
       const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
       const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
-      const effectiveRateVal = toFiniteNumber(effectiveRule.charge_percent, 0);
+      const effectiveRateVal = sfMerchantRule ? toFiniteNumber(sfMerchantRule.charge_percent, sfDefaultRate) : sfDefaultRate;
 
       const mapped = mapRuleToMerchantFormat(effectiveRule, {
         merchantId: Number(merchantId),
@@ -2793,11 +2950,14 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
       });
       return {
         ...mapped,
+        id: sfMerchantRule?.id || sfDefaultRule?.id || adminRule?.id || mapped.id || key,
+        rule_id: sfMerchantRule?.id || null,
         admin_rate: adminRate,
         base_rate: sfDefaultRate,
         merchant_rate: effectiveRateVal,
         source_scope: sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise' : 'admin',
-        base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin'
+        base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
+        isInherited: !sfMerchantRule
       };
     }).filter(Boolean).sort(sortMappedRates);
   } catch (error) {
@@ -2808,9 +2968,15 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
 
 export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateObject, updates, superFranchiseId) => {
   try {
-    if (rateObject.isInherited) {
+    const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
+    const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
+    const baseRate = rateObject?.base_rate ?? adminRate;
+    const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+
+    if (isInherited) {
       const payloadOverrides = {
         ...updates,
+        charge_percent: inputCharge,
         user_id: Number(merchantId),
         super_franchise_id: Number(superFranchiseId),
         is_active: true
@@ -2818,12 +2984,11 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
       if (rateObject?.franchaise_id) {
         payloadOverrides.franchaise_id = Number(rateObject.franchaise_id);
       }
-      const sourceRule = rateObject?.original_rule || rateObject?.base_rule;
+      const sourceRule = rateObject?.original_rule || rateObject?.base_rule || rateObject;
       const payload = normalizeRulePayload(sourceRule, payloadOverrides);
       const response = await axios.post(POS_CHARGE_RULES_BASE, payload, getAuthHeaders());
-      const record = extractRuleRecord(response.data);
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent, 0);
+      const record = extractRuleRecord(response.data) || { ...payload, id: response.data?.id };
+      const newRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
       const mapped = mapRuleToMerchantFormat(record, {
         merchantId: Number(merchantId),
         superFranchiseId: Number(superFranchiseId),
@@ -2833,19 +2998,35 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
       });
       return {
         ...mapped,
+        id: record?.id || rateObject?.id,
+        rule_id: record?.id,
         admin_rate: adminRate,
-        base_rate: adminRate,
+        base_rate: baseRate,
         merchant_rate: newRate,
-        source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        source_scope: 'super_franchise_merchant',
+        base_source_scope: 'super_franchise',
+        isInherited: false
       };
     } else {
-      const ruleId = rateObject?.rule_id || rateObject?.id;
-      const payload = buildUpdatePayload({ ...updates, user_id: Number(merchantId), super_franchise_id: Number(superFranchiseId) }, rateObject?.original_rule);
+      const ruleId = Number(rateObject?.rule_id || rateObject?.id);
+      const payload = buildUpdatePayload(
+        {
+          ...updates,
+          charge_percent: inputCharge,
+          user_id: Number(merchantId),
+          super_franchise_id: Number(superFranchiseId)
+        },
+        rateObject?.original_rule || rateObject
+      );
       const response = await axios.put(`${POS_CHARGE_RULES_BASE}/${ruleId}`, payload, getAuthHeaders());
-      const record = resolveUpdatedRuleRecord({ responseData: response.data, currentRule: rateObject?.original_rule, payload, ruleId, logEvent: 'super-franchise-rates:update-merchant' });
-      const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
-      const newRate = toFiniteNumber(record?.charge_percent ?? updates?.chargePercent, 0);
+      const record = resolveUpdatedRuleRecord({
+        responseData: response.data,
+        currentRule: rateObject?.original_rule,
+        payload,
+        ruleId,
+        logEvent: 'super-franchise-rates:update-merchant'
+      }) || { ...payload, id: ruleId };
+      const newRate = toFiniteNumber(record?.charge_percent ?? inputCharge, inputCharge);
       const mapped = mapRuleToMerchantFormat(record, {
         merchantId: Number(merchantId),
         superFranchiseId: Number(superFranchiseId),
@@ -2855,11 +3036,14 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
       });
       return {
         ...mapped,
+        id: ruleId,
+        rule_id: ruleId,
         admin_rate: adminRate,
-        base_rate: adminRate,
+        base_rate: baseRate,
         merchant_rate: newRate,
-        source_scope: 'super_franchise',
-        base_source_scope: 'admin'
+        source_scope: 'super_franchise_merchant',
+        base_source_scope: 'super_franchise',
+        isInherited: false
       };
     }
   } catch (error) {
@@ -2870,13 +3054,11 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
 
 export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, superFranchiseId) => {
   try {
-    const rules = await fetchSuperFranchiseListRules();
-    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
-    if (adminRules.length === 0) {
-      adminRules = await fetchBaseDefaultRules();
-    }
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
-    const sfFranchiseRules = rules.filter(r => r.scope === 'super_franchise_franchise');
+    const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
+
+    const sfFranchiseRules = (allRules || []).filter(
+      r => r.scope === 'super_franchise_franchise' || (hasFranchiseScope(r) && !hasMerchantScope(r))
+    );
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
@@ -2886,7 +3068,7 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
       const fId = franchise?.id ?? franchise?.userId ?? null;
       if (!fId) continue;
 
-      const specificRules = sfFranchiseRules.filter(r => Number(r.franchaise_id) === Number(fId));
+      const specificRules = sfFranchiseRules.filter(r => Number(getRuleFranchiseId(r)) === Number(fId));
       const specificByKey = new Map(specificRules.map(r => [makeRuleKey(r), r]));
       const keys = new Set([...adminByKey.keys(), ...sfDefaultByKey.keys(), ...specificByKey.keys()]);
 
@@ -2899,7 +3081,7 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
 
         const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
         const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
-        const effectiveRateVal = toFiniteNumber(effectiveRule.charge_percent, 0);
+        const effectiveRateVal = sfFranchiseRule ? toFiniteNumber(sfFranchiseRule.charge_percent, sfDefaultRate) : sfDefaultRate;
 
         const mapped = mapRuleToFranchiseFormat(effectiveRule, {
           franchiseId: Number(fId),
@@ -2910,13 +3092,16 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
         });
         return {
           ...mapped,
+          id: sfFranchiseRule?.id || sfDefaultRule?.id || adminRule?.id || mapped.id || key,
+          rule_id: sfFranchiseRule?.id || null,
           admin_rate: adminRate,
           base_rate: sfDefaultRate,
           merchant_rate: effectiveRateVal,
           franchise_rate: effectiveRateVal,
           super_franchise_rate: sfDefaultRate,
           source_scope: sfFranchiseRule ? 'super_franchise_franchise' : sfDefaultRule ? 'super_franchise' : 'admin',
-          base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin'
+          base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
+          isInherited: !sfFranchiseRule
         };
       }).filter(Boolean).sort(sortMappedRates);
     }
@@ -2929,13 +3114,11 @@ export const getSuperFranchiseManagedAllFranchiseRates = async (franchises, supe
 
 export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superFranchiseId) => {
   try {
-    const rules = await fetchSuperFranchiseListRules();
-    let adminRules = rules.filter(r => r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default' || r.scope === 'super_admin_admin');
-    if (adminRules.length === 0) {
-      adminRules = await fetchBaseDefaultRules();
-    }
-    const sfDefaultRules = rules.filter(r => r.scope === 'super_franchise_default' && (!superFranchiseId || Number(r.super_franchise_id) === Number(superFranchiseId)));
-    const sfMerchantRules = rules.filter(r => r.scope === 'super_franchise_merchant');
+    const { adminRules, sfDefaultRules, allRules } = await fetchSuperFranchiseBaseAndDefaultRules(superFranchiseId);
+
+    const sfMerchantRules = (allRules || []).filter(
+      r => r.scope === 'super_franchise_merchant' || hasMerchantScope(r)
+    );
 
     const adminByKey = buildPreferredRuleMap(adminRules, getAdminAudienceRulePriority);
     const sfDefaultByKey = new Map(sfDefaultRules.map(r => [makeRuleKey(r), r]));
@@ -2945,7 +3128,7 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
       const mId = merchant?.id ?? merchant?.merchant_id ?? merchant?.userId ?? null;
       if (!mId) continue;
 
-      const specificRules = sfMerchantRules.filter(r => Number(r.user_id) === Number(mId));
+      const specificRules = sfMerchantRules.filter(r => Number(getRuleUserId(r)) === Number(mId));
       const specificByKey = new Map(specificRules.map(r => [makeRuleKey(r), r]));
       const keys = new Set([...adminByKey.keys(), ...sfDefaultByKey.keys(), ...specificByKey.keys()]);
 
@@ -2958,7 +3141,7 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
 
         const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
         const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
-        const effectiveRateVal = toFiniteNumber(effectiveRule.charge_percent, 0);
+        const effectiveRateVal = sfMerchantRule ? toFiniteNumber(sfMerchantRule.charge_percent, sfDefaultRate) : sfDefaultRate;
 
         const mapped = mapRuleToMerchantFormat(effectiveRule, {
           merchantId: Number(mId),
@@ -2969,11 +3152,14 @@ export const getSuperFranchiseManagedAllMerchantRates = async (merchants, superF
         });
         return {
           ...mapped,
+          id: sfMerchantRule?.id || sfDefaultRule?.id || adminRule?.id || mapped.id || key,
+          rule_id: sfMerchantRule?.id || null,
           admin_rate: adminRate,
           base_rate: sfDefaultRate,
           merchant_rate: effectiveRateVal,
           source_scope: sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise' : 'admin',
-          base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin'
+          base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
+          isInherited: !sfMerchantRule
         };
       }).filter(Boolean).sort(sortMappedRates);
     }

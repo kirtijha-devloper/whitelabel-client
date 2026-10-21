@@ -18,7 +18,7 @@ const normalizeText = (value) => String(value ?? "").trim();
 const pickArray = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.list)) return payload.list;
+  if (Array.isArray(payload?.list)) return payload.list; 
   if (Array.isArray(payload?.rows)) return payload.rows;
   if (Array.isArray(payload?.result)) return payload.result;
   if (Array.isArray(payload?.data?.data)) return payload.data.data;
@@ -215,7 +215,6 @@ export const submitBillAvenuePayment = async ({
 };
 
 /**
- * POST /api/bill-avenue/biller-info-json
  * Retrieves detailed information for a selected BillAvenue biller.
  */
 export const getBillAvenueBillerInfo = async (billerId) => {
