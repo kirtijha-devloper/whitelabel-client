@@ -323,7 +323,6 @@ const ServiceWiseReports = ({ embedded = false, currentUser }) => {
                 <th className="py-3 px-4 text-right">Charges (₹)</th>
                 <th className="py-3 px-4 text-right">Commission (₹)</th>
                 <th className="py-3 px-4 text-right">Net Profit (₹)</th>
-                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -403,7 +402,7 @@ const ServiceWiseReports = ({ embedded = false, currentUser }) => {
                     </td>
 
                     {/* Action */}
-                    <td className="py-3 px-4 text-center">
+                    {/* <td className="py-3 px-4 text-center">
                       <Link
                         to="/super-admin/set-charges"
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#00D3CD]/10 text-[#00a8a3] hover:bg-[#00D3CD]/20 font-semibold text-[11px] transition"
@@ -411,7 +410,7 @@ const ServiceWiseReports = ({ embedded = false, currentUser }) => {
                       >
                         Set Charges <FaArrowRight className="w-2.5 h-2.5" />
                       </Link>
-                    </td>
+                    </td> */}
                   </tr>
                 ))
               )}
