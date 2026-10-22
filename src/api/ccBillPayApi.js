@@ -285,26 +285,69 @@ const buildPendingStatus = (referenceId) => ({
  */
 export const getCcBillBanks = async () => {
   try {
-    const response = await api.get("/bbps-cc/billers", {
-      headers: authHeaders(),
-    });
+    let list = [];
+    let primaryError = null;
 
-    console.groupCollapsed("[CCBillPay] biller list response");
-    console.log("Raw response", response?.data);
-    console.groupEnd();
+    try {
+      const response = await api.get("/bbps-cc/billers", {
+        headers: authHeaders(),
+      });
 
-    const list = pickArray(response.data?.data ?? response.data);
-    return list.map((item) => ({
-      id: normalizeText(item?.billerId || item?.id),
-      name: normalizeText(item?.billerName || item?.name),
-      code: normalizeText(item?.billerId || item?.code),
-      raw: item,
-    }));
+      console.groupCollapsed("[CCBillPay] biller list response");
+      console.log("Raw response", response?.data);
+      console.groupEnd();
+
+      list = pickArray(response.data?.data ?? response.data);
+    } catch (err) {
+      primaryError = err;
+      console.warn("[CCBillPay] /bbps-cc/billers request failed:", err?.message);
+    }
+
+    // Fallback: If /bbps-cc/billers returned empty or failed, fetch from /bill-avenue/billers
+    // (reusing the working Credit Card billers in the project as per Requirement 3)
+    if (!list || list.length === 0) {
+      try {
+        const baResponse = await api.get("/bill-avenue/billers", {
+          headers: authHeaders(),
+          params: { category: "Credit Card" },
+        });
+        const payload = baResponse.data?.data;
+        if (Array.isArray(payload?.billers)) {
+          list = payload.billers;
+        } else {
+          list = pickArray(payload ?? baResponse.data);
+        }
+      } catch (baErr) {
+        console.warn("[CCBillPay] /bill-avenue/billers fallback failed:", baErr?.message);
+        if (primaryError) throw primaryError;
+        throw baErr;
+      }
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      return [];
+    }
+
+    return list
+      .map((item) => {
+        const id = normalizeText(item?.billerId || item?.id || item?.biller_id || item?.code);
+        const name = normalizeText(item?.billerName || item?.name || item?.biller_name);
+        const code = normalizeText(item?.code || item?.billerId || id);
+        return {
+          id,
+          name,
+          code,
+          billerId: id,
+          billerName: name,
+          raw: item,
+        };
+      })
+      .filter((item) => Boolean(item.id && item.name));
   } catch (error) {
     if (error.response) {
       if (error.response.status === 502) {
         throw new Error(
-          "InstantPay upstream failure. Unable to load billers. Please try again.",
+          "Upstream service failure. Unable to load billers. Please try again.",
         );
       }
       const resp = error.response.data;
@@ -314,7 +357,7 @@ export const getCcBillBanks = async () => {
       }
       throw new Error(error.response?.data?.message || "Unable to load billers. Please try again.");
     }
-    throw new Error("Unable to load billers. Please try again.");
+    throw new Error(error.message || "Unable to load billers. Please try again.");
   }
 };
 
@@ -335,13 +378,31 @@ export const fetchCcBill = async ({
   if (!billerId) throw new Error("Biller is required");
 
   try {
-    const billerDetailsResp = await api.post(
-      "/bbps-cc/biller-details",
-      { billerId },
-      { headers: authHeaders() },
-    );
+    let billerDetailsResp = null;
+    try {
+      billerDetailsResp = await api.post(
+        "/bbps-cc/biller-details",
+        { billerId },
+        { headers: authHeaders() },
+      );
+    } catch (billerErr) {
+      console.warn("[CCBillPay] /bbps-cc/biller-details failed:", billerErr?.message);
+    }
 
-    const billerDetails = extractBillerDetails(billerDetailsResp.data);
+    let billerDetails = extractBillerDetails(billerDetailsResp?.data);
+    if (!billerDetails || Object.keys(billerDetails).length === 0) {
+      try {
+        const baInfoResp = await api.post(
+          "/bill-avenue/biller-info/json",
+          { billerId },
+          { headers: authHeaders() },
+        );
+        billerDetails = baInfoResp.data?.data || {};
+      } catch (baInfoErr) {
+        console.warn("[CCBillPay] fallback biller info failed:", baInfoErr?.message);
+      }
+    }
+
     const paymentModes = normalizePaymentModes(billerDetails?.paymentModes);
 
     const { param1, param2 } = inferEnquiryParams(billerDetails, {

@@ -30,11 +30,12 @@ const getUserOptionLabel = (u) => {
   const mobile = String(u?.mobile ?? u?.mobile_number ?? u?.phone ?? "");
   return mobile ? `${id} - ${name} (${mobile})` : `${id} - ${name}`;
 };
-const getBankCodeValue = (bank) => String(bank?.code ?? "").trim().toUpperCase();
+const getBankCodeValue = (bank) =>
+  String(bank?.code ?? bank?.billerId ?? bank?.id ?? "").trim().toUpperCase();
 const getBankLogoValue = (bank) =>
   String(bank?.logoUrl ?? bank?.logo ?? bank?.icon ?? bank?.image ?? "").trim();
 const getBankKey = (bank) =>
-  String(bank?.id || getBankCodeValue(bank) || bank?.name || "").trim().toLowerCase();
+  String(bank?.id || bank?.billerId || getBankCodeValue(bank) || bank?.name || bank?.billerName || "").trim().toLowerCase();
 const BANK_LOGO_DOMAIN_BY_KEY = {
   icici: "icicibank.com",
   hdfc: "hdfcbank.com",
@@ -54,8 +55,12 @@ const BANK_LOGO_DOMAIN_BY_KEY = {
 
 const resolveBankDomain = (bank) => {
   const code = getBankCodeValue(bank).toLowerCase();
-  const name = String(bank?.name || "").toLowerCase();
+  const name = String(bank?.name || bank?.billerName || "").toLowerCase();
   if (BANK_LOGO_DOMAIN_BY_KEY[code]) return BANK_LOGO_DOMAIN_BY_KEY[code];
+  const matchByCodePrefix = Object.keys(BANK_LOGO_DOMAIN_BY_KEY).find(
+    (key) => code.startsWith(key)
+  );
+  if (matchByCodePrefix) return BANK_LOGO_DOMAIN_BY_KEY[matchByCodePrefix];
   const matchByNameKey = Object.keys(BANK_LOGO_DOMAIN_BY_KEY).find(
     (key) => name.includes(key)
   );
@@ -75,13 +80,14 @@ const getBankLogoCandidates = (bank) => {
 };
 
 const getBankInitials = (bank) => {
-  const code = getBankCodeValue(bank);
-  if (code) return code.slice(0, 2);
-  const nameParts = String(bank?.name ?? "")
+  const nameParts = String(bank?.name ?? bank?.billerName ?? "")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (nameParts.length === 0) return "BK";
+  if (nameParts.length === 0) {
+    const code = getBankCodeValue(bank);
+    return code ? code.slice(0, 2) : "BK";
+  }
   if (nameParts.length === 1) return nameParts[0].slice(0, 2).toUpperCase();
   return `${nameParts[0][0] || ""}${nameParts[1][0] || ""}`.toUpperCase();
 };
@@ -329,9 +335,16 @@ export default function CCBillPay({ currentUser }) {
   }, [fixedPayingUser, isSelfPayRole]);
 
   const selectedBank = useMemo(() => {
-    const fromList = banks.find((bank) => String(bank.id) === String(selectedBankId));
+    const targetId = String(selectedBankId || "").trim();
+    if (!targetId) return null;
+    const fromList = banks.find(
+      (bank) => String(bank.id || bank.billerId) === targetId
+    );
     if (fromList) return fromList;
-    if (selectedBankSnapshot && String(selectedBankSnapshot.id) === String(selectedBankId)) {
+    if (
+      selectedBankSnapshot &&
+      String(selectedBankSnapshot.id || selectedBankSnapshot.billerId) === targetId
+    ) {
       return selectedBankSnapshot;
     }
     return null;
@@ -340,8 +353,8 @@ export default function CCBillPay({ currentUser }) {
   const bankOptions = useMemo(
     () =>
       banks.map((bank) => ({
-        value: String(bank.id),
-        label: String(bank.name || bank.code || "Unknown Bank"),
+        value: String(bank.id || bank.billerId),
+        label: String(bank.name || bank.billerName || bank.code || "Unknown Bank"),
         bank,
       })),
     [banks]
@@ -350,8 +363,8 @@ export default function CCBillPay({ currentUser }) {
   const selectedBankOption = useMemo(() => {
     if (!selectedBank) return null;
     return {
-      value: String(selectedBank.id),
-      label: String(selectedBank.name || selectedBank.code || "Unknown Bank"),
+      value: String(selectedBank.id || selectedBank.billerId),
+      label: String(selectedBank.name || selectedBank.billerName || selectedBank.code || "Unknown Bank"),
       bank: selectedBank,
     };
   }, [selectedBank]);
@@ -757,10 +770,24 @@ navigate(billBasePath, { replace: true });
                   <label className={labelClass}>Select Credit Card Biller</label>
                   <button
                     type="button"
-                    onClick={() => refetchBanks()}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    onClick={async () => {
+                      try {
+                        const result = await refetchBanks();
+                        if (result?.data && result.data.length > 0) {
+                          toast.success("Biller list reloaded");
+                        } else if (result?.error) {
+                          toast.error(result.error.message || "Failed to reload billers");
+                        } else {
+                          toast.info("No billers returned");
+                        }
+                      } catch (err) {
+                        toast.error(err?.message || "Failed to reload biller list");
+                      }
+                    }}
+                    disabled={banksLoading}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
-                    Refresh
+                    {banksLoading ? "Refreshing..." : "Refresh"}
                   </button>
                 </div>
                 <Select
@@ -771,6 +798,16 @@ navigate(billBasePath, { replace: true });
                   onChange={(option) => setSelectedBankId(option?.value || "")}
                   placeholder={banksLoading ? "Loading biller list..." : "Select biller"}
                   isDisabled={banksLoading}
+                  isLoading={banksLoading}
+                  noOptionsMessage={({ inputValue }) =>
+                    inputValue
+                      ? "No matching biller found"
+                      : banksLoading
+                        ? "Loading biller list..."
+                        : banksError
+                          ? (banksError.message || "Failed to load billers")
+                          : "No billers available"
+                  }
                   isClearable={false}
                   isSearchable
                   formatOptionLabel={(option) => (
@@ -822,13 +859,23 @@ navigate(billBasePath, { replace: true });
                   <div className="mt-2 flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-600">
                     {renderBankLogo(selectedBank, "h-7 w-7")}
                     <span>
-                      Selected biller: <span className="font-semibold text-gray-800">{selectedBank.name}</span>
+                      Selected biller: <span className="font-semibold text-gray-800">{selectedBank.name || selectedBank.billerName}</span>
                     </span>
                   </div>
                 )}
+                {banksLoading && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Loading credit card billers...
+                  </p>
+                )}
+                {!banksLoading && !banksError && banks.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    No credit card billers available. Please click Refresh to try again.
+                  </p>
+                )}
                 {banksError && (
                   <p className="mt-1 text-sm text-red-600">
-                    {banksError.message || "Unable to fetch biller list"}
+                    {banksError.message || "Unable to fetch biller list. Please click Refresh to try again."}
                   </p>
                 )}
               </div>
