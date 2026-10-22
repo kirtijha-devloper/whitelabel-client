@@ -11,9 +11,17 @@ const api = axios.create({
 
 const inferRoleFromAbheepayId = (abheepayId = "") => {
   const normalized = String(abheepayId || "").toUpperCase();
+  if (normalized.startsWith("APSF")) return "super_franchise";
   if (normalized.startsWith("APM")) return "merchant";
   if (normalized.startsWith("APF")) return "franchise";
   return null;
+};
+
+const normalizeRoleString = (role) => {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "franchaise") return "franchise";
+  if (normalized === "superfranchise") return "super_franchise";
+  return normalized || null;
 };
 
 const normalizeLedgerRow = (row = {}) => ({
@@ -22,9 +30,9 @@ const normalizeLedgerRow = (row = {}) => ({
   createdAt: row.createdAt ?? row.date ?? row.date_and_time ?? null,
   date_and_time: row.date_and_time ?? row.date ?? row.createdAt ?? null,
   user_role:
-    row.user_role ??
-    row.role ??
-    row.user?.role ??
+    normalizeRoleString(row.user_role) ??
+    normalizeRoleString(row.role) ??
+    normalizeRoleString(row.user?.role) ??
     inferRoleFromAbheepayId(row.user?.abheepay_id),
   merchant_id: row.merchant_id ?? row.user_id ?? row.user?.id ?? null,
   requested_by: row.requested_by ?? row.user?.name ?? row.metadata?.admin_name ?? "-",

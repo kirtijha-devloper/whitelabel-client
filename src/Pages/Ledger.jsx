@@ -375,9 +375,17 @@ const Ledger = ({ currentUser }) => {
 
   const transactions = ledgerData?.transactions || [];
   const selectedRole = String(filters.searched_role || "").trim().toLowerCase();
+  const normalizeRoleVal = (r) => {
+    const lower = String(r || "").trim().toLowerCase();
+    if (lower === "franchaise") return "franchise";
+    if (lower === "superfranchise") return "super_franchise";
+    return lower;
+  };
   const visibleTransactions = transactions.filter((tx) => {
-    const txRole = String(tx.user_role || "").trim().toLowerCase();
-    const roleMatches = !selectedRole || txRole === selectedRole;
+    const txRole = String(tx.user_role || tx.user?.role || "").trim().toLowerCase();
+    const normalizedTxRole = normalizeRoleVal(txRole);
+    const normalizedSelectedRole = normalizeRoleVal(selectedRole);
+    const roleMatches = !normalizedSelectedRole || normalizedTxRole === normalizedSelectedRole;
     if (!roleMatches) return false;
     if (selectedUser?.id) {
       const txUserId = String(tx.user?.id || tx.merchant_id || tx.user_id || "");
@@ -398,7 +406,7 @@ const Ledger = ({ currentUser }) => {
   const roleOptions = [
     { value: "merchant", label: "Merchant" },
     { value: "franchise", label: "Franchise" },
-    { value: "franchise", label: "Super Franchise" },
+    { value: "super_franchise", label: "Super Franchise" },
   ];
 
   const transactionTypeOptions = [
@@ -419,7 +427,7 @@ const Ledger = ({ currentUser }) => {
   const filteredRoleOptions =
     userRole === "merchant"
       ? roleOptions.filter((option) => option.value === "merchant") 
-      : userRole === "franchise"
+      : userRole === "franchise" || userRole === "franchaise"
       ? roleOptions.filter((option) => option.value === "franchise")
       : roleOptions;
 
@@ -447,8 +455,10 @@ const Ledger = ({ currentUser }) => {
         rowsToExport = !selectedRole
           ? fetchedRows
           : fetchedRows.filter((tx) => {
-              const txRole = String(tx.user_role || "").trim().toLowerCase();
-              return txRole === selectedRole;
+              const txRole = String(tx.user_role || tx.user?.role || "").trim().toLowerCase();
+              const normalizedTxRole = normalizeRoleVal(txRole);
+              const normalizedSelectedRole = normalizeRoleVal(selectedRole);
+              return !normalizedSelectedRole || normalizedTxRole === normalizedSelectedRole;
             });
       }
 
@@ -687,7 +697,7 @@ const Ledger = ({ currentUser }) => {
               <label className="mb-2 block text-sm font-medium text-gray-700">Search by Role</label>
               <Select
                 options={filteredRoleOptions}
-                value={filteredRoleOptions.find((option) => option.value === filters.searched_role)}
+                value={filteredRoleOptions.find((option) => option.value === filters.searched_role) || null}
                 onChange={(selected) =>
                   setFilters((prev) => ({ ...prev, searched_role: selected?.value || null }))
                 }
