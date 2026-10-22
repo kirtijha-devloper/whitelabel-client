@@ -470,11 +470,11 @@ const UserList = ({
   const isAdmin = isAdminUser(currentUser);
   const isFranchiseViewer = normalizedCurrentUserRole === "franchise" || normalizedCurrentUserRole === "super_franchise";
   const isEmployeeDirectory = listMode === "employees";
+  const isSuperFranchiseViewer = normalizedCurrentUserRole === "super_franchise";
   const canListUsers = isFranchiseViewer || hasPermission(currentUser, "users.list");
   const canSearchUsers = isFranchiseViewer || hasPermission(currentUser, "users.search");
   const canReadUsers = isFranchiseViewer || hasPermission(currentUser, "users.read");
-  const canUpdateUsers = isFranchiseViewer || hasPermission(currentUser, "users.update");
-  const isSuperFranchiseViewer = normalizedCurrentUserRole === "super_franchise";
+  const canUpdateUsers = (normalizedCurrentUserRole === "franchise") || hasPermission(currentUser, "users.update");
   const isSuperFranchiseUser = isSuperFranchiseViewer;
   const canUseImpersonateLogin = isAdmin || hasPermission(currentUser, "users.impersonate");
   const canUpdateUserStatus =
