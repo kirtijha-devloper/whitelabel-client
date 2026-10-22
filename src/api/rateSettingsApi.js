@@ -780,11 +780,11 @@ const getAdminAudienceRulePriority = (rule) => {
   const scope = getRawRuleScope(rule);
   if (scope === 'super_franchise_franchise' || scope === RULE_SCOPES.SUPER_FRANCHISE_FRANCHISE) return 6;
   if (scope === 'super_franchise_default' || scope === RULE_SCOPES.SUPER_FRANCHISE_DEFAULT) return 5;
-  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 4;
-  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.ADMIN_MERCHANT) return 3;
+  if (scope === 'admin_super_franchise' || scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 4;
+  if (scope === 'admin_franchise' || scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === 'admin_merchant' || scope === RULE_SCOPES.ADMIN_MERCHANT) return 3;
   if (getRuleFranchiseId(rule) !== null || getRuleUserId(rule) !== null) return 3;
-  if (scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 2;
-  if (scope === RULE_SCOPES.ADMIN_DEFAULT) return 1;
+  if (scope === 'super_admin_admin' || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 2;
+  if (scope === 'admin_default' || scope === RULE_SCOPES.ADMIN_DEFAULT) return 1;
   return 0; // SUPER_ADMIN_DEFAULT
 };
 
@@ -974,7 +974,7 @@ const buildFranchiseManagedDefaultRates = (adminRules, franchiseOwnedRules, fran
   );
   const keys = new Set([...adminByKey.keys(), ...franchiseDefaultByKey.keys()]);
 
-  return [...keys]
+  const rawResults = [...keys]
     .map((key) => {
       const adminRule = adminByKey.get(key) || null;
       const franchiseRule = franchiseDefaultByKey.get(key) || null;
@@ -996,8 +996,35 @@ const buildFranchiseManagedDefaultRates = (adminRules, franchiseOwnedRules, fran
         franchiseRule
       });
     })
-    .filter(Boolean)
-    .sort(sortMappedRates);
+    .filter(Boolean);
+
+  // Safety dedup: keep only the single nearest/highest-priority rule per core criteria (method|network|type|class|settlement|company)
+  const coreMap = new Map();
+  const getScopeRank = (r) => {
+    const sc = String(r?.source_scope || r?.scope || '').toLowerCase();
+    if (sc.includes('franchise_default') || !r?.isInherited) return 4;
+    if (sc.includes('super_franchise')) return 3;
+    if (sc.includes('admin')) return 2;
+    return 1;
+  };
+
+  rawResults.forEach((r) => {
+    const coreKey = [
+      normalizeKeyToken(r.method || r.payment_mode),
+      normalizeKeyToken(r.network || r.card_brand),
+      normalizeKeyToken(r.card_type),
+      normalizeKeyToken(r.card_classification),
+      normalizeKeyToken(r.settlement_type),
+      normalizeKeyToken(r.company_name),
+    ].join('|');
+
+    const existing = coreMap.get(coreKey);
+    if (!existing || getScopeRank(r) >= getScopeRank(existing)) {
+      coreMap.set(coreKey, r);
+    }
+  });
+
+  return [...coreMap.values()].sort(sortMappedRates);
 };
 
 const buildFranchiseManagedMerchantRates = (
@@ -1168,8 +1195,24 @@ const createScopedRuleOverride = async (
 
 export const getSuperFranchises = async () => {
   try {
-    const res = await SuperFranchiseAllUsers({ limit: 1000 });
-    return res?.data || res || [];
+    let list = [];
+    try {
+      const res = await SuperFranchiseAllUsers({ limit: 1000 });
+      list = extractArrayPayload(res);
+    } catch {
+      // ignore
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const fallbackRes = await AllUsers({ role: 'super_franchise', limit: 1000 });
+        list = extractArrayPayload(fallbackRes);
+      } catch {
+        // ignore
+      }
+    }
+
+    return Array.isArray(list) ? list : [];
   } catch (error) {
     console.error('Error fetching super franchises:', error);
     return [];
@@ -1636,10 +1679,39 @@ export const getFranchiseRates = async (franchiseId, options = {}) => {
 export const getFranchiseManagedDefaultRates = async (franchiseId) => {
   try {
     const params = franchiseId ? { franchaise_id: franchiseId } : {};
-    const [adminRules, franchiseOwnedRules] = await Promise.all([
+    let [adminRules, franchiseOwnedRules] = await Promise.all([
       fetchChargeRulesByAudience('admin', params),
       fetchChargeRulesByAudience('franchise', params)
     ]);
+
+    try {
+      const applicableRes = await fetchMyAdminApplicableCharges();
+      const posRules = applicableRes?.data?.pos || [];
+      if (posRules.length > 0) {
+        const mappedApplicable = posRules.map((r, idx) => ({
+          id: r.id || `inherited-pos-${idx}`,
+          rule_id: r.id || null,
+          payment_mode: r.payment_mode || r.method || 'CARD',
+          card_brand: r.card_brand || r.network || 'ALL',
+          card_type: r.card_type || 'ANY',
+          card_classification: r.card_classification || 'ANY',
+          settlement_type: r.settlement_type || null,
+          company_name: r.company_name || null,
+          min_amount: toFiniteNumber(r.min_amount ?? r.from_amount, 0),
+          max_amount: toNullableNumber(r.max_amount ?? r.to_amount),
+          charge_percent: toFiniteNumber(r.charge_percent ?? r.base_rate ?? r.rate, 0),
+          charge_flat: toFiniteNumber(r.charge_flat ?? r.flat_fee, 0),
+          gst_required: Boolean(r.gst_required),
+          gst_percent: toFiniteNumber(r.gst_percent ?? r.gst_rate, 18),
+          scope: r.source_label?.toLowerCase()?.includes('super') ? 'super_franchise_default' : 'admin_default',
+          source_scope: r.source_label?.toLowerCase()?.includes('super') ? 'super_franchise' : 'admin',
+          is_active: r.is_active !== false,
+        }));
+        adminRules = [...adminRules, ...mappedApplicable];
+      }
+    } catch (e) {
+      logRateWarn('Failed to fetch applicable charges for franchise base defaults', e);
+    }
 
     return buildFranchiseManagedDefaultRates(
       adminRules.filter(isUplineRule),
