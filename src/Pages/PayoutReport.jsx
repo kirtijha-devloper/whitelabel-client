@@ -656,13 +656,6 @@ const buildServerPayoutFilters = (filters = {}, options = {}) => {
   return nextFilters;
 };
 
-const formatLogTime = (date = new Date()) =>
-  date.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
 
 const renderKeyValue = (label, value) => {
   if (value == null || value === '') return null;
@@ -1010,7 +1003,6 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
     }));
   };
   const [expandedRows, setExpandedRows] = useState({});
-  const [manualProcessRunning, setManualProcessRunning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [combinedExportModalOpen, setCombinedExportModalOpen] = useState(false);
   const [combinedExportFilters, setCombinedExportFilters] = useState({
@@ -1430,9 +1422,6 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
       }
     : reportResponse?.pagination || { total: 0, page: 1, limit: 50, totalPages: 1 };
   const totalCount = filteredRows.length;
-  const pendingBranchxRows = visibleRows.filter(
-    (row) => normalizePayoutStatus(row.status) === 'PENDING' && isBranchXPayout(row)
-  );
   const reportTitle = isCcBill3Report ? 'CC Bill 3 Report' : 'Payout Report';
   const activeTab = isCcBill3Report ? 'cc-bill-3' : 'payout';
 
@@ -1851,70 +1840,6 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
       ...prev,
       [rowKey]: !prev[rowKey],
     }));
-  };
-
-  const pushManualLog = (message) => {
-    console.log(`[Payout Manual] ${formatLogTime()} | ${message}`);
-  };
-
-  const processPendingBranchxManually = async () => {
-    if (manualProcessRunning) return;
-
-    if (pendingBranchxRows.length === 0) {
-      toast.info('No pending BranchX payouts on the current page.');
-      pushManualLog('No pending BranchX payouts found on the current page.');
-      return;
-    }
-
-    setManualProcessRunning(true);
-    pushManualLog(`Starting manual processing for ${pendingBranchxRows.length} pending BranchX payout(s).`);
-
-    let changedSomething = false;
-
-    try {
-      for (const [index, row] of pendingBranchxRows.entries()) {
-        const seq = `${index + 1}/${pendingBranchxRows.length}`;
-        const refId = row.reference_id || row.referenceId || row.merchantRefId || `row-${row.id}`;
-        const payload = row.id
-          ? { payout_transaction_id: Number(row.id) }
-          : row.reference_id
-            ? { requestId: row.reference_id }
-            : null;
-
-        if (!payload) {
-          pushManualLog(`${seq} ref=${refId} skipped: missing payout reference.`);
-          continue;
-        }
-
-        const startedAt = Date.now();
-        pushManualLog(`${seq} ref=${refId} start.`);
-
-        try {
-          const res = await checkBranchXPayoutStatus(payload);
-          const statusRaw = res?.data?.data?.status || res?.data?.status || 'PENDING';
-          const normalizedStatus = String(statusRaw).trim().toUpperCase() || 'PENDING';
-          const providerMessage = res?.data?.data?.message || res?.data?.message || 'no message';
-          const durationSec = ((Date.now() - startedAt) / 1000).toFixed(2);
-
-          pushManualLog(`${seq} ref=${refId} -> ${normalizedStatus} in ${durationSec}s | ${providerMessage}`);
-          changedSomething = true;
-        } catch (error) {
-          const durationSec = ((Date.now() - startedAt) / 1000).toFixed(2);
-          const errorMessage = error?.message || 'request failed';
-          pushManualLog(`${seq} ref=${refId} -> ERROR in ${durationSec}s | ${errorMessage}`);
-        }
-      }
-
-      pushManualLog('Manual processing finished.');
-      toast.success(`Manual processing finished for ${pendingBranchxRows.length} payout(s).`);
-
-      await queryClient.invalidateQueries(['payoutReport']);
-      if (changedSomething) {
-        await queryClient.invalidateQueries(['currentUser']);
-      }
-    } finally {
-      setManualProcessRunning(false);
-    }
   };
 
   const handleExportExcel = async () => {
@@ -2439,17 +2364,6 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Records</p>
           <p className="text-2xl font-bold mt-1">{totalCount}</p>
           <p className="text-sm text-gray-500 mt-1">{formatCurrency(totalAmount)} total</p>
-          {!isCcBill3Report && (
-            <button
-              type="button"
-              onClick={processPendingBranchxManually}
-              disabled={manualProcessRunning || pendingBranchxRows.length === 0}
-              title={`Processes ${pendingBranchxRows.length} pending BranchX payout(s) on the current page one by one`}
-              className="mt-3 inline-flex items-center justify-center rounded-lg bg-[#00D3CD] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {manualProcessRunning ? 'Processing...' : 'Process Manually'}
-            </button>
-          )}
         </div>
         <div className="bg-white p-5 rounded-lg shadow-sm border-l-4 border-green-500">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Success Amount</p>

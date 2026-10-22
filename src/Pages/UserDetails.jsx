@@ -626,7 +626,7 @@ function UserDetails({ currentUser }) {
               <InfoField label="Role" value={user.role || "N/A"} />
               <InfoField label="Status" value={user.status || "N/A"} badge />
               <InfoField label="Approved" value={(user.is_approved || user.isApproved) ? "Yes" : "No"} badge />
-              <InfoField label="POS Assigned" value={(user.is_pos_asigned || user.is_pos_assigned || user.isPosAssigned) ? "Yes" : "No"} badge />
+              <InfoField label="POS Assigned" value={(user.is_pos_asigned || user.is_pos_assigned || user.isPosAssigned || (Array.isArray(userData?.pos_details) && userData.pos_details.length > 0)) ? "Yes" : "No"} badge />
             </Card>
 
             {/* Documents Card */}
