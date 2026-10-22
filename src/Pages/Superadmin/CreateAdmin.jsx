@@ -298,14 +298,14 @@ function CreateAdmin() {
 
     // In CREATE mode, fields are strictly required:
     if (!isEditMode) {
-      if (!form.name?.trim()) {
-        toast.error('Director name is required');
-        return;
-      }
-      if (!form.email?.trim()) {
-        toast.error('Email address is required');
-        return;
-      }
+      // if (!form.name?.trim()) {
+      //   toast.error('Director name is required');
+      //   return;
+      // }
+      // if (!form.email?.trim()) {
+      //   toast.error('Email address is required');
+      //   return;
+      // }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(form.email.trim())) {
         toast.error('Please enter a valid email address');
@@ -319,67 +319,67 @@ function CreateAdmin() {
         toast.error('Password must be at least 8 characters long');
         return;
       }
-      if (!form.gender) {
-        toast.error('Please select gender');
-        return;
-      }
-      if (!form.dob) {
-        toast.error('Date of birth is required');
-        return;
-      }
-      if (!form.address1?.trim()) {
-        toast.error('Address line 1 is required');
-        return;
-      }
-      if (!form.city?.trim()) {
-        toast.error('City is required');
-        return;
-      }
-      if (!form.district?.trim()) {
-        toast.error('District is required');
-        return;
-      }
-      if (!form.state?.trim()) {
-        toast.error('State is required');
-        return;
-      }
-      if (!form.pincode?.trim() || form.pincode.trim().length !== 6) {
-        toast.error('Valid 6-digit Pincode is required');
-        return;
-      }
-      if (!form.aadhar_number?.trim() || form.aadhar_number.trim().length !== 12) {
-        toast.error('Valid 12-digit Aadhaar number is required');
-        return;
-      }
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      if (!form.pan_number?.trim() || !panRegex.test(form.pan_number.trim().toUpperCase())) {
-        toast.error('Valid 10-character PAN number is required (e.g. ABCDE1234F)');
-        return;
-      }
-      if (!form.company_or_shop_name?.trim()) {
-        toast.error('Company / Shop Name is required');
-        return;
-      }
-      if (!form.domain_name?.trim()) {
-        toast.error('Domain Name is required');
-        return;
-      }
-      if (!(form.aadhar_photo instanceof File)) {
-        toast.error('Aadhaar front photo is required');
-        return;
-      }
-      if (!(form.aadhar_back_photo instanceof File)) {
-        toast.error('Aadhaar back photo is required');
-        return;
-      }
-      if (!(form.pan_photo instanceof File)) {
-        toast.error('PAN card photo is required');
-        return;
-      }
-      if (!(form.bank_passbook instanceof File)) {
-        toast.error('Bank passbook document is required');
-        return;
-      }
+      // if (!form.gender) {
+      //   toast.error('Please select gender');
+      //   return;
+      // }
+      // if (!form.dob) {
+      //   toast.error('Date of birth is required');
+      //   return;
+      // }
+      // if (!form.address1?.trim()) {
+      //   toast.error('Address line 1 is required');
+      //   return;
+      // }
+      // if (!form.city?.trim()) {
+      //   toast.error('City is required');
+      //   return;
+      // }
+      // if (!form.district?.trim()) {
+      //   toast.error('District is required');
+      //   return;
+      // }
+      // if (!form.state?.trim()) {
+      //   toast.error('State is required');
+      //   return;
+      // }
+      // if (!form.pincode?.trim() || form.pincode.trim().length !== 6) {
+      //   toast.error('Valid 6-digit Pincode is required');
+      //   return;
+      // }
+      // if (!form.aadhar_number?.trim() || form.aadhar_number.trim().length !== 12) {
+      //   toast.error('Valid 12-digit Aadhaar number is required');
+      //   return;
+      // }
+      // const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      // if (!form.pan_number?.trim() || !panRegex.test(form.pan_number.trim().toUpperCase())) {
+      //   toast.error('Valid 10-character PAN number is required (e.g. ABCDE1234F)');
+      //   return;
+      // }
+      // if (!form.company_or_shop_name?.trim()) {
+      //   toast.error('Company / Shop Name is required');
+      //   return;
+      // }
+      // if (!form.domain_name?.trim()) {
+      //   toast.error('Domain Name is required');
+      //   return;
+      // }
+      // if (!(form.aadhar_photo instanceof File)) {
+      //   toast.error('Aadhaar front photo is required');
+      //   return;
+      // }
+      // if (!(form.aadhar_back_photo instanceof File)) {
+      //   toast.error('Aadhaar back photo is required');
+      //   return;
+      // }
+      // if (!(form.pan_photo instanceof File)) {
+      //   toast.error('PAN card photo is required');
+      //   return;
+      // }
+      // if (!(form.bank_passbook instanceof File)) {
+      //   toast.error('Bank passbook document is required');
+      //   return;
+      // }
     } else {
       // In EDIT mode: NO fields are mandatory!
       // Only validate format IF a field is provided:
@@ -398,21 +398,21 @@ function CreateAdmin() {
           return;
         }
       }
-      if (form.aadhar_number && form.aadhar_number.trim() && form.aadhar_number.trim().length !== 12) {
-        toast.error('Aadhaar number must be exactly 12 digits');
-        return;
-      }
-      if (form.pan_number && form.pan_number.trim()) {
-        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-        if (!panRegex.test(form.pan_number.trim().toUpperCase())) {
-          toast.error('PAN number format must be valid (e.g. ABCDE1234F)');
-          return;
-        }
-      }
-      if (form.pincode && form.pincode.trim() && form.pincode.trim().length !== 6) {
-        toast.error('Pincode must be exactly 6 digits');
-        return;
-      }
+      // if (form.aadhar_number && form.aadhar_number.trim() && form.aadhar_number.trim().length !== 12) {
+      //   toast.error('Aadhaar number must be exactly 12 digits');
+      //   return;
+      // }
+      // if (form.pan_number && form.pan_number.trim()) {
+      //   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      //   if (!panRegex.test(form.pan_number.trim().toUpperCase())) {
+      //     toast.error('PAN number format must be valid (e.g. ABCDE1234F)');
+      //     return;
+      //   }
+      // }
+      // if (form.pincode && form.pincode.trim() && form.pincode.trim().length !== 6) {
+      //   toast.error('Pincode must be exactly 6 digits');
+      //   return;
+      // }
     }
 
     setLoading(true);

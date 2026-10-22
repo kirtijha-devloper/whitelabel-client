@@ -649,17 +649,21 @@ const StockPOSMachine = ({ currentUser }) => {
   const canShowAssignButton = (machine) => {
     if (isAdminStyleStockViewer) return true;
     if (isFranchiseUser) {
-      return (
-        String(machine?.assigned_to) === String(currentUser?.id) &&
-        normalizeRoleValue(machine?.assigned_user?.role) === "franchise"
-      );
+      // return (
+      //   String(machine?.assigned_to) === String(currentUser?.id) &&
+      //   normalizeRoleValue(machine?.assigned_user?.role) === "franchise"
+      // );
+
+      return true;
     }
     if (isSuperFranchiseUser) {
-      const assignedRole = normalizeRoleValue(machine?.assigned_user?.role);
-      return (
-        String(machine?.assigned_to) === String(currentUser?.id) &&
-        (assignedRole === "super_franchise" || assignedRole === "superfranchise" || !assignedRole)
-      );
+      // const assignedRole = normalizeRoleValue(machine?.assigned_user?.role);
+      // return (
+      //   String(machine?.assigned_to) === String(currentUser?.id) &&
+      //   (assignedRole === "super_franchise" || assignedRole === "superfranchise" || !assignedRole)
+      // );
+
+      return true;
     }
     return false;
   };
@@ -1773,7 +1777,8 @@ const StockPOSMachine = ({ currentUser }) => {
                               <span>Assign</span>
                             </button>
                           )}
-                          {canManageStockModule && (
+                          {/* This is commented for white label as all machine modify access is assigned to POS machine */}
+                          {/* {canManageStockModule && (
                             <button
                               onClick={() => handleEditClick(machine)}
                               className="px-2 py-0.5 font-semibold text-blue-600 hover:bg-blue-200 flex gap-0.5 items-center border border-blue-600 rounded-full text-xs"
@@ -1782,7 +1787,7 @@ const StockPOSMachine = ({ currentUser }) => {
                               <Edit2 className="w-5 h-5" />
                               <span>Edit</span>
                             </button>
-                          )}
+                          )} */}
                         </div>
 
                         {/* {canManageStockModule && (

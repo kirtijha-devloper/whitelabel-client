@@ -8,6 +8,8 @@ import 'react-toastify/dist/ReactToastify.css';
 const Login = lazy(() => import('./Pages/Auth/Login'));
 const Signup = lazy(() => import('./Pages/Auth/Signup'));
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+import AbheePayLogo from "./assets/FORMAT-PNG.png";
+import AnanyaPayLogo from './assets/ananyaPay.jpeg';
 const SuperFranchiseLayout = lazy(() => import('./layouts/SuperFranchiseLayout'));
 const FranchiseLayout = lazy(() => import('./layouts/FranchiseLayout'));
 const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
@@ -21,6 +23,11 @@ const Loading = () => (
 );
 
 export default function App() {
+  const isAnanyaPay = typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes("ananyapay");
+  const logo = isAnanyaPay ?  AnanyaPayLogo : AbheePayLogo;
+
+  document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
+
   return (
     <Router>
       <ToastContainer />

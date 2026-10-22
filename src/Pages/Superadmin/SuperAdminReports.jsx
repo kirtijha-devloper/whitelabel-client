@@ -690,7 +690,7 @@ export default function SuperAdminReports({ currentUser }) {
           <span>Commission Report</span>
         </button>
 
-        <button
+        {/* <button
           type="button"
           onClick={() => handleTabSwitch("service_reports")}
           className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-bold transition-all ${
@@ -701,7 +701,7 @@ export default function SuperAdminReports({ currentUser }) {
         >
           <Layers className="h-4 w-4" />
           <span>Service Wise Reports</span>
-        </button>
+        </button> */}
       </div>
 
       {activeTab === "service_reports" && (
