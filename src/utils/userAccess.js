@@ -102,15 +102,26 @@ export const maskEmailForUser = (email, currentUser) => {
 };
 
 export const getParentFranchiseId = (user = {}) => {
-  const candidate =
+  const explicitFranchise =
     user?.franchise_id ??
     user?.franchaise_id ??
     user?.franchiseId ??
     user?.franchise_details?.id ??
-    user?.parent_id ??
     null;
-  const num = Number(candidate);
-  return Number.isFinite(num) && num > 0 ? num : null;
+  const num = Number(explicitFranchise);
+  if (Number.isFinite(num) && num > 0) return num;
+
+  const sfId =
+    user?.super_franchise_id ??
+    user?.superFranchiseId ??
+    user?.super_franchise_details?.id ??
+    null;
+  const pId = Number(user?.parent_id);
+  if (Number.isFinite(pId) && pId > 0) {
+    if (sfId && Number(sfId) === pId) return null;
+    return pId;
+  }
+  return null;
 };
 
 export const isDirectAdminUser = (user = {}) => {

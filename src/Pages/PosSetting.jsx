@@ -500,13 +500,87 @@ export default function PosSetting({ currentUser }) {
     });
   }, [posData?.data?.customers, posData?.customers, allUsersData, isEmployee]);
 
+  // Look up user role and user object by ID
+  const allUsersMap = useMemo(() => {
+    const map = new Map();
+    const fromAllUsers = extractUsersArray(allUsersData);
+    fromAllUsers.forEach((u) => {
+      if (u && u.id) map.set(String(u.id), u);
+    });
+    rawUsersList.forEach((u) => {
+      if (u && u.id) {
+        const existing = map.get(String(u.id)) || {};
+        map.set(String(u.id), { ...existing, ...u });
+      }
+    });
+    if (currentUser?.id) {
+      const existing = map.get(String(currentUser.id)) || {};
+      map.set(String(currentUser.id), { ...existing, ...currentUser });
+    }
+    return map;
+  }, [allUsersData, rawUsersList, currentUser]);
+
+  const getUserRole = (userId) => {
+    if (!userId) return null;
+    const u = allUsersMap.get(String(userId));
+    return u ? normalizeUserRole(u.role) : null;
+  };
+
+  const getSuperFranchiseParentId = (user = {}) => {
+    const candidate =
+      user?.super_franchise_id ??
+      user?.superFranchiseId ??
+      user?.super_franchise_details?.id ??
+      null;
+    const num = Number(candidate);
+    if (Number.isFinite(num) && num > 0) return num;
+
+    const pId = Number(user?.parent_id);
+    if (Number.isFinite(pId) && pId > 0) {
+      if (isSuperFranchise && Number(currentUser?.id) === pId) return pId;
+      const pRole = getUserRole(pId);
+      if (pRole === "super_franchise") return pId;
+    }
+    return null;
+  };
+
+  const getFranchiseParentId = (user = {}) => {
+    const candidate =
+      user?.franchise_id ??
+      user?.franchaise_id ??
+      user?.franchiseId ??
+      user?.franchise_details?.id ??
+      null;
+    const num = Number(candidate);
+    if (Number.isFinite(num) && num > 0) {
+      const role = getUserRole(num);
+      if (role !== "super_franchise" && role !== "admin" && role !== "super_admin") {
+        return num;
+      }
+    }
+
+    const pId = Number(user?.parent_id);
+    if (Number.isFinite(pId) && pId > 0) {
+      if (isFranchise && Number(currentUser?.id) === pId) return pId;
+      if ((isAdmin || isEmployee) && Number(currentUser?.id) === pId) return null;
+      if (isSuperFranchise && Number(currentUser?.id) === pId) return null;
+
+      const pRole = getUserRole(pId);
+      if (pRole === "franchise") return pId;
+      if (pRole === "admin" || pRole === "super_admin" || pRole === "super_franchise" || pRole === "employee" || pRole === "staff") {
+        return null;
+      }
+    }
+    return null;
+  };
+
   // Map of Franchise ID -> array of child Merchants
   const franchiseMerchantsMap = useMemo(() => {
     const map = new Map();
     rawUsersList.forEach((u) => {
       const uRole = normalizeUserRole(u.role);
       if (uRole === "admin" || uRole === "super_franchise" || uRole === "franchise" || uRole === "employee" || uRole === "staff") return;
-      const parentId = getParentFranchiseId(u);
+      const parentId = getFranchiseParentId(u);
       if (parentId) {
         const key = String(parentId);
         if (!map.has(key)) map.set(key, []);
@@ -514,9 +588,9 @@ export default function PosSetting({ currentUser }) {
       }
     });
     return map;
-  }, [rawUsersList]);
+  }, [rawUsersList, allUsersMap]);
 
-  // Map of Super Franchise ID -> array of child Franchises
+  // Map of Super Franchise ID -> array of child Franchises and direct child Merchants
   const superFranchiseChildrenMap = useMemo(() => {
     const map = new Map();
     rawUsersList.forEach((u) => {
@@ -532,14 +606,10 @@ export default function PosSetting({ currentUser }) {
       ) {
         return;
       }
-      const parentFranchiseId = getParentFranchiseId(u);
-      // Only include child franchises or direct merchants without a sub-franchise
+      const parentFranchiseId = getFranchiseParentId(u);
+      // Only include child franchises or direct merchants without an intermediate franchise
       if (uRole !== "franchise" && parentFranchiseId) return;
-      const sfId =
-        u?.super_franchise_id ??
-        u?.superFranchiseId ??
-        u?.super_franchise_details?.id ??
-        null;
+      const sfId = getSuperFranchiseParentId(u);
       if (sfId) {
         const key = String(sfId);
         if (!map.has(key)) map.set(key, []);
@@ -547,7 +617,7 @@ export default function PosSetting({ currentUser }) {
       }
     });
     return map;
-  }, [rawUsersList]);
+  }, [rawUsersList, allUsersMap]);
 
   // Hierarchical Scoped User List (Excluding Admin and Employee roles)
   const scopedUsersList = useMemo(() => {
@@ -565,18 +635,14 @@ export default function PosSetting({ currentUser }) {
         ) {
           return false;
         }
-        const sfId =
-          u?.super_franchise_id ??
-          u?.superFranchiseId ??
-          u?.super_franchise_details?.id ??
-          null;
+        const sfId = getSuperFranchiseParentId(u);
         const belongsToCurrentSf = Number(sfId) === currentSfId || String(u.super_franchise_id) === String(currentUser?.id);
 
         if (uRole === "franchise") {
           return belongsToCurrentSf;
         }
         if (uRole === "merchant" || uRole === "user") {
-          const parentFranchiseId = getParentFranchiseId(u);
+          const parentFranchiseId = getFranchiseParentId(u);
           return !parentFranchiseId && belongsToCurrentSf;
         }
         return false;
@@ -598,11 +664,10 @@ export default function PosSetting({ currentUser }) {
         ) {
           return false;
         }
-        const parentId = getParentFranchiseId(u);
+        const parentId = getFranchiseParentId(u);
         return (
           parentId === currentFranchiseId ||
-          String(u.franchise_id) === String(currentUser?.id) ||
-          String(u.parent_id) === String(currentUser?.id)
+          String(u.franchise_id) === String(currentUser?.id)
         );
       });
     }
@@ -621,12 +686,12 @@ export default function PosSetting({ currentUser }) {
           return false;
         }
         if (uRole === "super_franchise") return true;
+        const sfId = getSuperFranchiseParentId(u);
+        const parentId = getFranchiseParentId(u);
         if (uRole === "franchise") {
-          const sfId = u?.super_franchise_id ?? u?.superFranchiseId ?? u?.super_franchise_details?.id ?? null;
           return !sfId;
         }
-        const parentId = getParentFranchiseId(u);
-        const sfId = u?.super_franchise_id ?? u?.superFranchiseId ?? u?.super_franchise_details?.id ?? null;
+        // Direct merchants under Admin: have neither a super franchise nor a franchise parent!
         return parentId === null && !sfId;
       });
     }
@@ -641,7 +706,7 @@ export default function PosSetting({ currentUser }) {
         uRole !== "staff"
       );
     });
-  }, [rawUsersList, isSuperFranchise, isFranchise, isAdmin, isEmployee, currentUser?.id]);
+  }, [rawUsersList, isSuperFranchise, isFranchise, isAdmin, isEmployee, currentUser?.id, allUsersMap]);
 
   const stats = useMemo(() => {
     const total = scopedUsersList.length;
@@ -762,9 +827,9 @@ export default function PosSetting({ currentUser }) {
             : backendAdminLimits?.payin_limit);
 
     const isPayinNotSet =
-      rawPayinLimit === null || rawPayinLimit === undefined || rawPayinLimit === "";
+      !isSuperAdmin && (rawPayinLimit === null || rawPayinLimit === undefined || rawPayinLimit === "");
     const isPayinUnlimited =
-      !isPayinNotSet && String(rawPayinLimit).toLowerCase() === "unlimited";
+      isSuperAdmin || (!isPayinNotSet && String(rawPayinLimit).toLowerCase() === "unlimited");
     const payinLimitNum =
       !isPayinNotSet && !isPayinUnlimited ? Number(rawPayinLimit) || 0 : null;
 
@@ -848,11 +913,7 @@ export default function PosSetting({ currentUser }) {
       const uRole = normalizeUserRole(u.role);
       if (uRole === "admin" || uRole === "superadmin" || uRole === "super_franchise") return;
 
-      const uSfId =
-        u?.super_franchise_id ??
-        u?.superFranchiseId ??
-        u?.super_franchise_details?.id ??
-        (u?.parent_id ? String(u.parent_id) : null);
+      const uSfId = getSuperFranchiseParentId(u);
 
       if (String(uSfId) === sfIdStr) {
         children.push(u);
@@ -945,8 +1006,8 @@ export default function PosSetting({ currentUser }) {
     if (isAdmin || isEmployee) {
       const isTopLevelAccount =
         isSuperFranchiseRole ||
-        (isFranchiseRole && !customer?.super_franchise_id && !customer?.superFranchiseId) ||
-        (!isSuperFranchiseRole && !isFranchiseRole && !getParentFranchiseId(customer) && !customer?.super_franchise_id);
+        (isFranchiseRole && !getSuperFranchiseParentId(customer)) ||
+        (!isSuperFranchiseRole && !isFranchiseRole && !getFranchiseParentId(customer) && !getSuperFranchiseParentId(customer));
 
       if (isTopLevelAccount) {
         const rawAdminPayin = adminLimitsStats?.payinLimit;
@@ -954,14 +1015,14 @@ export default function PosSetting({ currentUser }) {
         const isPayinUnlimited = adminLimitsStats?.isPayinUnlimited;
         const proposedVal = finalLimitVal !== null ? Number(finalLimitVal) : 0;
 
-        if (isPayinNotSet && proposedVal > 0) {
+        if (!isSuperAdmin && isPayinNotSet && proposedVal > 0) {
           toast.error(
             "Cannot assign T0 limit! Admin has no Payin (T0) limit pool assigned by Super Admin (Not Set / ₹0). Super Admin must assign a Payin limit first."
           );
           return;
         }
 
-        if (!isPayinNotSet && !isPayinUnlimited) {
+        if (!isSuperAdmin && !isPayinNotSet && !isPayinUnlimited) {
           const adminPool = Number(rawAdminPayin) || 0;
           if (adminPool <= 0 && proposedVal > 0) {
             toast.error(
@@ -1075,11 +1136,9 @@ export default function PosSetting({ currentUser }) {
       }
     }
 
-    // 3. Validate sub-allocation against Super Franchise assigned pool (if customer is a Franchise or Employee under a Super Franchise)
+    // 3. Validate sub-allocation against Super Franchise assigned pool (if customer is a Franchise, Employee, or direct Merchant under a Super Franchise)
     const sfParentId =
-      customer?.super_franchise_id ??
-      customer?.superFranchiseId ??
-      customer?.super_franchise_details?.id ??
+      getSuperFranchiseParentId(customer) ??
       (isSuperFranchise ? Number(currentUser?.id) : null);
     const parentSuperFranchiseId =
       !isSuperFranchiseRole && sfParentId ? Number(sfParentId) : null;
@@ -1115,7 +1174,7 @@ export default function PosSetting({ currentUser }) {
         if (proposedVal > parentSfTotalPool) {
           const sfName = parentSuperFranchise?.name || parentSuperFranchise?.full_name || parentSuperFranchise?.business_name || `Super Franchise #${parentSuperFranchiseId}`;
           const childRole = normalizeUserRole(customer.role);
-          const childRoleLabel = childRole === "employee" ? "employee" : "franchise";
+          const childRoleLabel = childRole === "employee" ? "employee" : childRole === "franchise" ? "franchise" : "merchant";
           toast.error(
             `Limit pool of ${sfName} (₹${parentSfTotalPool.toLocaleString("en-IN")}) exceeded! ${childRoleLabel.charAt(0).toUpperCase() + childRoleLabel.slice(1)} limit (₹${proposedVal.toLocaleString("en-IN")}) cannot exceed Super Franchise limit (₹${parentSfTotalPool.toLocaleString("en-IN")}).`
           );
@@ -1142,7 +1201,7 @@ export default function PosSetting({ currentUser }) {
           const sfName = parentSuperFranchise?.name || parentSuperFranchise?.full_name || parentSuperFranchise?.business_name || `Super Franchise #${parentSuperFranchiseId}`;
           const usedText = parentSfUsedToday > 0 ? ` (Parent Super Franchise has already used ₹${parentSfUsedToday.toLocaleString("en-IN")} today)` : "";
           const childRole = normalizeUserRole(customer.role);
-          const childRoleLabel = childRole === "employee" ? "employee" : "franchise";
+          const childRoleLabel = childRole === "employee" ? "employee" : childRole === "franchise" ? "franchise" : "merchant";
           toast.error(
             `Limit pool of ${sfName} (₹${parentSfTotalPool.toLocaleString("en-IN")}) exceeded!${usedText} Maximum limit available to assign to this ${childRoleLabel} is ₹${maxAvailableForThisChild.toLocaleString("en-IN")}.`
           );
@@ -1154,7 +1213,7 @@ export default function PosSetting({ currentUser }) {
     // 4. Validate sub-allocation against Franchise and Super Franchise assigned pools (for Merchant)
     const isMerchantRole = !isFranchiseRole && !isSuperFranchiseRole;
     if (isMerchantRole) {
-      const parentFranchiseId = getParentFranchiseId(customer) || (isFranchise ? Number(currentUser?.id) : null);
+      const parentFranchiseId = getFranchiseParentId(customer) || (isFranchise ? Number(currentUser?.id) : null);
       const parentFranchise = parentFranchiseId
         ? rawUsersList.find((u) => Number(u.id) === Number(parentFranchiseId)) ||
           extractUsersArray(allUsersData).find((u) => Number(u.id) === Number(parentFranchiseId)) ||
@@ -1162,28 +1221,16 @@ export default function PosSetting({ currentUser }) {
         : null;
 
       const merchantSuperFranchiseId =
-        customer?.super_franchise_id ??
-        customer?.superFranchiseId ??
-        customer?.super_franchise_details?.id ??
-        parentFranchise?.super_franchise_id ??
-        parentFranchise?.superFranchiseId ??
-        parentFranchise?.super_franchise_details?.id ??
+        getSuperFranchiseParentId(customer) ||
+        getSuperFranchiseParentId(parentFranchise) ||
         (isSuperFranchise ? Number(currentUser?.id) : null);
 
       const proposedVal = finalLimitVal !== null ? Number(finalLimitVal) : 0;
 
       // If proposed limit > 0, check hierarchy restrictions
       if (proposedVal > 0) {
-        // Rule: If hierarchy has a Super Franchise, Merchant CANNOT have limit set directly without a Franchise
-        if (merchantSuperFranchiseId && (!parentFranchiseId || !parentFranchise)) {
-          toast.error(
-            "Cannot set Merchant limit directly! Merchant must belong to a Franchise. Please assign a Franchise first before allocating a limit."
-          );
-          return;
-        }
-
-        // Rule: If Franchise is not set (Not Set / ₹0), we CANNOT set limit of Merchant directly
-        if (parentFranchiseId) {
+        // If merchant belongs to a Franchise, Franchise limit must be set first
+        if (parentFranchiseId && parentFranchise) {
           const rawFranchiseLimit = parentFranchise?.t0_daily_limit;
           const isFranchiseNotSet =
             rawFranchiseLimit === null ||
@@ -1249,8 +1296,8 @@ export default function PosSetting({ currentUser }) {
         }
       }
 
-      // Check sub-allocation against Franchise assigned pool
-      if (parentFranchiseId) {
+      // Check sub-allocation against Franchise assigned pool (if merchant is under a Franchise)
+      if (parentFranchiseId && parentFranchise) {
         const rawParentLimit = parentFranchise?.t0_daily_limit;
         const isParentNotSet =
           rawParentLimit === null ||
@@ -1566,7 +1613,7 @@ export default function PosSetting({ currentUser }) {
           if (matchedUser) {
             if (isFranchise) {
               const currentFranchiseId = Number(currentUser?.id);
-              const parentId = getParentFranchiseId(matchedUser);
+              const parentId = getFranchiseParentId(matchedUser);
               const isChild =
                 parentId === currentFranchiseId ||
                 String(matchedUser.franchaise_id) === String(currentUser?.id) ||
@@ -1582,11 +1629,7 @@ export default function PosSetting({ currentUser }) {
               }
             } else if (isSuperFranchise) {
               const currentSfId = Number(currentUser?.id);
-              const sfId =
-                matchedUser?.super_franchise_id ??
-                matchedUser?.superFranchiseId ??
-                matchedUser?.super_franchise_details?.id ??
-                null;
+              const sfId = getSuperFranchiseParentId(matchedUser);
               const isChild =
                 Number(sfId) === currentSfId ||
                 String(matchedUser.super_franchise_id) === String(currentUser?.id);
