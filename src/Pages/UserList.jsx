@@ -347,17 +347,10 @@ const USER_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill",
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
-  pos_inventory: "POS Machine",
-  qr_inventory: "QR & Soundbox",
-  pg_inventory: "PG Routing",
 };
 
 const EXCLUDED_INLINE_SERVICE_KEYS = new Set([
-  "user_daily_limit",
   "pos_t0_settlement",
-  "pos_inventory",
-  "qr_inventory",
-  "pg_inventory",
 ]);
 
 const MASTER_SERVICE_CONTROLS = [
@@ -368,7 +361,6 @@ const MASTER_SERVICE_CONTROLS = [
   { key: "cc_bill_pay", label: "CC Bill" },
   { key: "ba_cc_bill_pay", label: "BA CC Bill" },
   { key: "cc_bill_3", label: "CC Bill 3" },
-  { key: "user_daily_limit", label: "User Daily Limit" },
   { key: "pos_t0_settlement", label: "POS T0/T1 Settlement & Limit" },
 ];
 
