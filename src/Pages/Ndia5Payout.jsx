@@ -46,7 +46,7 @@ const Ndia5Payout = ({ currentUser }) => {
   const merchantId = currentUser?.id;
   const isPayoutEnabled = getServiceFlagValue(currentUser?.service_flags, 'ndia5_payout', true);
   const role = String(currentUser?.role || '').trim().toLowerCase();
-  const normalizedRole = role === 'franchaise' ? 'franchise' : role;
+  const normalizedRole = role === 'franchaise' ? 'franchise' : role === 'super_franchise' ? 'super-franchise' : role;
 
   const walletNum = parseFloat(currentUser?.wallet ?? 0);
   const availableBalanceNum =

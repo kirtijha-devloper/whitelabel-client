@@ -18,7 +18,7 @@ export default function PayoutSuccess() {
   const data = state?.payoutData ?? {};
   const payload = state?.payoutPayload ?? {};
   const role = String(state?.role || 'merchant').trim().toLowerCase();
-  const normalizedRole = role === 'franchaise' ? 'franchise' : role;
+  const normalizedRole = role === 'franchaise' ? 'franchise' : role === 'super_franchise' ? 'super-franchise' : role;
 
   const txnId = data?.transaction_id ?? data?.txnId ?? data?.transactionId ?? data?.refId ?? payload?.merchantRefId ?? '—';
   const status = data?.status ?? data?.txnStatus ?? 'Processing';

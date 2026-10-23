@@ -39,6 +39,9 @@ const Logout = lazy(() => import('../Pages/Logout'));
 const SevenPayPayout = lazy(() => import('../Pages/SevenPayPayout'));
 const VimoPayout = lazy(() => import('../Pages/VimoPayout'));
 const BranchXPayout = lazy(() => import('../Pages/BranchXPayout'));
+const Ndia5Payout = lazy(() => import('../Pages/Ndia5Payout'));
+const MxPayout = lazy(() => import('../Pages/MxPayout'));
+const PayoutSuccess = lazy(() => import('../Pages/PayoutSuccess'));
 const CCBillPay = lazy(() => import("../Pages/CCBillPay"));
 const BillAvenueCCBillPay = lazy(() => import('../Pages/BillAvenueCCBillPay'));
 
@@ -130,15 +133,45 @@ export default function SuperFranchiseLayout() {
                 path='vimo-payout'
                 element={guardServiceRoute('vimo_payout', <VimoPayout currentUser={currentUser} />)}
               />
+              <Route
+                path='vimo-payout/success'
+                element={guardServiceRoute('vimo_payout', <PayoutSuccess />)}
+              />
 
               <Route
                 path='branchx-payout'
                 element={guardServiceRoute('branchx_payout', <BranchXPayout currentUser={currentUser} />)}
               />
+              <Route
+                path='branchx-payout/success'
+                element={guardServiceRoute('branchx_payout', <PayoutSuccess />)}
+              />
 
               <Route
                 path='sevenpay-payout'
                 element={guardServiceRoute('sevenpay_payout', <SevenPayPayout currentUser={currentUser} />)}
+              />
+              <Route
+                path='sevenpay-payout/success'
+                element={guardServiceRoute('sevenpay_payout', <PayoutSuccess />)}
+              />
+
+              <Route
+                path='ndia5-payout'
+                element={guardServiceRoute('ndia5_payout', <Ndia5Payout currentUser={currentUser} />)}
+              />
+              <Route
+                path='ndia5-payout/success'
+                element={guardServiceRoute('ndia5_payout', <PayoutSuccess />)}
+              />
+
+              <Route
+                path='mx-payout'
+                element={guardServiceRoute('mx_payout', <MxPayout currentUser={currentUser} />)}
+              />
+              <Route
+                path='mx-payout/success'
+                element={guardServiceRoute('mx_payout', <PayoutSuccess />)}
               />
 
               <Route
@@ -148,7 +181,7 @@ export default function SuperFranchiseLayout() {
 
               <Route
                 path='ba-cc-bill-pay'
-                element={guardServiceRoute('ba-cc-bill-pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
+                element={guardServiceRoute('ba_cc_bill_pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
               />
 
               <Route path="pos-machine-list" element={<PosMachineList />} />
@@ -167,6 +200,7 @@ export default function SuperFranchiseLayout() {
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               <Route path="ledger-entries" element={<FranchiseLedger currentUser={currentUser} />} />
               <Route path="logout" element={<Logout />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Routes>
           </Suspense>
         </UserCreationProvider>
