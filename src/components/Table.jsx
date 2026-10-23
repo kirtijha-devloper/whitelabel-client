@@ -17,7 +17,7 @@ const Table = ({
   data,
   onRowClick,
   actions,
-  currentUser,
+  currentUser = null,
   actionsHeader = "Actions",
   actionsAlign = "left",
   containerClassName = "overflow-x-auto bg-white shadow-md rounded-lg",
@@ -86,7 +86,7 @@ const Table = ({
                   </td>
                 );
               })}
-              {row.id !== currentUser.id && actions && (
+              {(row === null || currentUser === null || row.id !== currentUser.id) && actions && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className={`flex items-center gap-2 ${contentAlignClass}`}>
                     {actions.map((action, actionIndex) => {
