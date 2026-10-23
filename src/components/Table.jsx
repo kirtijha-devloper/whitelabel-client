@@ -17,6 +17,7 @@ const Table = ({
   data,
   onRowClick,
   actions,
+  currentUser,
   actionsHeader = "Actions",
   actionsAlign = "left",
   containerClassName = "overflow-x-auto bg-white shadow-md rounded-lg",
@@ -67,10 +68,10 @@ const Table = ({
                   renderedContent =
                     typeof column.Cell === "function"
                       ? column.Cell({
-                          value: cellValue,
-                          row: { original: row, index: rowIndex },
-                          data,
-                        })
+                        value: cellValue,
+                        row: { original: row, index: rowIndex },
+                        data,
+                      })
                       : column.Cell;
                 } else {
                   renderedContent = cellValue;
@@ -85,29 +86,29 @@ const Table = ({
                   </td>
                 );
               })}
-              {actions && (
+              {row.id !== currentUser.id && actions && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className={`flex items-center gap-2 ${contentAlignClass}`}>
-{actions.map((action, actionIndex) => {
-  if (action.show && !action.show(row)) {
-    return null;
-  }
+                    {actions.map((action, actionIndex) => {
+                      if (action.show && !action.show(row)) {
+                        return null;
+                      }
 
-  return (
-    <button
-      key={actionIndex}
-      onClick={(e) => {
-        e.stopPropagation();
-        action.onClick(row);
-      }}
-      className="text-blue-500 hover:text-blue-700"
-    >
-      {typeof action.label === "function"
-        ? action.label(row)
-        : action.label}
-    </button>
-  );
-})}
+                      return (
+                        <button
+                          key={actionIndex}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick(row);
+                          }}
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          {typeof action.label === "function"
+                            ? action.label(row)
+                            : action.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </td>
               )}

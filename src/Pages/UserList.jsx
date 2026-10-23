@@ -2408,10 +2408,10 @@ const UserList = ({
 
             {/* Desktop/Tablet Table */}
             <div className="hidden md:block">
-              {console.log("columns", columns)}
               <Table
                 columns={columns}
                 data={tableData}
+                currentUser = {currentUser}
                 actions={userActions()}
                 actionsHeader="Quick Actions"
                 actionsAlign="center"
