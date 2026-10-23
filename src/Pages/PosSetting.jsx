@@ -1143,7 +1143,7 @@ export default function PosSetting({ currentUser }) {
     const parentSuperFranchiseId =
       !isSuperFranchiseRole && sfParentId ? Number(sfParentId) : null;
 
-    if (parentSuperFranchiseId && String(customer.id) !== String(parentSuperFranchiseId)) {
+    if ((isSuperFranchise || isAdmin) && parentSuperFranchiseId && String(customer.id) !== String(parentSuperFranchiseId)) {
       const parentSuperFranchise =
         rawUsersList.find((u) => Number(u.id) === Number(parentSuperFranchiseId)) ||
         extractUsersArray(allUsersData).find((u) => Number(u.id) === Number(parentSuperFranchiseId)) ||
@@ -1252,7 +1252,7 @@ export default function PosSetting({ currentUser }) {
         }
 
         // Rule: Merchant cannot exceed Super Franchise pool
-        if (merchantSuperFranchiseId) {
+        if ((isSuperFranchise || isAdmin) && merchantSuperFranchiseId) {
           const parentSuperFranchise =
             rawUsersList.find((u) => Number(u.id) === Number(merchantSuperFranchiseId)) ||
             extractUsersArray(allUsersData).find((u) => Number(u.id) === Number(merchantSuperFranchiseId)) ||
@@ -1279,7 +1279,7 @@ export default function PosSetting({ currentUser }) {
             return;
           }
 
-          if (!isSfUnlimited && !isSfNotSet && !isSfZero) {
+          if (isSuperFranchise && !isSfUnlimited && !isSfNotSet && !isSfZero) {
             const sfTotalPool = Number(rawParentSfLimit) || 0;
             if (proposedVal > sfTotalPool) {
               const sfName =

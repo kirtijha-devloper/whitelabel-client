@@ -246,7 +246,7 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
                 <Wallet size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-gray-500 font-medium text-xs">Admin Pool Wallet</p>
+                <p className="text-gray-500 font-medium text-xs">Admin Wallet</p>
                 <p className="text-emerald-700 font-bold text-lg sm:text-xl leading-tight">
                   ₹{Number(currentUser?.wallet ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
@@ -261,7 +261,7 @@ const HeaderInfo = ({ dashboardData, currentUser }) => {
                 <Wallet size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-gray-500 font-medium text-xs">Daily Limit Pool</p>
+                <p className="text-gray-500 font-medium text-xs">Daily Limit</p>
                 <p className="text-emerald-700 font-bold text-lg sm:text-xl leading-tight">
                   ₹{Number(currentUser?.t0_daily_limit ?? currentUser?.wallet ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
