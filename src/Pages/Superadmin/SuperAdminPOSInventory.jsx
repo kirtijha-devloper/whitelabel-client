@@ -187,8 +187,8 @@ const SuperAdminPOSInventory = () => {
       const matchesSearch = !search || values.some((value) => String(value || "").toLowerCase().includes(search));
       const status = getMachineStatus(machine);
       const matchesStatus = statusFilter === "all" ||
-        (statusFilter === "available" ? !machine?.assigned_to && !status.includes("return") :
-          statusFilter === "active" ? Boolean(machine?.assigned_to) || status === "active" :
+        (statusFilter === "available" ? (!isMachineAssigned(machine) || status === "available") && !status.includes("return") :
+          statusFilter === "active" ? isMachineAssigned(machine) || status === "active" :
             statusFilter === "returned" ? status.includes("return") : status === statusFilter);
       return matchesSearch && matchesStatus;
     });
