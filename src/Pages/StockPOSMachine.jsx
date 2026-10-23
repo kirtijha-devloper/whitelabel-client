@@ -363,6 +363,7 @@ const StockPOSMachine = ({ currentUser }) => {
 
   const invalidateMachineViews = () => {
     queryClient.invalidateQueries({ queryKey: ["posMachines"] });
+    queryClient.invalidateQueries({ queryKey: ["posMachineHeadingStats"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
@@ -432,7 +433,7 @@ const StockPOSMachine = ({ currentUser }) => {
 
       return [...firstPageMachines, ...remainingMachines];
     },
-    staleTime: 1000 * 30,
+    staleTime: 0,
   });
 
   const posMachines = useMemo(
@@ -641,7 +642,46 @@ const StockPOSMachine = ({ currentUser }) => {
     return raw === "franchaise" ? "franchise" : raw;
   };
 
-  const isMachineAssigned = (machine) => Boolean(machine?.assigned_to);
+  const isMachineAssigned = (machine) => {
+    if (!machine?.assigned_to) return false;
+
+    const assignedRole = getAssignmentUserRole(machine?.assigned_user);
+
+    // If viewer is Admin or Admin Employee
+    if (isAdminStyleStockViewer) {
+      if (assignedRole === "admin" || String(machine.assigned_to) === String(currentUser?.id)) {
+        return false;
+      }
+      return true;
+    }
+
+    // If viewer is Super Franchise
+    if (isSuperFranchiseUser) {
+      if (
+        assignedRole === "super_franchise" ||
+        assignedRole === "admin" ||
+        String(machine.assigned_to) === String(currentUser?.id)
+      ) {
+        return false;
+      }
+      return true;
+    }
+
+    // If viewer is Franchise
+    if (isFranchiseUser) {
+      if (
+        assignedRole === "franchise" ||
+        assignedRole === "super_franchise" ||
+        assignedRole === "admin" ||
+        String(machine.assigned_to) === String(currentUser?.id)
+      ) {
+        return false;
+      }
+      return true;
+    }
+
+    return Boolean(machine.assigned_to);
+  };
 
   const getAssignmentStatusLabel = (machine) =>
     isMachineAssigned(machine) ? "assigned" : "un-assigned";
@@ -649,20 +689,9 @@ const StockPOSMachine = ({ currentUser }) => {
   const canShowAssignButton = (machine) => {
     if (isAdminStyleStockViewer) return true;
     if (isFranchiseUser) {
-      // return (
-      //   String(machine?.assigned_to) === String(currentUser?.id) &&
-      //   normalizeRoleValue(machine?.assigned_user?.role) === "franchise"
-      // );
-
       return true;
     }
     if (isSuperFranchiseUser) {
-      // const assignedRole = normalizeRoleValue(machine?.assigned_user?.role);
-      // return (
-      //   String(machine?.assigned_to) === String(currentUser?.id) &&
-      //   (assignedRole === "super_franchise" || assignedRole === "superfranchise" || !assignedRole)
-      // );
-
       return true;
     }
     return false;
@@ -670,8 +699,11 @@ const StockPOSMachine = ({ currentUser }) => {
 
   const getMachineDisplayStatus = (machine) => {
     const rawStatus = String(machine?.status || "").trim().toLowerCase();
+    if (["inactive", "in_active", "return_initiated", "returned-initiated"].includes(rawStatus)) {
+      return "inactive";
+    }
 
-    if (isAdminStyleStockViewer) {
+    if (isAdminStyleStockViewer || isSuperFranchiseUser || isFranchiseUser) {
       return isMachineAssigned(machine) ? "active" : "inactive";
     }
 
@@ -1219,10 +1251,10 @@ const StockPOSMachine = ({ currentUser }) => {
       "Device Serial Number": machine.device_serial_number || "-",
       "TID Number": machine.tid_number || "-",
       "MID Number": machine.mid_number || "-",
-      "Status": machine.status || "-",
-      "Assigned Name": machine?.assigned_user?.name || "-",
-      "Assigned Username": machine?.assigned_user?.username || machine?.assigned_user?.user_name || machine?.assigned_user?.userName || "-",
-      "Assigned Mobile": machine?.assigned_user?.mobile_number || machine?.assigned_user?.mobile || machine?.assigned_user?.phone_number || "-",
+      "Status": isMachineAssigned(machine) ? "assigned" : "un-assigned",
+      "Assigned Name": isMachineAssigned(machine) ? (machine?.assigned_user?.name || "-") : "-",
+      "Assigned Username": isMachineAssigned(machine) ? (getAssignmentUserUsername(machine?.assigned_user) || "-") : "-",
+      "Assigned Mobile": isMachineAssigned(machine) ? (getAssignmentUserMobile(machine?.assigned_user) || "-") : "-",
       "Razorpay ID": machine.razorpay_id || "-",
       "Remarks": machine.remarks || "-",
       "Created At": machine.createdAt || machine?.created_at || "-",
@@ -1272,7 +1304,10 @@ const StockPOSMachine = ({ currentUser }) => {
   const currentPageActive = effectiveMachines.filter((m) => getMachineDisplayStatus(m) === "active").length;
   const currentPageInactive = effectiveMachines.filter((m) => getMachineDisplayStatus(m) !== "active").length;
 
-  const headingMachines = filteredStatsMachines.length > 0 ? filteredStatsMachines : bankFilteredMachines;
+  const headingMachines =
+    totalPages > 1 && filteredStatsMachines.length > 0
+      ? filteredStatsMachines
+      : bankFilteredMachines;
   const totalMachinesValue = headingMachines.length;
   const totalActiveValue = headingMachines.filter((m) => getMachineDisplayStatus(m) === "active").length;
   const totalInactiveValue = headingMachines.filter((m) => getMachineDisplayStatus(m) !== "active").length;
@@ -1488,25 +1523,7 @@ const StockPOSMachine = ({ currentUser }) => {
         </div>
 
         {/* Stats Section */}
-        <div className={`grid grid-cols-1 ${isAdminStyleStockViewer ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-6 md:mb-8`}>
-          {isAdminStyleStockViewer && (
-            <div className="rounded-xl p-3 text-white bg-[#14b8a6]">
-              <h3 className="text-[1.05rem] font-semibold">Total Company</h3>
-              <p className="mt-0.5 text-2xl font-bold leading-none">{companyOptions.length}</p>
-              <div className="mt-1 flex items-center justify-between gap-3">
-                <p className="text-xs text-white/90">Master company list</p>
-                <button
-                  type="button"
-                  onClick={() => setShowCompanyListModal(true)}
-                  disabled={!companyOptions.length}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/50 px-3 py-1 text-xs font-semibold text-white hover:bg-white/10 disabled:opacity-50"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  View
-                </button>
-              </div>
-            </div>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 md:mb-8">
           {[
             {
               label: "Total Machines",
@@ -1631,19 +1648,8 @@ const StockPOSMachine = ({ currentUser }) => {
                 <p className="text-gray-700"><span className="font-medium">TID:</span> {machine.tid_number || "-"}</p>
                 <p className="text-gray-700"><span className="font-medium">MID:</span> {machine.mid_number || "-"}</p>
                 <div className="text-gray-700">
-                  <span className="font-medium">Franchise:</span>
-                  <div>{getFranchiseDisplayName(machine)}</div>
-                  {getAssignmentUserRole(machine?.assigned_user) === "franchise" && (
-                    <div className="text-xs text-gray-500">
-                      {getAssignmentUserUsername(machine?.assigned_user) || ""}
-                      {getAssignmentUserUsername(machine?.assigned_user) && getAssignmentUserMobile(machine?.assigned_user) ? " | " : ""}
-                      {getAssignmentUserMobile(machine?.assigned_user) || ""}
-                    </div>
-                  )}
-                </div>
-                <div className="text-gray-700">
                   <span className="font-medium">Assign To:</span>
-                  {machine?.assigned_to ? (
+                  {isMachineAssigned(machine) && machine?.assigned_to ? (
                     <>
                       <div>{machine?.assigned_user?.name || "(unknown)"}</div>
                       <div className="text-xs text-gray-500">
@@ -1736,9 +1742,6 @@ const StockPOSMachine = ({ currentUser }) => {
                     Actions
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Franchise Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Assign To
                   </th>
                 </tr>
@@ -1807,19 +1810,7 @@ const StockPOSMachine = ({ currentUser }) => {
                     </td>
                     <td>
                       <div className="text-center text-sm">
-                        <div>{getFranchiseDisplayName(machine)}</div>
-                        {getAssignmentUserRole(machine?.assigned_user) === "franchise" && (
-                          <div className="text-xs text-gray-500">
-                            {getAssignmentUserUsername(machine?.assigned_user) || ""}
-                            {getAssignmentUserUsername(machine?.assigned_user) && getAssignmentUserMobile(machine?.assigned_user) ? " | " : ""}
-                            {getAssignmentUserMobile(machine?.assigned_user) || ""}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="text-center text-sm">
-                        {machine?.assigned_to ? (
+                        {isMachineAssigned(machine) && machine?.assigned_to ? (
                           <>
                             <div>{machine?.assigned_user?.name || "(unknown)"}</div>
                             <div className="text-xs text-gray-500">
@@ -2263,7 +2254,7 @@ const StockPOSMachine = ({ currentUser }) => {
               >
                 Assign
               </button>
-              {(isAdminStyleStockViewer || isSuperFranchiseUser) && assignMachine?.assigned_to && (
+              {(isAdminStyleStockViewer || isSuperFranchiseUser) && isMachineAssigned(assignMachine) && (
                 <button
                   onClick={handleUnassign}
                   className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"

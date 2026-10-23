@@ -616,18 +616,6 @@ const SuperAdminPOSInventory = () => {
             >
               Active
             </button>
-
-            <button
-              type="button"
-              onClick={() => setStatusFilter("returned")}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition ${
-                statusFilter === "returned"
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Returned
-            </button>
           </div>
         </div>
       </div>
