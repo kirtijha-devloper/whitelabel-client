@@ -44,6 +44,7 @@ const MxPayout = lazy(() => import('../Pages/MxPayout'));
 const PayoutSuccess = lazy(() => import('../Pages/PayoutSuccess'));
 const CCBillPay = lazy(() => import("../Pages/CCBillPay"));
 const BillAvenueCCBillPay = lazy(() => import('../Pages/BillAvenueCCBillPay'));
+const ApplyKyc = lazy(() => import('../Pages/Kyc/ApplyKyc'));
 
 export default function SuperFranchiseLayout() {
   const navigate = useNavigate();
@@ -178,9 +179,29 @@ export default function SuperFranchiseLayout() {
                 path="cc-bill-pay"
                 element={guardServiceRoute('cc_bill_pay', <CCBillPay currentUser={currentUser} />)}
               />
+              <Route
+                path="cc-bill-pay/review"
+                element={guardServiceRoute('cc_bill_pay', <CCBillPay currentUser={currentUser} />)}
+              />
+              <Route
+                path="cc-bill-pay/result"
+                element={guardServiceRoute('cc_bill_pay', <CCBillPay currentUser={currentUser} />)}
+              />
+              <Route
+                path="cc-bill-pay/kyc"
+                element={guardServiceRoute('cc_bill_pay', <ApplyKyc />)}
+              />
 
               <Route
                 path='ba-cc-bill-pay'
+                element={guardServiceRoute('ba_cc_bill_pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
+              />
+              <Route
+                path='ba-cc-bill-pay/review'
+                element={guardServiceRoute('ba_cc_bill_pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
+              />
+              <Route
+                path='ba-cc-bill-pay/result'
                 element={guardServiceRoute('ba_cc_bill_pay', <BillAvenueCCBillPay currentUser={currentUser} />)}
               />
 

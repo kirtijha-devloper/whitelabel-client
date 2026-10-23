@@ -257,19 +257,22 @@ export default function CCBillPay({ currentUser }) {
   });
   const sharedLimit = sharedCcBillLimitResp?.data || null;
 
-  // CC Bill Pay is self-pay only for franchise/merchant; user selection is intentionally hidden.
+  // CC Bill Pay is self-pay: paying directly from the logged-in user's account/wallet
   const isSelfPayRole =
-    userRole === "merchant" || userRole === "franchise" || userRole === "franchaise";
+    userRole === "merchant" ||
+    userRole === "franchise" ||
+    userRole === "franchaise" ||
+    userRole === "super_franchise" ||
+    userRole === "superfranchise" ||
+    userRole === "admin" ||
+    userRole === "super_admin";
   const fixedPayingUser = useMemo(
-    () =>
-      isSelfPayRole
-        ? {
-            id: currentUser?.id ?? currentUser?.user_id ?? "",
-            name: currentUser?.name ?? currentUser?.full_name ?? currentUser?.user_name ?? "User",
-            mobile: currentUser?.mobile ?? currentUser?.mobile_number ?? currentUser?.phone ?? "",
-          }
-        : null,
-    [currentUser, isSelfPayRole]
+    () => ({
+      id: currentUser?.id ?? currentUser?.user_id ?? "",
+      name: currentUser?.name ?? currentUser?.full_name ?? currentUser?.user_name ?? "User",
+      mobile: currentUser?.mobile ?? currentUser?.mobile_number ?? currentUser?.phone ?? "",
+    }),
+    [currentUser]
   );
 
   const [selectedBankId, setSelectedBankId] = useState(
