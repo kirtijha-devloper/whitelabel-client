@@ -41,12 +41,7 @@ const CANONICAL_SERVICE_META = {
   cc_bill_3: { label: "CC Bill 3", category: "CC Bill", description: "CC Bill 3 Bank-Callback Payment Route" },
 
   // Payin Services
-  pos_t0_settlement: { label: "POS Settlement Evaluator", category: "Payin", description: "Dynamic Money-In T0/T1 settlement evaluation and daily limits" },
-  user_daily_limit: { label: "User Daily Limit", category: "Payin", description: "Daily payout transaction volume limit enforcement across users" },
-  pos_inventory: { label: "POS Machine Hardware", category: "Payin", description: "POS terminal machine inventory and merchant assignment" },
-  qr_inventory: { label: "QR Standees & Soundboxes", category: "Payin", description: "Physical QR code standees and 4G voice soundbox hardware" },
-  pg_inventory: { label: "PG MID Routing", category: "Payin", description: "Payment Gateway MIDs and aggregator routing services" },
-  qr_payments: { label: "QR & Soundbox Payments", category: "Payin", description: "Dynamic UPI soundbox audio notifications and standee collections" },
+  pos_t0_settlement: { label: "POS T0 Instant Settlement", category: "Payin", description: "Instant same-day T0 POS Settlement & limits" },
 };
 
 // Safe Category Normalization Helper to map legacy / custom categories into the 3 Core Categories
@@ -103,7 +98,7 @@ const CATEGORY_DEFINITIONS = [
     name: "Payin",
     shortName: "Payin",
     icon: FaExchangeAlt,
-    description: "POS Settlement, User Daily Limit, POS Hardware, QR Standees, Soundboxes, and PG Routing",
+    description: "POS T0 Instant Settlement & Money-In Collections",
     headerBg: "bg-emerald-50 border-emerald-200 text-emerald-900",
     badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
     iconColor: "text-emerald-600 bg-emerald-100/70",
@@ -157,31 +152,46 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
   });
 
   const services = useMemo(() => {
-    return (rawServices || [])
-      .filter((s) => (s?.key || s?.service_key) !== "mx_payout")
-      .map((s) => {
-        const key = s?.key || s?.service_key || "";
-        const canonical = CANONICAL_SERVICE_META[key] || {};
-        const resolvedCategory = normalizeCategory(s?.category, key);
-        const resolvedLabel = s?.label || canonical.label || key;
-        const resolvedDesc = s?.description || canonical.description || "";
-        const isEnabled =
-          s?.is_enabled !== undefined
-            ? s.is_enabled
-            : s?.enabled !== undefined
-            ? s.enabled
-            : true;
+    const REMOVED_SERVICE_KEYS = new Set([
+      "user_daily_limit",
+      "pos_inventory",
+      "qr_payments",
+      "qr_inventory",
+      "pg_inventory",
+      "mx_payout",
+    ]);
 
-        return {
-          ...s,
-          key,
-          service_key: key,
-          label: resolvedLabel,
-          category: resolvedCategory,
-          description: resolvedDesc,
-          is_enabled: isEnabled,
-        };
+    const seen = new Set();
+    const result = [];
+
+    (rawServices || []).forEach((s) => {
+      const key = s?.key || s?.service_key || "";
+      if (!key || REMOVED_SERVICE_KEYS.has(key) || seen.has(key)) return;
+      seen.add(key);
+
+      const canonical = CANONICAL_SERVICE_META[key] || {};
+      const resolvedCategory = normalizeCategory(s?.category, key);
+      const resolvedLabel = s?.label || canonical.label || key;
+      const resolvedDesc = s?.description || canonical.description || "";
+      const isEnabled =
+        s?.is_enabled !== undefined
+          ? s.is_enabled
+          : s?.enabled !== undefined
+          ? s.enabled
+          : true;
+
+      result.push({
+        ...s,
+        key,
+        service_key: key,
+        label: resolvedLabel,
+        category: resolvedCategory,
+        description: resolvedDesc,
+        is_enabled: isEnabled,
       });
+    });
+
+    return result;
   }, [rawServices]);
 
   // Toggle Mutation
@@ -274,6 +284,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
       description: formData.description.trim() || `Service: ${formData.label}`,
       is_enabled: formData.enabled,
       target_roles: formData.target_roles,
+      is_update: Boolean(editingService),
     };
 
     saveMutation.mutate(payload);
@@ -525,6 +536,7 @@ const SuperAdminServiceManagement = ({ embedded = false }) => {
           <button
             type="button"
             onClick={() => {
+              setEditingService(null);
               setEditingService(null);
               setFormData({
                 key: "",

@@ -49,38 +49,10 @@ export const INITIAL_SERVICE_CONFIG = [
     target_roles: ["admin", "franchise", "merchant", "super_franchise"],
   },
   {
-    key: "pos_inventory",
-    label: "POS Machine Hardware",
-    category: "POS & Hardware",
-    description: "Enable or disable POS terminal machines and hardware stock management.",
-    target_roles: ["admin", "franchise", "merchant"],
-  },
-  {
-    key: "qr_inventory",
-    label: "QR Standees & Soundboxes",
-    category: "Digital QR",
-    description: "Enable or disable physical QR code standees and 4G voice soundbox services.",
-    target_roles: ["admin", "franchise", "merchant"],
-  },
-  {
-    key: "pg_inventory",
-    label: "PG MID Routing",
-    category: "Payment Gateway",
-    description: "Enable or disable Payment Gateway MIDs and aggregator routing services.",
-    target_roles: ["admin", "merchant"],
-  },
-  {
-    key: "user_daily_limit",
-    label: "User Daily Limit",
-    category: "Financial Controls",
-    description: "Enable or disable daily payout limit enforcement for users.",
-    target_roles: ["admin", "franchise", "merchant"],
-  },
-  {
     key: "pos_t0_settlement",
-    label: "POS Settlement Evaluator",
-    category: "Settlement & Limits",
-    description: "Enable or disable global POS Settlement Evaluator. When ON, Money-In events dynamically evaluate daily limit rules.",
+    label: "POS T0 Instant Settlement",
+    category: "POS & Hardware",
+    description: "Enable or disable global POS T0 Instant Settlement. When ON, Money-In events dynamically evaluate daily limit rules.",
     target_roles: ["admin"],
   },
 ];
@@ -88,20 +60,31 @@ export const INITIAL_SERVICE_CONFIG = [
 export const SERVICE_FLAG_CONFIG = INITIAL_SERVICE_CONFIG;
 
 export const getRegisteredServices = () => {
+  const REMOVED_SERVICE_KEYS = new Set([
+    "user_daily_limit",
+    "pos_inventory",
+    "qr_payments",
+    "qr_inventory",
+    "pg_inventory",
+  ]);
+
   try {
     const savedCustom = localStorage.getItem("super_admin_custom_services");
     if (savedCustom) {
       const parsed = JSON.parse(savedCustom);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const customKeys = new Set(parsed.map((s) => s.key));
-        const base = INITIAL_SERVICE_CONFIG.filter((s) => !customKeys.has(s.key));
-        return [...base, ...parsed];
+        const validCustom = parsed.filter((s) => !REMOVED_SERVICE_KEYS.has(s.key));
+        const customKeys = new Set(validCustom.map((s) => s.key));
+        const base = INITIAL_SERVICE_CONFIG.filter(
+          (s) => !customKeys.has(s.key) && !REMOVED_SERVICE_KEYS.has(s.key)
+        );
+        return [...base, ...validCustom];
       }
     }
   } catch (e) {
     console.warn("Failed to load custom services", e);
   }
-  return INITIAL_SERVICE_CONFIG;
+  return INITIAL_SERVICE_CONFIG.filter((s) => !REMOVED_SERVICE_KEYS.has(s.key));
 };
 
 export const getServiceStatusMap = () => {

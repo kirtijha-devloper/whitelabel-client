@@ -57,11 +57,24 @@ const AdminServiceManagement = () => {
   const servicesList = useMemo(() => {
     if (!rawSettingsData || typeof rawSettingsData !== "object") return [];
 
-    return Object.entries(rawSettingsData)
-      .filter(([key]) => key !== "mx_payout")
-      .map(([key, config]) => {
+    const REMOVED_SERVICE_KEYS = new Set([
+      "user_daily_limit",
+      "pos_inventory",
+      "qr_payments",
+      "qr_inventory",
+      "pg_inventory",
+      "mx_payout",
+    ]);
+
+    const seen = new Set();
+    const list = [];
+
+    Object.entries(rawSettingsData).forEach(([key, config]) => {
+      if (!key || REMOVED_SERVICE_KEYS.has(key) || seen.has(key)) return;
+      seen.add(key);
+
       const isObject = typeof config === "object" && config !== null;
-      return {
+      list.push({
         key,
         service_key: key,
         label: isObject && config.label ? config.label : key.replace(/_/g, " ").toUpperCase(),
@@ -69,8 +82,10 @@ const AdminServiceManagement = () => {
         description: isObject && config.description ? config.description : "",
         is_enabled: isObject ? config.is_enabled !== false : Boolean(config),
         is_super_admin_disabled: Boolean(isObject && config.is_super_admin_disabled),
-      };
+      });
     });
+
+    return list;
   }, [rawSettingsData]);
 
   // Dynamic Categories from Data
