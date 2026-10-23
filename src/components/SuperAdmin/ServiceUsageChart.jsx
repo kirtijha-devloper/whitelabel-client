@@ -99,6 +99,7 @@ const CustomTooltip = ({ active, payload }) => {
   }
 
   const data = payload[0];
+  const count = data.payload?.count;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg">
@@ -111,6 +112,11 @@ const CustomTooltip = ({ active, payload }) => {
         <span className="font-semibold text-gray-900">
           {data.value}%
         </span>
+        {count !== undefined && (
+          <span className="text-xs text-gray-500 ml-1.5 font-normal">
+            ({Number(count).toLocaleString("en-IN")} {Number(count) === 1 ? "txn" : "txns"})
+          </span>
+        )}
       </p>
     </div>
   );
@@ -121,7 +127,10 @@ const CustomTooltip = ({ active, payload }) => {
    ========================================= */
 
 const ServiceUsageChart = ({ data }) => {
-  const hasData = Array.isArray(data) && data.length > 0;
+  const hasData =
+    Array.isArray(data) &&
+    data.length > 0 &&
+    data.some((item) => Number(item?.value) > 0);
   return (
     <div className="w-full rounded-2xl bg-white p-6 shadow-sm">
 
@@ -151,7 +160,7 @@ const ServiceUsageChart = ({ data }) => {
                 cy="45%"
                 innerRadius={70}
                 outerRadius={120}
-                paddingAngle={3}
+                paddingAngle={data.length > 1 ? 3 : 0}
                 dataKey="value"
                 nameKey="name"
 
