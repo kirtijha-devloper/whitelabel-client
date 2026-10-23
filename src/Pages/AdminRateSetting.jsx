@@ -416,11 +416,13 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setMatrixSearchError('');
 
       try {
-        const role = activeTab === 'super_franchise'
-          ? 'super_franchise'
-          : activeTab === 'specific'
-            ? 'franchaise'
-            : 'merchant';
+        const role = isSuperAdmin
+          ? 'admin'
+          : activeTab === 'super_franchise'
+            ? 'super_franchise'
+            : activeTab === 'specific'
+              ? 'franchaise'
+              : 'merchant';
         const response = await searchUsers({
           q: debouncedSearchTerm,
           status: 'active',
@@ -470,7 +472,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     return () => {
       isCancelled = true;
     };
-  }, [activeTab, debouncedSearchTerm, unassignedMerchants, viewMode]);
+  }, [activeTab, debouncedSearchTerm, isSuperAdmin, unassignedMerchants, viewMode]);
 
   // Fetch Logic
   const fetchInitialData = async () => {
@@ -1112,7 +1114,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
 
-    if(activeTab === "specific" && isSuperAdmin) {
+    if (activeTab === "specific" && isSuperAdmin) {
       const id = selectedFranchiseId;
       const [adminOverrides, defaultRules] = await Promise.all([
         fetchAdminPosRules(id),
@@ -1317,7 +1319,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
   const handleCreateNewRate = async () => {
     if ((newRateForm.chargePercent === '' || newRateForm.chargePercent === undefined) &&
-        (newRateForm.chargeFlat === '' || newRateForm.chargeFlat === undefined)) {
+      (newRateForm.chargeFlat === '' || newRateForm.chargeFlat === undefined)) {
       toast.error("Please enter a rate percentage or flat charge amount.");
       return;
     }
@@ -1494,7 +1496,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       return;
     }
     if ((posTxnEditForm.chargePercent === '' || posTxnEditForm.chargePercent === undefined) &&
-        (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
+      (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
       toast.error('Please enter a charge percentage or flat amount.');
       return;
     }
@@ -1626,14 +1628,16 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const emptyStateMessage = matrixSearchError
       ? matrixSearchError
       : remoteSearchPending
-        ? `Searching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'}...`
+        ? `Searching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : isSuperAdmin ? 'admins' : 'franchises'}...`
         : shouldUseRemoteSearch
-          ? `No matching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : 'franchises'} found.`
+          ? `No matching ${isSuperFranchiseTab ? 'super franchises' : isUnassignedTab ? 'merchants' : isSuperAdmin ? 'admins' : 'franchises'} found.`
           : isSuperFranchiseTab
             ? 'No super franchises found.'
             : isUnassignedTab
               ? 'No unassigned merchants found.'
-              : 'No franchises found.';
+              : isSuperAdmin
+                ? 'No admins found.'
+                : 'No franchises found.';
 
     const totalFilteredEntities = filteredEntities.length;
     const totalMatrixPages = Math.max(1, Math.ceil(totalFilteredEntities / matrixRowsPerPage));
@@ -1862,8 +1866,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 type="button"
                 onClick={() => setMatrixPage(pageNumber)}
                 className={`px-3 py-1.5 rounded-md border text-sm ${currentMatrixPage === pageNumber
-                    ? 'border-[#00D3CD] bg-[#00D3CD] text-white'
-                    : 'border-gray-300 text-gray-700'
+                  ? 'border-[#00D3CD] bg-[#00D3CD] text-white'
+                  : 'border-gray-300 text-gray-700'
                   }`}
               >
                 {pageNumber}
