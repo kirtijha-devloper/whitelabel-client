@@ -311,6 +311,7 @@ const getUserServiceSettings = (user = {}) => {
     normalized.vimo_payout = legacyPayoutValue;
     normalized.sevenpay_payout = legacyPayoutValue;
     normalized.branchx_payout = legacyPayoutValue;
+    normalized.ndia5_payout = legacyPayoutValue;
   }
 
   return normalized;
@@ -327,6 +328,7 @@ const getEffectiveServiceFlags = (user = {}) => {
     normalized.vimo_payout = legacyPayoutValue;
     normalized.sevenpay_payout = legacyPayoutValue;
     normalized.branchx_payout = legacyPayoutValue;
+    normalized.ndia5_payout = legacyPayoutValue;
   }
 
   return normalized;

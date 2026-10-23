@@ -108,7 +108,7 @@ export const getServiceStatusMap = () => {
   const registered = getRegisteredServices();
   const defaults = {};
   registered.forEach((item) => {
-    defaults[item.key] = item.key === "ndia5_payout" ? false : true;
+    defaults[item.key] = true;
   });
 
   try {
@@ -195,7 +195,7 @@ export const isGlobalServiceEnabled = (serviceKey, fallback = true) => {
 };
 
 export const SERVICE_FLAG_DEFAULTS = INITIAL_SERVICE_CONFIG.reduce((acc, item) => {
-  acc[item.key] = item.key === "ndia5_payout" ? false : true;
+  acc[item.key] = true;
   return acc;
 }, {});
 
@@ -218,7 +218,7 @@ export const getServiceFlagValue = (source, serviceKey, fallback = true) => {
     return rawValue.is_enabled;
   }
 
-  const effectiveFallback = serviceKey === "ndia5_payout" || serviceKey === "mx_payout" ? false : fallback;
+  const effectiveFallback = serviceKey === "mx_payout" ? false : fallback;
   return effectiveFallback;
 };
 
