@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import {
   getAllPosMachines,
+  getPosMachine,
   markAsDelivered,
   markAsReturnInitiated,
   updatePosMachine,
@@ -20,7 +21,7 @@ import { createCompanyName, getCompanyNames } from "../api/companyName";
 import { getDashboard } from "../api/DashboardAndHeader";
 import Modal from "../components/Modal";
 import FormInput from "../components/FormInput";
-import { Plus, X, Edit2, Upload, Eye, Trash2, Download } from "lucide-react";
+import { Plus, X, Edit2, Upload, Eye, Trash2, Download, AlertCircle } from "lucide-react";
 import Loader from "../components/Loader";
 import Select from "react-select";
 import { FranchiseAllUsers, MerchantAllUsers, SuperFranchiseAllUsers, searchUsers } from "../api/FranchiseApi";
@@ -278,6 +279,9 @@ const StockPOSMachine = ({ currentUser }) => {
   const [showAssignModal, setShowAssignModal] = useState(false); // modal for assigning machine
   const [assignMachine, setAssignMachine] = useState(null);
   const [assignUser, setAssignUser] = useState(null);
+  const [showUnassignedAlertModal, setShowUnassignedAlertModal] = useState(false);
+  const [unassignedAlertMessage, setUnassignedAlertMessage] = useState("");
+  const [isDeassigning, setIsDeassigning] = useState(false);
   const [availableFranchises, setAvailableFranchises] = useState([]);
   const [availableSuperFranchises, setAvailableSuperFranchises] = useState([]);
   const [availableMerchants, setAvailableMerchants] = useState([]);
@@ -649,7 +653,11 @@ const StockPOSMachine = ({ currentUser }) => {
 
     // If viewer is Admin or Admin Employee
     if (isAdminStyleStockViewer) {
-      if (assignedRole === "admin" || String(machine.assigned_to) === String(currentUser?.id)) {
+      if (
+        assignedRole === "admin" ||
+        String(machine.assigned_to) === String(currentUser?.id) ||
+        (currentUser?.admin_id && String(machine.assigned_to) === String(currentUser?.admin_id))
+      ) {
         return false;
       }
       return true;
@@ -1132,28 +1140,67 @@ const StockPOSMachine = ({ currentUser }) => {
       });
   };
 
-  const handleUnassign = () => {
-    if (!assignMachine) return;
+  const handleUnassign = async (machineToDeassign = assignMachine) => {
+    let target = machineToDeassign || assignMachine;
+    if (!target) return;
 
+    // 1. Check whether the POS machine is currently assigned to any user
+    if (!isMachineAssigned(target)) {
+      setUnassignedAlertMessage("This POS machine is already unassigned.");
+      setShowUnassignedAlertModal(true);
+      toast.info("This POS machine is already unassigned.");
+      return; // 4. Prevent unnecessary API calls and duplicate deassignment operations
+    }
+
+    // 5. Verify the assignment status using reliable backend data, not just frontend UI state
+    try {
+      setIsDeassigning(true);
+      const freshMachine = await getPosMachine(target.id);
+      if (freshMachine) {
+        target = freshMachine;
+        if (!isMachineAssigned(freshMachine)) {
+          setUnassignedAlertMessage("This POS machine is already unassigned.");
+          setShowUnassignedAlertModal(true);
+          toast.info("This POS machine is already unassigned.");
+          invalidateMachineViews();
+          setIsDeassigning(false);
+          return;
+        }
+      }
+    } catch (fetchErr) {
+      console.warn("Could not fetch fresh machine status before deassign", fetchErr);
+    } finally {
+      setIsDeassigning(false);
+    }
+
+    // 2. If the machine is assigned, proceed with the existing deassignment flow
     const confirmed = window.confirm(
-      `Are you sure you want to deassign POS #${assignMachine.id} from its current user?`
+      `Are you sure you want to deassign POS #${target.id} from its current user?`
     );
     if (!confirmed) return;
 
-    unassignPosMachine(assignMachine.id)
-      .then(() => {
-        toast.success("POS machine deassigned successfully");
+    try {
+      setIsDeassigning(true);
+      const res = await unassignPosMachine(target.id);
+      toast.success(res?.message || "POS machine deassigned successfully");
+      invalidateMachineViews();
+      setShowAssignModal(false);
+      setAssignMachine(null);
+      setAssignUser(null);
+    } catch (e) {
+      console.error("Deassign failed", e);
+      const errorMsg = e?.response?.data?.message || e?.message || "Failed to deassign POS machine";
+      if (e?.response?.data?.already_unassigned || String(errorMsg).toLowerCase().includes("already unassigned")) {
+        setUnassignedAlertMessage("This POS machine is already unassigned.");
+        setShowUnassignedAlertModal(true);
+        toast.info("This POS machine is already unassigned.");
         invalidateMachineViews();
-        setShowAssignModal(false);
-        setAssignMachine(null);
-        setAssignUser(null);
-      })
-      .catch((e) => {
-        console.error("Deassign failed", e);
-        toast.error(
-          e?.response?.data?.message || e?.message || "Failed to deassign POS machine"
-        );
-      });
+      } else {
+        toast.error(errorMsg);
+      }
+    } finally {
+      setIsDeassigning(false);
+    }
   };
 
   const handleAssignModalClose = () => {
@@ -2254,16 +2301,46 @@ const StockPOSMachine = ({ currentUser }) => {
               >
                 Assign
               </button>
-              {(isAdminStyleStockViewer || isSuperFranchiseUser) && isMachineAssigned(assignMachine) && (
-                <button
-                  onClick={handleUnassign}
-                  className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Deassign
-                </button>
-              )}
+              {(isAdminStyleStockViewer || isSuperFranchiseUser || isFranchiseUser) &&
+                isMachineAssigned(assignMachine) && (
+                  <button
+                    type="button"
+                    onClick={() => handleUnassign(assignMachine)}
+                    disabled={isDeassigning}
+                    className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                    {isDeassigning ? "Deassigning..." : "Deassign"}
+                  </button>
+                )}
             </div>
+          </div>
+        </Modal>
+
+        {/* Informative Popup: POS Machine Already Unassigned */}
+        <Modal
+          isOpen={showUnassignedAlertModal}
+          onClose={() => setShowUnassignedAlertModal(false)}
+          title="POS Machine Status"
+          className="max-w-md"
+        >
+          <div className="flex flex-col items-center text-center p-4 space-y-4">
+            <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Notice</h3>
+              <p className="mt-2 text-sm text-gray-600 font-medium">
+                {unassignedAlertMessage || "This POS machine is already unassigned."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowUnassignedAlertModal(false)}
+              className="w-full bg-[#00D3CD] text-white py-2.5 rounded-xl hover:bg-[#00bdb7] transition-colors font-semibold text-sm shadow-sm"
+            >
+              OK
+            </button>
           </div>
         </Modal>
 

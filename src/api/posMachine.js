@@ -754,7 +754,9 @@ export const unassignPosMachine = async (posMachineId) => {
       endpoint,
       error: error.response?.data || error.message,
     });
-    throw new Error(error.response?.data?.message || "Failed to unassign POS machine");
+    const err = new Error(error.response?.data?.message || "Failed to unassign POS machine");
+    err.response = error.response;
+    throw err;
   }
 };
 
