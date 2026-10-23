@@ -155,8 +155,11 @@ const MerchantCharges = ({ currentUser }) => {
   } = useQuery({
     queryKey: ['charges-page', 'admin-global', activeTab],
     queryFn: async () => {
-      const rules = await getAuthenticatedMerchantChargeRules(null, { is_active: 'true' });
-      return (Array.isArray(rules) ? rules : []).map(mapAdminChargeRuleToMerchantRow);
+      // getAuthenticatedMerchantChargeRules now uses /service-charge/my-applicable-charges
+      // which returns the nearest upline rate. The result is already in display format
+      // (method, rate_percentage, network, …) — no further mapping needed.
+      const rules = await getAuthenticatedMerchantChargeRules();
+      return Array.isArray(rules) ? rules : [];
     },
     enabled: isMerchantUser || (isFranchiseUser && activeTab === 'chargeSet'),
     refetchOnMount: 'always',

@@ -2043,6 +2043,25 @@ export const getMerchantRates = async (merchantId, scope = {}) => {
 
 export const getAuthenticatedMerchantChargeRules = async () => {
   try {
+    // Primary source: /service-charge/my-applicable-charges walks the full
+    // hierarchy (admin → super franchise → franchise → merchant) and returns
+    // the single nearest override per criteria. This handles scopes like
+    // admin_super_franchise that the old /list/merchant endpoint missed.
+    let posRules = [];
+    try {
+      const applicableRes = await fetchMyAdminApplicableCharges();
+      posRules = applicableRes?.data?.pos || [];
+    } catch (err) {
+      console.warn('[rate-settings] merchant-self-rates: applicable-charges fallback to list/merchant', err);
+    }
+
+    if (posRules.length > 0) {
+      // data.pos already uses DB field names (payment_mode, charge_percent, …)
+      // which buildAuthenticatedMerchantRules expects.
+      return buildAuthenticatedMerchantRules(posRules);
+    }
+
+    // Fallback: old list/merchant endpoint (covers franchise_merchant etc.)
     const rules = await fetchChargeRulesByAudience('merchant');
     return buildAuthenticatedMerchantRules(rules);
   } catch (error) {
