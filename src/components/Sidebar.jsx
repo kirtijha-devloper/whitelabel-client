@@ -152,12 +152,12 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaMoneyBillWave />,
       permissions: ["rate.settings.read", "rate.settings.manage"],
     },
-      {
-      name: "My Charges",
-      path: "/admin/my-charges",
-      icon: <FaCoins />,
-      adminOnly: true,
-    },
+    //   {
+    //   name: "My Charges",
+    //   path: "/admin/my-charges",
+    //   icon: <FaCoins />,
+    //   adminOnly: true,
+    // },
     {
       name: "Settlement",
       path: "/admin/pos-setting",
