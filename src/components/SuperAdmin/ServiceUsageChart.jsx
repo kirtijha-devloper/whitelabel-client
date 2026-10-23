@@ -127,10 +127,21 @@ const CustomTooltip = ({ active, payload }) => {
    ========================================= */
 
 const ServiceUsageChart = ({ data }) => {
+  const chartData = React.useMemo(() => {
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => ({
+      ...item,
+      name:
+        String(item?.name || "").trim().toLowerCase() === "payout / dmt"
+          ? "Payout"
+          : item?.name,
+    }));
+  }, [data]);
+
   const hasData =
-    Array.isArray(data) &&
-    data.length > 0 &&
-    data.some((item) => Number(item?.value) > 0);
+    Array.isArray(chartData) &&
+    chartData.length > 0 &&
+    chartData.some((item) => Number(item?.value) > 0);
   return (
     <div className="w-full rounded-2xl bg-white p-6 shadow-sm">
 
@@ -155,12 +166,12 @@ const ServiceUsageChart = ({ data }) => {
             <PieChart>
 
               <Pie
-                data={data}
+                data={chartData}
                 cx="50%"
                 cy="45%"
                 innerRadius={70}
                 outerRadius={120}
-                paddingAngle={data.length > 1 ? 3 : 0}
+                paddingAngle={chartData.length > 1 ? 3 : 0}
                 dataKey="value"
                 nameKey="name"
 
@@ -168,7 +179,7 @@ const ServiceUsageChart = ({ data }) => {
                 label={renderCustomizedLabel}
                 labelLine={false}
               >
-                {data.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell
                     key={`service-${index}`}
                     fill={
