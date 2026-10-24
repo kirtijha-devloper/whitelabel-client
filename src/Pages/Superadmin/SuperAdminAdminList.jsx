@@ -107,6 +107,9 @@ const SuperAdminAdminList = ({ currentUser }) => {
         queryClient.invalidateQueries({ queryKey: ["superAdminAdminsSearch"] }),
         queryClient.invalidateQueries({ queryKey: ["adminServices"] }),
         queryClient.invalidateQueries({ queryKey: ["superAdminServices"] }),
+        queryClient.invalidateQueries({ queryKey: ["currentUser"] }),
+        queryClient.invalidateQueries({ queryKey: ["masterServiceSettings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-service-settings"] }),
       ]);
       if (typeof refetchAllAdmins === "function") {
         await refetchAllAdmins();

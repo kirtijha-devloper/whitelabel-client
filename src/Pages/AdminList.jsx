@@ -630,6 +630,15 @@ const AdminList = ({
         queryClient.invalidateQueries({
           queryKey: ["superAdminServices"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["currentUser"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["masterServiceSettings"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-service-settings"],
+        }),
       ]);
 
 
