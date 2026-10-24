@@ -339,6 +339,34 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const showNetworkAndCardType = isCardMethod || isUpiMethod;
   const showGSTInput = newRateForm.gstRequired;
 
+  const newRateHasBoth =
+    parseFloat(newRateForm.chargePercent || '0') > 0 &&
+    parseFloat(newRateForm.chargeFlat || '0') > 0;
+
+  const posTxnEditHasBoth =
+    parseFloat(posTxnEditForm.chargePercent || '0') > 0 &&
+    parseFloat(posTxnEditForm.chargeFlat || '0') > 0;
+
+  useEffect(() => {
+    if (newRateHasBoth) {
+      toast.warn('Please set either Flat Rate or Base Rate (%), not both.', {
+        toastId: 'new-rate-both-conflict',
+      });
+    } else {
+      toast.dismiss('new-rate-both-conflict');
+    }
+  }, [newRateHasBoth]);
+
+  useEffect(() => {
+    if (posTxnEditHasBoth) {
+      toast.warn('Please set either Flat Rate or Base Rate (%), not both.', {
+        toastId: 'edit-rate-both-conflict',
+      });
+    } else {
+      toast.dismiss('edit-rate-both-conflict');
+    }
+  }, [posTxnEditHasBoth]);
+
   // Initial Load
   useEffect(() => {
     fetchInitialData();
@@ -1318,10 +1346,28 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const handleCreateNewRate = async () => {
+    if (newRateHasBoth) {
+      toast.error("Please set either Flat Rate or Base Rate (%), not both.");
+      return;
+    }
     if ((newRateForm.chargePercent === '' || newRateForm.chargePercent === undefined) &&
       (newRateForm.chargeFlat === '' || newRateForm.chargeFlat === undefined)) {
       toast.error("Please enter a rate percentage or flat charge amount.");
       return;
+    }
+    if (parseFloat(newRateForm.minAmount || '0') < 0) {
+      toast.error("Min Amount cannot be negative.");
+      return;
+    }
+    if (newRateForm.maxAmount !== '' && newRateForm.maxAmount !== null && newRateForm.maxAmount !== undefined) {
+      if (parseFloat(newRateForm.maxAmount) < 0) {
+        toast.error("Max Amount cannot be negative.");
+        return;
+      }
+      if (parseFloat(newRateForm.maxAmount) < parseFloat(newRateForm.minAmount || '0')) {
+        toast.error("Max Amount cannot be less than Min Amount.");
+        return;
+      }
     }
     if (showGSTInput && !newRateForm.gstPercent) {
       toast.error("Please enter a GST percentage.");
@@ -1495,10 +1541,28 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setIsPosTxnEditModalOpen(false);
       return;
     }
+    if (posTxnEditHasBoth) {
+      toast.error("Please set either Flat Rate or Base Rate (%), not both.");
+      return;
+    }
     if ((posTxnEditForm.chargePercent === '' || posTxnEditForm.chargePercent === undefined) &&
       (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
       toast.error('Please enter a charge percentage or flat amount.');
       return;
+    }
+    if (parseFloat(posTxnEditForm.minAmount || '0') < 0) {
+      toast.error("Min Amount cannot be negative.");
+      return;
+    }
+    if (posTxnEditForm.maxAmount !== '' && posTxnEditForm.maxAmount !== null && posTxnEditForm.maxAmount !== undefined) {
+      if (parseFloat(posTxnEditForm.maxAmount) < 0) {
+        toast.error("Max Amount cannot be negative.");
+        return;
+      }
+      if (parseFloat(posTxnEditForm.maxAmount) < parseFloat(posTxnEditForm.minAmount || '0')) {
+        toast.error("Max Amount cannot be less than Min Amount.");
+        return;
+      }
     }
 
     // ── Minimum rate guard: admin cannot charge downstream users less than their own cost ──
@@ -3337,7 +3401,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     type="number"
                     step="0.01"
                     min="0"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${
+                      newRateHasBoth ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300'
+                    }`}
                     placeholder="e.g. 1.7"
                     value={newRateForm.chargePercent}
                     onChange={(e) => setNewRateForm({ ...newRateForm, chargePercent: e.target.value })}
@@ -3351,13 +3417,46 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     type="number"
                     step="0.01"
                     min="0"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${
+                      newRateHasBoth ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300'
+                    }`}
                     placeholder="e.g. 2"
                     value={newRateForm.chargeFlat}
                     onChange={(e) => setNewRateForm({ ...newRateForm, chargeFlat: e.target.value })}
                   />
                 </div>
               </div>
+
+              {/* Mutual Exclusivity Popup / Alert Banner */}
+              {newRateHasBoth && (
+                <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-xs shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-600 text-base leading-none shrink-0 mt-0.5">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-amber-800">Set either Flat Rate or Base Rate (%)</p>
+                      <p className="text-amber-700 mt-0.5">
+                        You have entered both Base Rate and Flat Charge. Please set only one (set the other to 0 or leave empty) to save changes.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewRateForm((prev) => ({ ...prev, chargeFlat: '' }))}
+                          className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-medium text-xs transition border border-amber-300"
+                        >
+                          Keep Base Rate only (Clear Flat)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewRateForm((prev) => ({ ...prev, chargePercent: '' }))}
+                          className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-medium text-xs transition border border-amber-300"
+                        >
+                          Keep Flat Charge only (Clear Rate)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* GST Required */}
               <div>
@@ -3389,20 +3488,30 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={closeCreateRateModal}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateNewRate}
-                disabled={isSaving}
-                className="px-4 py-2 bg-[#00D3CD] text-white rounded font-medium hover:bg-[#00b8b3] transition disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save Rule'}
-              </button>
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
+              {newRateHasBoth ? (
+                <span className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                  <span>⚠️</span> Set either Flat Rate or Base Rate (%)
+                </span>
+              ) : <div />}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={closeCreateRateModal}
+                  className="px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNewRate}
+                  disabled={isSaving || newRateHasBoth}
+                  title={newRateHasBoth ? "Please set either Flat Rate or Base Rate (%), not both." : ""}
+                  className={`px-4 py-2 bg-[#00D3CD] text-white rounded font-medium hover:bg-[#00b8b3] transition disabled:opacity-50 ${
+                    newRateHasBoth ? 'cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isSaving ? 'Saving...' : 'Save Rule'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3566,7 +3675,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     type="number"
                     step="0.01"
                     min={!isSuperAdmin && activeTab !== 'default' && posTxnEditRate ? (posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? 0) : 0}
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${
+                      posTxnEditHasBoth ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300'
+                    }`}
                     placeholder="e.g. 1.7"
                     value={posTxnEditForm.chargePercent}
                     onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, chargePercent: e.target.value })}
@@ -3580,13 +3691,46 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                     type="number"
                     step="0.01"
                     min="0"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                    className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${
+                      posTxnEditHasBoth ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300'
+                    }`}
                     placeholder="e.g. 2"
                     value={posTxnEditForm.chargeFlat}
                     onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, chargeFlat: e.target.value })}
                   />
                 </div>
               </div>
+
+              {/* Mutual Exclusivity Popup / Alert Banner */}
+              {posTxnEditHasBoth && (
+                <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-xs shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-600 text-base leading-none shrink-0 mt-0.5">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-amber-800">Set either Flat Rate or Base Rate (%)</p>
+                      <p className="text-amber-700 mt-0.5">
+                        You have entered both Base Rate and Flat Charge. Please set only one (set the other to 0 or leave empty) to save changes.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setPosTxnEditForm((prev) => ({ ...prev, chargeFlat: '0' }))}
+                          className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-medium text-xs transition border border-amber-300"
+                        >
+                          Keep Base Rate only (Clear Flat)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPosTxnEditForm((prev) => ({ ...prev, chargePercent: '0' }))}
+                          className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-medium text-xs transition border border-amber-300"
+                        >
+                          Keep Flat Charge only (Clear Rate)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* GST Required */}
               <div>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -3612,20 +3756,30 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => { setIsPosTxnEditModalOpen(false); setPosTxnEditRate(null); }}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSavePosTxnEdit}
-                disabled={isSaving}
-                className="px-4 py-2 bg-[#00D3CD] text-white rounded font-medium hover:bg-[#00b8b3] transition disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
+              {posTxnEditHasBoth ? (
+                <span className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                  <span>⚠️</span> Set either Flat Rate or Base Rate (%)
+                </span>
+              ) : <div />}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => { setIsPosTxnEditModalOpen(false); setPosTxnEditRate(null); }}
+                  className="px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSavePosTxnEdit}
+                  disabled={isSaving || posTxnEditHasBoth}
+                  title={posTxnEditHasBoth ? "Please set either Flat Rate or Base Rate (%), not both." : ""}
+                  className={`px-4 py-2 bg-[#00D3CD] text-white rounded font-medium hover:bg-[#00b8b3] transition disabled:opacity-50 ${
+                    posTxnEditHasBoth ? 'cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

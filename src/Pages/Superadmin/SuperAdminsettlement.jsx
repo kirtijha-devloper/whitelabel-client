@@ -254,16 +254,6 @@ const SuperAdminsettlement = ({ currentUser }) => {
 
       delete dirtyInputsRef.current[saveKey];
 
-      const labelMap = {
-        payout: "Payout",
-        ccBill: "CC Bill",
-        payin: "Payin",
-      };
-
-      toast.success(
-        `${labelMap[limitType]} limit for ${admin.name || "Admin"} updated in database (₹${numValue.toLocaleString("en-IN")})`,
-      );
-
       // Invalidate queries so fresh DB data is loaded
       await queryClient.invalidateQueries({ queryKey: ["superAdminSettlementAdmins"] });
       await queryClient.invalidateQueries({ queryKey: ["superAdminSettlementSearch"] });

@@ -577,6 +577,10 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
         throw new Error("Charge percentage must be a number between 0 and 100.");
       }
 
+      if (parsedPercent > 0 && parsedFlat > 0) {
+        throw new Error("Please set either Flat Rate or Charge Rate (%), not both.");
+      }
+
       if (parsedMax !== null && parsedMin > parsedMax) {
         throw new Error("Slab Min Amount cannot be greater than Slab Max Amount.");
       }
@@ -1580,7 +1584,11 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                         max="100"
                         value={posForm.charge_percent}
                         onChange={(e) => setPosForm({ ...posForm, charge_percent: e.target.value })}
-                        className="w-full rounded-xl border border-gray-300 p-2 text-sm font-semibold text-emerald-700 focus:ring-2 focus:ring-[#00D3CD]"
+                        className={`w-full rounded-xl border p-2 text-sm font-semibold text-emerald-700 focus:ring-2 focus:ring-[#00D3CD] ${
+                          parseFloat(posForm.charge_percent || '0') > 0 && parseFloat(posForm.charge_flat || '0') > 0
+                            ? 'border-amber-400 bg-amber-50/40'
+                            : 'border-gray-300'
+                        }`}
                         placeholder="e.g. 1.25 (optional)"
                       />
                     </div>
@@ -1593,11 +1601,29 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                         min="0"
                         value={posForm.charge_flat}
                         onChange={(e) => setPosForm({ ...posForm, charge_flat: e.target.value })}
-                        className="w-full rounded-xl border border-gray-300 p-2 text-sm focus:ring-1 focus:ring-[#00D3CD]"
+                        className={`w-full rounded-xl border p-2 text-sm focus:ring-1 focus:ring-[#00D3CD] ${
+                          parseFloat(posForm.charge_percent || '0') > 0 && parseFloat(posForm.charge_flat || '0') > 0
+                            ? 'border-amber-400 bg-amber-50/40'
+                            : 'border-gray-300'
+                        }`}
                         placeholder="e.g. 0.00"
                       />
                     </div>
                   </div>
+
+                  {parseFloat(posForm.charge_percent || '0') > 0 && parseFloat(posForm.charge_flat || '0') > 0 && (
+                    <div className="p-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs shadow-sm">
+                      <div className="flex items-start gap-2">
+                        <span className="text-amber-600 text-base leading-none shrink-0 mt-0.5">⚠️</span>
+                        <div className="flex-1">
+                          <p className="font-bold text-amber-800">Set either Flat Rate or Charge Rate (%)</p>
+                          <p className="text-amber-700 mt-0.5">
+                            You have entered both Charge Rate and Flat Charge. Please set only one (set the other to 0 or leave empty) to save this override.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="flex items-center gap-2">
@@ -1724,7 +1750,10 @@ const AdminSpecificRateManagement = ({ currentUser }) => {
                 <button
                   type="submit"
                   disabled={
-                    savePosMutation.isPending || savePayoutMutation.isPending || saveCcBillMutation.isPending
+                    savePosMutation.isPending ||
+                    savePayoutMutation.isPending ||
+                    saveCcBillMutation.isPending ||
+                    (activeCategory === 'pos' && parseFloat(posForm.charge_percent || '0') > 0 && parseFloat(posForm.charge_flat || '0') > 0)
                   }
                   className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#00D3CD] to-[#1855e4] px-5 py-2 text-xs font-semibold text-white shadow hover:opacity-95 transition disabled:opacity-50"
                 >

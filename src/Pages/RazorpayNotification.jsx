@@ -16,8 +16,17 @@ import {
   getWorldlineNotifications,
   adminProcessWorldlineNotification,
 } from "../api/worldlineApi";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast as realToast } from "react-toastify";
+
+// All toast messages disabled for Razorpay Notification as requested
+const toast = {
+  success: () => {},
+  error: (msg) => { console.error("[RazorpayNotification Error]:", msg); },
+  info: () => {},
+  warn: () => {},
+  warning: () => {},
+  dismiss: () => {},
+};
 import * as XLSX from "xlsx";
 import { hasPermission, isSuperAdminUser } from "../utils/accessControl";
 import {
@@ -332,6 +341,9 @@ const hasNotificationRows = (payload) => {
 };
 
 const RazorpayNotification = ({ currentUser }) => {
+  useEffect(() => {
+    realToast.dismiss();
+  }, []);
   const baseFilters = useMemo(() => buildBaseFilters(), []);
   const fallbackNoticeRef = useRef("");
   const [page, setPage] = useState(1);
@@ -1752,7 +1764,7 @@ const RazorpayNotification = ({ currentUser }) => {
         </div>
       </Modal>
 
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar theme="light" />
+
     </div>
   );
 };

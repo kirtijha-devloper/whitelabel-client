@@ -13,6 +13,7 @@ import { UserCreationProvider } from "../context/UserCreationContext";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboard } from "../api/DashboardAndHeader";
 import Loader from "../components/Loader";
+import { toast } from "react-toastify";
 import { fetchUserDetails } from "../api/authApi";
 import {
   getAdminLandingPathForUser,
@@ -173,6 +174,7 @@ export default function AdminLayout() {
 
   // Scroll to top on route change
   useEffect(() => {
+    toast.dismiss();
     if (scrollRef.current) {
       scrollRef.current.scrollTo(0, 0);
     }
