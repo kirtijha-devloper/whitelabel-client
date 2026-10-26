@@ -34,7 +34,7 @@ const PAGE_NUMBER_WINDOW = 10;
 
 const logStockPosUi = () => {};
 
-const COMPANY_TABS = ["All", "AGRO-AXIS", "AGRO-HDFC", "Everlife"];
+// const COMPANY_TABS = ["All", "AGRO-AXIS", "AGRO-HDFC", "Everlife"];
 const ALL_COMPANY_TOKEN = "all";
 const AGRO_COMPANY_TOKEN = "agro";
 const AGRO_AXIS_COMPANY_TOKEN = "agro-axis";
@@ -973,12 +973,12 @@ const StockPOSMachine = ({ currentUser }) => {
     setUiPage(1);
   };
 
-  const handleTabSelect = (tab) => {
-    setCompanyTab(tab);
-    setBackendSearchMachines([]);
-    setServerPage(1);
-    setUiPage(1);
-  };
+  // const handleTabSelect = (tab) => {
+  //   setCompanyTab(tab);
+  //   setBackendSearchMachines([]);
+  //   setServerPage(1);
+  //   setUiPage(1);
+  // };
 
   const handleEditClick = (machine) => {
     const newFormData = {
@@ -1600,7 +1600,7 @@ const StockPOSMachine = ({ currentUser }) => {
         </div>
 
         {/* Company Tabs */}
-        <div className="mb-4 flex gap-2">
+        {/* <div className="mb-4 flex gap-2">
           {COMPANY_TABS.map((tab) => (
             <button
               key={tab}
@@ -1613,7 +1613,7 @@ const StockPOSMachine = ({ currentUser }) => {
               {tab}
             </button>
           ))}
-        </div>
+        </div> */}
 
         {/* Search Section */}
         <div className="mb-6 space-y-2">
