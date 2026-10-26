@@ -1097,7 +1097,7 @@ const UserList = ({
                 className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 disabled={employeeAccessRolesLoading || roleUpdatingUserId === row?.id}
               >
-                <option value="">Select role</option>
+                {/* <option value="">Select role</option> */}
                 {employeeAccessRoles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {role.name}
