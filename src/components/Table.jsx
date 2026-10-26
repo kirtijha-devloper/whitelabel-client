@@ -54,7 +54,7 @@ const Table = ({
           {data.map((row, rowIndex) => (
             <tr
               key={rowIndex}
-              hidden={currentUser.id === row.id}
+              hidden={Boolean(currentUser?.id && currentUser.id === row.id)}
               className="hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => onRowClick && onRowClick(row)}
             >

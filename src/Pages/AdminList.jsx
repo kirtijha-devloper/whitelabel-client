@@ -1692,6 +1692,7 @@ const AdminList = ({
               <div className="hidden md:block">
 
                 <Table
+                  currentUser={currentUser}
                   columns={columns}
                   data={tableData}
                   actions={actions}
