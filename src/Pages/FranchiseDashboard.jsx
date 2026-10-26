@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Wallet,
   Calendar,
-  Layers,
   Clock,
   UserPlus,
 } from "lucide-react";
@@ -92,16 +91,6 @@ const FranchiseDashboard = ({ dashboardData = {} }) => {
       linkText: "View All Terminals",
     },
     {
-      title: "Assigned to Franchise",
-      count: assignedToFranchiseCount,
-      subtitle: "In franchise stock / ready",
-      link: "/franchise/stock-pos",
-      icon: Layers,
-      iconBox: "bg-blue-50 text-blue-600 border border-blue-100",
-      hoverBorder: "hover:border-blue-300",
-      linkText: "View Stock Inventory",
-    },
-    {
       title: "Assigned to Merchants",
       count: assignedToMerchantCount,
       subtitle: "Deployed at merchant counters",
@@ -174,7 +163,7 @@ const FranchiseDashboard = ({ dashboardData = {} }) => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {entityCards.map((card) => {
             const Icon = card.icon;
             return (
