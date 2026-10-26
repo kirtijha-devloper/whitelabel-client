@@ -929,6 +929,20 @@ export default function AdminLayout() {
                 element={guardRoute(canViewReports, <AllTransactionReport />)}
               />
               <Route
+                path="total payouts"
+                element={guardRoute(
+                  canViewPayout,
+                  <TodayPayouts currentUser={currentUser} />,
+                )}
+              />
+              <Route
+                path="payouts"
+                element={guardRoute(
+                  canViewPayout,
+                  <TodayPayouts currentUser={currentUser} />,
+                )}
+              />
+              <Route
                 path="total-payouts"
                 element={guardRoute(
                   canViewPayout,

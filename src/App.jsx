@@ -8,12 +8,12 @@ import 'react-toastify/dist/ReactToastify.css';
 const Login = lazy(() => import('./Pages/Auth/Login'));
 const Signup = lazy(() => import('./Pages/Auth/Signup'));
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
-import AbheePayLogo from "./assets/FORMAT-PNG.png";
-import AnanyaPayLogo from './assets/ananyaPay.jpeg';
 const SuperFranchiseLayout = lazy(() => import('./layouts/SuperFranchiseLayout'));
 const FranchiseLayout = lazy(() => import('./layouts/FranchiseLayout'));
 const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
 const Logout = lazy(() => import('./Pages/Logout'));
+import ananyaPayFavicon from './assets/favicon-96x96.png';
+import abheePayFavicon from './assets/FORMAT-PNG.png';
 
 // Simple Loading Component
 const Loading = () => (
@@ -23,20 +23,30 @@ const Loading = () => (
 );
 
 export default function App() {
-  const isAnanyaPay = typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes("ananyapay");
-  const logo = isAnanyaPay ?  AnanyaPayLogo : AbheePayLogo;
+  const isAnanyaPay =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.toLowerCase().includes("ananyapay"));
 
   useEffect(() => {
     document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
-  
-    const ele = document.getElementById("icon");
-    if (ele) {
-      ele.href = isAnanyaPay ? "/favicon-96x96.png" : "/FORMAT-PNG.png";
-      ele.type = "image/png";
+
+    const faviconUrl = isAnanyaPay ? ananyaPayFavicon : abheePayFavicon;
+
+    // Recreate/replace the link element to force modern browsers to redraw the title bar tab icon
+    const existingIcon = document.getElementById("icon") || document.querySelector("link[rel*='icon']");
+    const newIcon = document.createElement("link");
+    newIcon.id = "icon";
+    newIcon.rel = "icon";
+    newIcon.type = "image/png";
+
+    newIcon.href = `${faviconUrl}?v=${Date.now()}`;
+
+    if (existingIcon && existingIcon.parentNode) {
+      existingIcon.parentNode.replaceChild(newIcon, existingIcon);
+    } else {
+      document.head.appendChild(newIcon);
     }
   }, [isAnanyaPay]);
-
-
 
   return (
     <Router>
@@ -51,9 +61,8 @@ export default function App() {
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={<AdminLayout />} />
-          {/* {super admin routes} */}
+          {/* Super admin routes */}
           <Route path="/super-admin/*" element={<AdminLayout />} />
-
 
           {/* Super Franchise Routes */}
           <Route path="/super-franchise/*" element={<SuperFranchiseLayout />} />

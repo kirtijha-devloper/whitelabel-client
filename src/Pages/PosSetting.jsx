@@ -1063,6 +1063,10 @@ export default function PosSetting({ currentUser }) {
 
       downstreamChildren.forEach((child) => {
         const cLimit = Number(child.t0_daily_limit);
+        if(child.franchaise_id !== null && child.role === "merchant") {
+          totalAllocatedToOthers += 0;
+          return;
+        }
         if (Number.isFinite(cLimit) && cLimit > 0) {
           const cRole = normalizeUserRole(child.role);
           if (cRole === "franchise") {

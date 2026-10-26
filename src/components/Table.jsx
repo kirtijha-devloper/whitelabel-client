@@ -54,6 +54,7 @@ const Table = ({
           {data.map((row, rowIndex) => (
             <tr
               key={rowIndex}
+              hidden={currentUser.id === row.id}
               className="hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => onRowClick && onRowClick(row)}
             >
@@ -86,7 +87,7 @@ const Table = ({
                   </td>
                 );
               })}
-              {(row === null || currentUser === null || row.id !== currentUser.id) && actions && (
+              {actions && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className={`flex items-center gap-2 ${contentAlignClass}`}>
                     {actions.map((action, actionIndex) => {
