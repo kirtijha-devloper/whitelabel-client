@@ -2,7 +2,6 @@ import React from "react";
 import {
   X,
   SlidersHorizontal,
-  Percent,
   Wallet,
   ChevronRight,
   Building,
@@ -42,18 +41,7 @@ const AdminActionMenuModal = ({
       badgeColor: "bg-[#00D3CD]/10 text-[#00a8a3]",
       onClick: () => onSelectServiceManagement(admin),
     },
-    {
-      id: "rate",
-      title: "Rate Management",
-      description:
-        "Configure transaction charges, rental slabs, and service commissions",
-      icon: <Percent className="h-6 w-6 text-emerald-600" />,
-      iconBg: "bg-emerald-50 border border-emerald-200",
-      badge: "Rates & Slabs",
-      badgeColor: "bg-emerald-50 text-emerald-700",
-      onClick: () => onSelectRateManagement(admin),
-    },
-    {
+        {
       id: "wallet",
       title: "Wallet Management",
       description:
