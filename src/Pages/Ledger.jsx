@@ -762,7 +762,7 @@ const Ledger = ({ currentUser }) => {
             </div>
           </div>
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="min-w-0">
+            {/* <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-gray-700">Source</label>
               <input
                 type="text"
@@ -773,7 +773,7 @@ const Ledger = ({ currentUser }) => {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="agro_axis, agro_hdfc, etc."
               />
-            </div>
+            </div> */}
             <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-gray-700">Bank</label>
               <input
