@@ -14,7 +14,7 @@ import {
   getServiceFlagValue,
   isServiceDisabledError,
 } from '../utils/serviceFlags';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, UserPlus, X, Landmark, Send, Trash2 } from 'lucide-react';
 import { checkUserDailyPayoutLimit, recordUserPayoutExecution } from '../utils/userLimit';
 
 const POLL_INTERVAL_MS = 6000; // poll every 6 s (documented desired rate)
@@ -56,6 +56,8 @@ const BranchXPayout = ({ currentUser }) => {
     BRANCHX_MAX_PAYOUT_AMOUNT
   );
   const settlementType = currentUser?.settlement_type;
+  const fieldClassName =
+    'mt-1 block w-full rounded-xl border border-gray-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-[#00D3CD] focus:bg-white focus:ring-2 focus:ring-[#00D3CD]/20';
 
   // phase: 'list' | 'amount' | 'confirm' | 'pending'
   const [phase, setPhase] = useState('list');
@@ -499,10 +501,33 @@ const BranchXPayout = ({ currentUser }) => {
   return (
     <div className="pb-1">
       <div className="mx-auto max-w-4xl rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 md:p-6">
-        <h1 className="text-2xl font-bold mb-2">Payout-X</h1>
-        <p className="mb-5 border-b border-gray-100 pb-4 text-sm text-gray-600 sm:mb-6 sm:pb-5">
-          Role: {normalizedRole}. Payout status: {isPayoutEnabled ? 'Enabled' : 'Disabled'}.
-        </p>
+        <div className="mb-5 border-b border-gray-100 pb-4 sm:mb-6 sm:pb-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Payout-X</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Role: {normalizedRole}. Payout status:{' '}
+                <span
+                  className={
+                    isPayoutEnabled ? 'font-semibold text-green-600' : 'font-semibold text-red-600'
+                  }
+                >
+                  {isPayoutEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                <Landmark className="h-4 w-4 text-[#00D3CD]" />
+                Available Balance
+              </div>
+              <p className="mt-2 text-xl font-semibold text-gray-900">
+                ₹{availableBalanceNum.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
 
 
         {pollStatus === 'CRON_HANDOVER' && (
@@ -597,9 +622,10 @@ const BranchXPayout = ({ currentUser }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddForm(true)}
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-[#00D3CD] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#00b8b3] sm:w-auto"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00D3CD] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#00b8b3] sm:w-auto"
                 >
-                  + Add Beneficiary
+                  <UserPlus className="h-4 w-4" />
+                  Add Beneficiary
                 </button>
               </div>
             </div>
@@ -625,36 +651,52 @@ const BranchXPayout = ({ currentUser }) => {
                 {filteredBeneficiaries.map((b) => (
                   <div
                     key={b.id}
-                    className="rounded-2xl border border-gray-200 bg-white p-4"
+                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-[#00D3CD]/50"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-gray-900">{b.beneficiary_name}</div>
-                      <div className="mt-1 break-words text-xs text-gray-600">
-                        {b.account_number} | {b.ifsc_code} | {b.bank_name}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-semibold text-gray-900">{b.beneficiary_name}</p>
+                        <p className="mt-1 text-sm font-medium text-gray-600">
+                          {b.account_number} • {b.ifsc_code}
+                        </p>
+                        <div className="mt-3 grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
+                          <p>
+                            <span className="font-medium text-gray-700">Bank:</span> {b.bank_name}
+                          </p>
+                          <p>
+                            <span className="font-medium text-gray-700">Mobile:</span> {b.mobile_number}
+                          </p>
+                          {b.email && (
+                            <p className="sm:col-span-2">
+                              <span className="font-medium text-gray-700">Email:</span> {b.email}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-1 break-words text-xs text-gray-500">{b.mobile_number} | {b.email}</div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-0 sm:ml-2 sm:flex sm:shrink-0 sm:items-center">
-                      <button
-                        type="button"
-                        onClick={() => deleteBeneficiaryMutation.mutate({ id: b.id })}
-                        disabled={deleteBeneficiaryMutation.isPending}
-                        className="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectBeneficiary(b)}
-                        disabled={!isPayoutEnabled}
-                        className={`inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold text-white transition-colors ${
-                          isPayoutEnabled
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        Pay
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => deleteBeneficiaryMutation.mutate({ id: b.id })}
+                          disabled={deleteBeneficiaryMutation.isPending}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectBeneficiary(b)}
+                          disabled={!isPayoutEnabled}
+                          className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white transition-colors ${
+                            isPayoutEnabled
+                              ? 'bg-[#00D3CD] hover:bg-[#00b8b3]'
+                              : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                          }`}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          Pay
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -807,75 +849,156 @@ const BranchXPayout = ({ currentUser }) => {
 
         {/* ── Add Beneficiary Modal ── */}
         {showAddForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-lg">
-              <h3 className="text-lg font-semibold mb-1">Add Beneficiary</h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Bank account is validated automatically (penny-drop). The name stored will be
-                the bank-verified name, which may differ from what you enter.
-              </p>
-              <form onSubmit={handleAddBeneficiarySubmit} className="space-y-3">
-                {[
-                  { field: 'beneficiary_name', label: 'Beneficiary Name' },
-                  { field: 'mobile_number', label: 'Mobile Number' },
-                  { field: 'bank_name', label: 'Bank Name' },
-                  { field: 'account_number', label: 'Account Number' },
-                  { field: 'ifsc_code', label: 'IFSC Code' },
-                  { field: 'email', label: 'Email', type: 'email' },
-                ].map(({ field, label, type = 'text' }) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {label} <span className="text-red-500">*</span>
-                    </label>
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center sm:p-4">
+            <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-2xl">
+              <div className="flex items-start justify-between border-b border-gray-100 bg-gradient-to-r from-[#00D3CD]/10 via-white to-white px-4 py-3 sm:px-5 sm:py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00B8B3]">
+                    <UserPlus className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Add Beneficiary</h3>
+                    <p className="text-xs text-gray-500">
+                      Bank account is validated automatically (penny-drop).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setAddForm(EMPTY_ADD_FORM);
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gray-500 transition-colors hover:bg-slate-100 hover:text-gray-700"
+                  aria-label="Close beneficiary form"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleAddBeneficiarySubmit}
+                className="max-h-[58vh] overflow-y-auto px-4 py-3 sm:max-h-[78vh] sm:px-5 sm:py-5"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Bank</label>
                     <input
-                      type={type}
-                      value={addForm[field]}
+                      type="text"
+                      value={addForm.bank_name}
+                      onChange={(e) => setAddForm((p) => ({ ...p, bank_name: e.target.value }))}
+                      className={fieldClassName}
+                      placeholder="Enter Bank Name"
+                      required
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Account Holder Name</label>
+                    <input
+                      type="text"
+                      value={addForm.beneficiary_name}
+                      onChange={(e) => setAddForm((p) => ({ ...p, beneficiary_name: e.target.value }))}
+                      className={fieldClassName}
+                      placeholder="Enter Account Holder Name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Account Number</label>
+                    <input
+                      type="text"
+                      value={addForm.account_number}
                       onChange={(e) =>
                         setAddForm((p) => ({
                           ...p,
-                          [field]:
-                            field === 'mobile_number'
-                              ? e.target.value.replace(/\D/g, '').slice(0, 10)
-                              :
-                            field === 'ifsc_code'
-                              ? e.target.value.toUpperCase()
-                              : e.target.value,
+                          account_number: e.target.value.replace(/\D/g, ''),
                         }))
                       }
-                      inputMode={field === 'mobile_number' ? 'numeric' : undefined}
-                      maxLength={field === 'mobile_number' ? 10 : undefined}
-                      pattern={field === 'mobile_number' ? '\\d{10}' : undefined}
-                      className={`mt-1 block w-full rounded shadow-sm focus:ring-indigo-500 ${
-                        field === 'mobile_number' && mobileHasRepeatedDigits
-                          ? 'border-red-500 focus:border-red-500'
-                          : 'border-gray-300'
-                      }`}
+                      className={fieldClassName}
+                      placeholder="Enter Account Number"
+                      inputMode="numeric"
                       required
                     />
-                    {field === 'mobile_number' && mobileHasRepeatedDigits && (
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">IFSC</label>
+                    <input
+                      type="text"
+                      value={addForm.ifsc_code}
+                      onChange={(e) =>
+                        setAddForm((p) => ({
+                          ...p,
+                          ifsc_code: e.target.value.toUpperCase().trim(),
+                        }))
+                      }
+                      className={`${fieldClassName} uppercase`}
+                      placeholder="ENTER IFSC CODE"
+                      maxLength={11}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Mobile</label>
+                    <input
+                      type="tel"
+                      value={addForm.mobile_number}
+                      onChange={(e) =>
+                        setAddForm((p) => ({
+                          ...p,
+                          mobile_number: e.target.value.replace(/\D/g, '').slice(0, 10),
+                        }))
+                      }
+                      className={`${fieldClassName} ${
+                        mobileHasRepeatedDigits ? 'border-red-500 focus:border-red-500' : ''
+                      }`}
+                      placeholder="Enter Mobile Number"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[6-9]\d{9}"
+                      title="10-digit mobile number starting with 6, 7, 8, or 9"
+                      required
+                    />
+                    {mobileHasRepeatedDigits && (
                       <p className="mt-1 text-xs text-red-600">
                         Mobile number cannot contain the same digit 5 or more times consecutively.
                       </p>
                     )}
                   </div>
-                ))}
-                <div className="flex justify-end gap-2 pt-2">
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                      type="email"
+                      value={addForm.email}
+                      onChange={(e) => setAddForm((p) => ({ ...p, email: e.target.value }))}
+                      className={fieldClassName}
+                      placeholder="Enter Your Email"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col-reverse gap-3 sm:mt-5 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAddForm(false);
                       setAddForm(EMPTY_ADD_FORM);
                     }}
-                    className="px-4 py-2 rounded bg-gray-300 text-gray-700 hover:bg-gray-400"
+                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={addBeneficiaryMutation.isPending || mobileHasRepeatedDigits}
-                    className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="inline-flex items-center justify-center rounded-xl bg-[#00D3CD] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#00b8b3] disabled:opacity-60"
                   >
-                    {addBeneficiaryMutation.isPending ? 'Validating…' : 'Add'}
+                    {addBeneficiaryMutation.isPending ? 'Validating…' : 'Save Beneficiary'}
                   </button>
                 </div>
               </form>
