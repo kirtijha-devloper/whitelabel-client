@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -26,7 +26,17 @@ export default function App() {
   const isAnanyaPay = typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes("ananyapay");
   const logo = isAnanyaPay ?  AnanyaPayLogo : AbheePayLogo;
 
-  document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
+  useEffect(() => {
+    document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
+  
+    const ele = document.getElementById("icon");
+    if (ele) {
+      ele.href = isAnanyaPay ? "/favicon-96x96.png" : "/FORMAT-PNG.png";
+      ele.type = "image/png";
+    }
+  }, [isAnanyaPay]);
+
+
 
   return (
     <Router>
