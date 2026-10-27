@@ -31,19 +31,19 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
     { name: "User List", path: "/super-franchise/list", icon: <FaUsers /> },
     { name: "Stock POS", path: "/super-franchise/stock-pos", icon: <FaBox /> },
     {
-      name: "Payout-X",
+      name: "Payout B",
       path: "/super-franchise/branchx-payout",
       icon: <PiLayout className="w-5 h-5" />,
       serviceKey: "branchx_payout",
     },
     {
-      name: "Payout-V",
+      name: "Payout V",
       path: "/super-franchise/vimo-payout",
       icon: <PiLayout className="w-5 h-5" />,
       serviceKey: "vimo_payout",
     },
     {
-      name: "Payout-S",
+      name: "Payout S",
       path: "/super-franchise/sevenpay-payout",
       icon: <PiLayout className="w-5 h-5" />,
       serviceKey: "sevenpay_payout",
@@ -61,13 +61,13 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
       serviceKey: "mx_payout",
     },
     {
-      name: "CC Bill Pay",
+      name: "CC Bill 1",
       path: "/super-franchise/cc-bill-pay",
       icon: <FaMoneyBillWave />,
       serviceKey: "cc_bill_pay",
     },
     {
-      name: "BA CC Bill Pay",
+      name: "CC Bill 2",
       path: "/super-franchise/ba-cc-bill-pay",
       icon: <FaMoneyBillWave />,
       serviceKey: "ba_cc_bill_pay",

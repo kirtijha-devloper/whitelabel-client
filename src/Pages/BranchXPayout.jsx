@@ -423,7 +423,7 @@ const BranchXPayout = ({ currentUser }) => {
       return;
     }
     if (!isPayoutEnabled) {
-      toast.error('Payout-X is currently disabled.');
+      toast.error('Payout B is currently disabled.');
       return;
     }
 
@@ -504,7 +504,7 @@ const BranchXPayout = ({ currentUser }) => {
         <div className="mb-5 border-b border-gray-100 pb-4 sm:mb-6 sm:pb-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Payout-X</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Payout B</h1>
               <p className="mt-1 text-sm text-gray-600">
                 Role: {normalizedRole}. Payout status:{' '}
                 <span
@@ -548,7 +548,7 @@ const BranchXPayout = ({ currentUser }) => {
 
         {!isPayoutEnabled && (
           <div className="mb-4 rounded-2xl border border-gray-200 bg-slate-100 px-4 py-3 text-gray-700">
-            Payout-X is currently disabled right now.
+            Payout B is currently disabled right now.
           </div>
         )}
 
@@ -608,7 +608,7 @@ const BranchXPayout = ({ currentUser }) => {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Beneficiaries</h2>
                 <p className="text-sm text-gray-500">
-                  Choose a saved account to continue with Payout-X.
+                  Choose a saved account to continue with Payout B.
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

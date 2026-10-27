@@ -77,13 +77,13 @@ const MerchantSideBar = ({ currentUser }) => {
     { name: "Ledger", path: "/merchant/ledger", icon: <Wallet className="w-5 h-5" /> },
     { name: "Charges", path: "/merchant/charges", icon: <CreditCard className="w-5 h-5" /> },
     {
-      name: "CC Bill Pay",
+      name: "CC Bill 1",
       path: "/merchant/cc-bill-pay",
       icon: <CreditCard className="w-5 h-5" />,
       serviceKey: "cc_bill_pay",
     },
     {
-      name: "BA CC Bill Pay",
+      name: "CC Bill 2",
       path: "/merchant/ba-cc-bill-pay",
       icon: <CreditCard className="w-5 h-5" />,
       serviceKey: "ba_cc_bill_pay",

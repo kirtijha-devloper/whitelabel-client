@@ -253,7 +253,7 @@ const buildBaseFilters = (today) => ({
   cardNumber: '',
   posTxnNo: '',
   deviceNo: '',
-  source: '',
+  // source: '',
   settlementType: '',
   cardClassification: '',
 });
@@ -790,14 +790,14 @@ const Reports = ({ currentUser }) => {
                     )}
                   </div>
                   <div className="mt-3 grid grid-cols-1 gap-2">
-                    <input
+                    {/* <input
                       type="text"
                       name="source"
                       value={filters.source}
                       onChange={handleFilterChange}
                       className={inputClassName}
                       placeholder="Source"
-                    />
+                    /> */}
                     <select
                       name="settlementType"
                       value={filters.settlementType || ''}
@@ -965,8 +965,8 @@ const Reports = ({ currentUser }) => {
                     placeholder="Enter Device No"
                   />
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Source</label>
+                {/* <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Sourcess</label>
                   <input
                     type="text"
                     name="source"
@@ -975,7 +975,7 @@ const Reports = ({ currentUser }) => {
                     className={inputClassName}
                     placeholder="agro_axis, agro_hdfc, etc."
                   />
-                </div>
+                </div> */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">Settlement Type</label>
                   <select

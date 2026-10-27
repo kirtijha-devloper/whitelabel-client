@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { isChildRole } from "../../utils/serviceDisplayNames";
 
 const REPORT_TAB_CONFIG = [
   { key: "pos", label: "POS Transactions" },
@@ -75,7 +76,11 @@ const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_
                   : "border-gray-300 bg-white text-gray-600 hover:border-[#00D3CD] hover:text-[#00D3CD]"
               }`}
             >
-              {tab.label}
+              {isChildRole(currentUser) && tab.key === "cc-bill"
+                ? "CC Bill 1 Payment"
+                : isChildRole(currentUser) && tab.key === "ba-cc-bill"
+                ? "CC Bill 2 Payment"
+                : tab.label}
             </button>
           );
         })}

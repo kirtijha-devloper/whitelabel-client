@@ -690,7 +690,7 @@ navigate(billBasePath, { replace: true });
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">KYC Required</h1>
           <p className="text-gray-700 mb-6">
-            To use CC Bill Pay, you need to complete KYC verification first. This enables
+            To use CC Bill 1, you need to complete KYC verification first. This enables
             your outlet to be registered with the payment provider.
           </p>
           <button
@@ -707,7 +707,7 @@ navigate(billBasePath, { replace: true });
 
   return (
     <div className="mx-auto max-w-5xl p-4">
-      <h1 className="mb-4 text-2xl font-semibold text-gray-900">CC Bill Pay</h1>
+      <h1 className="mb-4 text-2xl font-semibold text-gray-900">CC Bill 1</h1>
       <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           {flowSteps.map((step) => {
@@ -744,7 +744,7 @@ navigate(billBasePath, { replace: true });
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-700">
             <FaExclamationCircle className="h-6 w-6" />
           </div>
-          <h2 className="mb-2 text-xl font-semibold text-gray-900">CC Bill Pay Disabled</h2>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">CC Bill 1 Disabled</h2>
           <p className="text-sm text-gray-600">
             This service is currently disabled by admin. Please try again later.
           </p>
@@ -1371,7 +1371,7 @@ navigate(billBasePath, { replace: true });
               onClick={() => navigate(billBasePath, { replace: true })}
               className="rounded border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             >
-              Back to CC Bill Pay
+              Back to CC Bill 1
             </button>
           </div>
         </div>
@@ -1404,7 +1404,7 @@ navigate(billBasePath, { replace: true });
               onClick={() => navigate(billBasePath, { replace: true })}
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             >
-              Back to CC Bill Pay
+              Back to CC Bill 1
             </button>
           </div>
         </div>

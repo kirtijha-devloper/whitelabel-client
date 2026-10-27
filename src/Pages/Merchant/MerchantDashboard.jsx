@@ -102,13 +102,13 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
   // Quick Action Services (One-tap navigation on all screens)
   const quickServices = [
     {
-      label: "CC Bill Pay",
+      label: "CC Bill 1",
       to: "/merchant/cc-bill-pay",
       icon: CreditCard,
       disabled: !serviceFlags.cc_bill_pay,
     },
     {
-      label: "BA CC Bill",
+      label: "CC Bill 2",
       to: "/merchant/ba-cc-bill-pay",
       icon: CreditCard,
       disabled: !serviceFlags.ba_cc_bill_pay,

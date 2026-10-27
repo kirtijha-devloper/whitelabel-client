@@ -380,7 +380,7 @@ const CCBillPaymentReports = () => {
         activeTab="cc-bill"
         trailingAction={<CombinedReportDownloadButton />}
       />
-      <h2 className="mb-6 text-2xl font-bold text-gray-800">CC Bill Payment Report</h2>
+      <h2 className="mb-6 text-2xl font-bold text-gray-800">CC Bill 1 Payment Report</h2>
 
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm md:rounded-xl md:p-6">
         <div className="space-y-3 md:hidden">

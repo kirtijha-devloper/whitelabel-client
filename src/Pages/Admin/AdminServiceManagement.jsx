@@ -15,6 +15,7 @@ import {
   updateServiceSettings,
 } from "../../api/serviceSettingsApi";
 import ConfirmationModal from "../../components/Common/ConfirmationModal";
+import { getServiceDisplayName } from "../../utils/serviceDisplayNames";
 
 const CATEGORY_ORDER = [
   "Payout & Banking",
@@ -24,7 +25,7 @@ const CATEGORY_ORDER = [
   "General",
 ];
 
-const AdminServiceManagement = () => {
+const AdminServiceManagement = ({ currentUser }) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -77,7 +78,11 @@ const AdminServiceManagement = () => {
       list.push({
         key,
         service_key: key,
-        label: isObject && config.label ? config.label : key.replace(/_/g, " ").toUpperCase(),
+        label: getServiceDisplayName(
+          key,
+          currentUser || "admin",
+          isObject && config.label ? config.label : key.replace(/_/g, " ").toUpperCase()
+        ),
         category: isObject && config.category ? config.category : "General",
         description: isObject && config.description ? config.description : "",
         is_enabled: isObject ? config.is_enabled !== false : Boolean(config),
@@ -86,7 +91,7 @@ const AdminServiceManagement = () => {
     });
 
     return list;
-  }, [rawSettingsData]);
+  }, [rawSettingsData, currentUser]);
 
   // Dynamic Categories from Data
   const categories = useMemo(() => {
