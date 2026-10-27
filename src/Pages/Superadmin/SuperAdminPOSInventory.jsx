@@ -109,7 +109,7 @@ const SuperAdminPOSInventory = () => {
   }, [companyOptions, companySearchTerm]);
 
   const getSerialNumber = (machine) => machine?.device_serial_number || machine?.serial_number || "-";
-  const getMachineModel = (machine) => machine?.model || machine?.device_model || "-";
+  const getMachineModel = (machine) => machine?.mid_number ;
   const getMachineStatus = (machine) =>
     String(machine?.status || (machine?.assigned_to ? "active" : "available"))
       .trim()
@@ -592,7 +592,7 @@ const SuperAdminPOSInventory = () => {
               <tr>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">TID Number</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Serial Number</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Model</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">MID</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Company Provider</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Assigned To</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
