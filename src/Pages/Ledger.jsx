@@ -20,6 +20,7 @@ import {
 } from "../utils/agroScope";
 
 const ADMIN_TRANSACTION_COMBO_VALUE = "__admin_debit_admin_credit__";
+const SUPER_ADMIN_TRANSACTION_COMBO_VALUE = "__super_admin_debit_super_admin_credit__";
 
 const DescriptionCell = ({ value }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -154,9 +155,8 @@ const StickyLedgerTable = ({ columns, data }) => {
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap text-gray-700 ${
-                      column.headerClassName || ""
-                    }`.trim()}
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap text-gray-700 ${column.headerClassName || ""
+                      }`.trim()}
                   >
                     {column.header}
                   </th>
@@ -186,9 +186,8 @@ const StickyLedgerTable = ({ columns, data }) => {
                 {columns.map((column, colIndex) => (
                   <td
                     key={column.key || colIndex}
-                    className={`px-6 py-4 align-top text-sm text-gray-900 ${
-                      column.cellClassName || ""
-                    }`.trim()}
+                    className={`px-6 py-4 align-top text-sm text-gray-900 ${column.cellClassName || ""
+                      }`.trim()}
                   >
                     {column.render
                       ? column.render(row[column.key], row, rowIndex)
@@ -207,13 +206,13 @@ const StickyLedgerTable = ({ columns, data }) => {
 const buildLedgerExportRows = (rows = []) =>
   rows.map((tx, idx) => {
     const desc = tx.description || "";
-    
+
     let txnId = "";
     const txnMatch = desc.match(/(?:Txn|Razorpay Transaction)\s*:\s*([^|\n]+)/i);
     if (txnMatch && txnMatch[1]) {
       txnId = txnMatch[1].trim();
     }
-    
+
     let rrn = "";
     // Use dedicated rr_number field from API if available (covers pos_credit, pos_charge etc.)
     if (tx.rr_number) {
@@ -276,6 +275,7 @@ const resolveTransactionTypeFilterValues = (values = []) =>
     new Set(
       values.flatMap((value) => {
         if (value === ADMIN_TRANSACTION_COMBO_VALUE) return ["admin_debit", "admin_credit"];
+        if (value === SUPER_ADMIN_TRANSACTION_COMBO_VALUE) return ["super_admin_debit", "super_admin_credit"];
         if (value === "payin" || value === "pay_in") return ["payin", "pay_in", "pos_credit", "pos_settlement", "pos_t0_settlement"];
         return [value];
       })
@@ -283,7 +283,7 @@ const resolveTransactionTypeFilterValues = (values = []) =>
   );
 
 const normalizeTransactionTypeSelection = (values = []) => {
-  const uniqueValues = Array.from(new Set(values.filter(Boolean)));
+  let uniqueValues = Array.from(new Set(values.filter(Boolean)));
   const hasCombo = uniqueValues.includes(ADMIN_TRANSACTION_COMBO_VALUE);
 
   if (hasCombo) {
@@ -298,6 +298,20 @@ const normalizeTransactionTypeSelection = (values = []) => {
         (value) => value !== "admin_debit" && value !== "admin_credit"
       ),
       ADMIN_TRANSACTION_COMBO_VALUE,
+    ];
+  }
+
+  const hasSuperAdminCombo = uniqueValues.includes(SUPER_ADMIN_TRANSACTION_COMBO_VALUE);
+  if (hasSuperAdminCombo) {
+    uniqueValues = uniqueValues.filter(
+      (value) => value !== "super_admin_debit" && value !== "super_admin_credit"
+    );
+  } else if (uniqueValues.includes("super_admin_debit") && uniqueValues.includes("super_admin_credit")) {
+    uniqueValues = [
+      ...uniqueValues.filter(
+        (value) => value !== "super_admin_debit" && value !== "super_admin_credit"
+      ),
+      SUPER_ADMIN_TRANSACTION_COMBO_VALUE,
     ];
   }
 
@@ -427,15 +441,18 @@ const Ledger = ({ currentUser }) => {
     { value: "admin_debit", label: "admin_debit" },
     { value: "admin_credit", label: "admin_credit" },
     { value: ADMIN_TRANSACTION_COMBO_VALUE, label: "admin_debit & admin_credit" },
+    { value: "super_admin_debit", label: "super_admin_debit" },
+    { value: "super_admin_credit", label: "super_admin_credit" },
+    { value: SUPER_ADMIN_TRANSACTION_COMBO_VALUE, label: "super_admin_debit & super_admin_credit" },
     { value: "rental_charge", label: "rental_charge" },
   ];
 
   const filteredRoleOptions =
     userRole === "merchant"
-      ? roleOptions.filter((option) => option.value === "merchant") 
+      ? roleOptions.filter((option) => option.value === "merchant")
       : userRole === "franchise" || userRole === "franchaise"
-      ? roleOptions.filter((option) => option.value === "franchise")
-      : roleOptions;
+        ? roleOptions.filter((option) => option.value === "franchise")
+        : roleOptions;
 
   useEffect(() => {
     setLedgerPage(1);
@@ -461,11 +478,11 @@ const Ledger = ({ currentUser }) => {
         rowsToExport = !selectedRole
           ? fetchedRows
           : fetchedRows.filter((tx) => {
-              const txRole = String(tx.user_role || tx.user?.role || "").trim().toLowerCase();
-              const normalizedTxRole = normalizeRoleVal(txRole);
-              const normalizedSelectedRole = normalizeRoleVal(selectedRole);
-              return !normalizedSelectedRole || normalizedTxRole === normalizedSelectedRole;
-            });
+            const txRole = String(tx.user_role || tx.user?.role || "").trim().toLowerCase();
+            const normalizedTxRole = normalizeRoleVal(txRole);
+            const normalizedSelectedRole = normalizeRoleVal(selectedRole);
+            return !normalizedSelectedRole || normalizedTxRole === normalizedSelectedRole;
+          });
       }
 
       if (!rowsToExport.length) {
@@ -907,8 +924,8 @@ const Ledger = ({ currentUser }) => {
                         <p className="font-medium text-green-600">
                           {tx.credit > 0
                             ? parseFloat(tx.credit).toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })
+                              minimumFractionDigits: 2,
+                            })
                             : ""}
                         </p>
                       </div>
@@ -919,8 +936,8 @@ const Ledger = ({ currentUser }) => {
                         >
                           {tx.debit > 0
                             ? parseFloat(tx.debit).toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })
+                              minimumFractionDigits: 2,
+                            })
                             : ""}
                         </p>
                       </div>
