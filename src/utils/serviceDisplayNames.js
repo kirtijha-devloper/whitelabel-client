@@ -7,54 +7,78 @@ import { isSuperAdminUser } from "./accessControl.js";
  * Strictly returns false for Super Admin.
  */
 export const isChildRole = (userOrRole) => {
-  // If window path is explicitly super-admin, this is Super Admin context
-  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/super-admin")) {
-    return false;
-  }
-
-  if (!userOrRole) {
-    // Default to checking window location prefix if no user/role provided
-    if (typeof window !== "undefined") {
-      const path = window.location?.pathname || "";
-      if (path.startsWith("/super-admin")) return false;
-      if (
-        path.startsWith("/admin") ||
-        path.startsWith("/franchise") ||
-        path.startsWith("/super-franchise") ||
-        path.startsWith("/merchant")
-      ) {
-        return true;
+  // 1. If explicit user object or role string is provided, evaluate it directly
+  if (userOrRole) {
+    if (typeof userOrRole === "object") {
+      if (isSuperAdminUser(userOrRole) || isSuperAdmin(userOrRole)) {
+        return false;
       }
     }
-    return false;
-  }
 
-  // If user object passed, check super admin indicators
-  if (typeof userOrRole === "object") {
-    if (isSuperAdminUser(userOrRole) || isSuperAdmin(userOrRole)) {
+    const roleValue = typeof userOrRole === "string" ? userOrRole : userOrRole?.role;
+    const normalized = normalizeUserRole(roleValue);
+
+    if (normalized === "super_admin") {
       return false;
+    }
+
+    if (["admin", "franchise", "super_franchise", "merchant", "employee"].includes(normalized)) {
+      return true;
     }
   }
 
-  const roleValue = typeof userOrRole === "string" ? userOrRole : userOrRole?.role;
-  const normalized = normalizeUserRole(roleValue);
+  // 2. Fallback: try resolving logged-in viewer from localStorage if in browser
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          if (isSuperAdminUser(parsed) || isSuperAdmin(parsed)) {
+            return false;
+          }
+          const norm = normalizeUserRole(parsed?.role);
+          if (norm === "super_admin") {
+            return false;
+          }
+          if (["admin", "franchise", "super_franchise", "merchant", "employee"].includes(norm)) {
+            return true;
+          }
+        }
+      }
+    } catch {
+      // ignore storage / parsing error
+    }
 
-  if (normalized === "super_admin") {
-    return false;
+    // 3. Fallback: check window location prefix
+    const path = window.location?.pathname || "";
+    if (path.startsWith("/super-admin")) {
+      return false;
+    }
+    if (
+      path.startsWith("/admin") ||
+      path.startsWith("/franchise") ||
+      path.startsWith("/super-franchise") ||
+      path.startsWith("/merchant")
+    ) {
+      return true;
+    }
   }
 
-  return ["admin", "franchise", "super_franchise", "merchant", "employee"].includes(normalized);
+  return false;
 };
 
 /**
  * Service display names for child roles
  */
 export const CHILD_SERVICE_DISPLAY_NAMES = {
-  // Payout Services (V, S, B)
+  // Payout Services (V, S, B, N)
   vimo_payout: "Payout V",
   vimo: "Payout V",
   sevenpay_payout: "Payout S",
   sevenpay: "Payout S",
+  ndia5_payout: "PAYOUT-N",
+  ndia5: "PAYOUT-N",
   branchx_payout: "Payout B",
   branchx: "Payout B",
 
@@ -114,6 +138,9 @@ export const getServiceDisplayName = (serviceKey, userOrRole, defaultName = "") 
   if (isChildRole(userOrRole)) {
     const mapped = CHILD_SERVICE_DISPLAY_NAMES[serviceKey];
     if (mapped) return mapped;
+  } else {
+    const superAdminMapped = SUPER_ADMIN_SERVICE_INLINE_LABELS[serviceKey];
+    if (superAdminMapped && !defaultName) return superAdminMapped;
   }
 
   return defaultName || serviceKey;
@@ -130,6 +157,12 @@ export const getPayoutProviderDisplayName = (providerKey, userOrRole, defaultNam
     if (normalizedKey.includes("vimo")) return "Payout V";
     if (normalizedKey.includes("sevenpay")) return "Payout S";
     if (normalizedKey.includes("branchx")) return "Payout B";
+    if (normalizedKey.includes("ndia5")) return "PAYOUT-N";
+  } else {
+    if (normalizedKey.includes("vimo")) return "Vimo";
+    if (normalizedKey.includes("sevenpay")) return "SevenPay";
+    if (normalizedKey.includes("branchx")) return "BranchX";
+    if (normalizedKey.includes("ndia5")) return "PAYOUT-N";
   }
 
   return defaultName || providerKey;
