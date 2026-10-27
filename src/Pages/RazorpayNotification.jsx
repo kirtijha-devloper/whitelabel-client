@@ -1033,7 +1033,7 @@ const RazorpayNotification = ({ currentUser }) => {
       <div className="bg-white shadow-sm rounded-lg p-4 mb-4">
         <h2 className="text-xl font-semibold mb-4">PoS Notification Report</h2>
         <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <select
+          {/* <select
             className="border rounded-lg px-3 py-2"
             value={filters.source}
             onChange={(e) => handleFilterChange("source", e.target.value)}
@@ -1044,7 +1044,7 @@ const RazorpayNotification = ({ currentUser }) => {
                 {option.label}
               </option>
             ))}
-          </select>
+          </select> */}
           <select
             className="border rounded-lg px-3 py-2"
             value={filters.settlement_type || filters.settlementType || ""}
