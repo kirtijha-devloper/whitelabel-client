@@ -1,5 +1,5 @@
 import { ArrowLeft, Loader2, X } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Select from "react-select";
@@ -49,7 +49,7 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise", fallbackP
     } = useInfiniteQuery({
         queryKey: ["posMachines", searchTerm, selectedFranchise?.value],
         queryFn: ({ pageParam = 1 }) =>
-            getAllPosMachines({ tidNumber: searchTerm || null, page: pageParam, limit: 50 }),
+            getAllPosMachines({ search: searchTerm.trim() || null, page: pageParam, limit: 50 }),
         staleTime: 1000 * 60 * 5,
         getNextPageParam: (lastPage) => {
             const currentPage = lastPage?.pagination?.page ?? 1;
@@ -65,7 +65,6 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise", fallbackP
 
     const totalMachines =
         posMachinesPages?.pages?.[0]?.pagination?.total ?? posMachines.length;
-    const loadedMachinesCount = posMachines.length;
 
     const {
         data: franchisesResponse = [],
@@ -196,9 +195,34 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise", fallbackP
         label: `${machine.status} (Serial No.: ${machine.device_serial_number || machine.tid_number || "N/A"})`,
     });
 
-    const availableMachines = posMachines
-        .filter((machine) => machine.assigned_to === null)
-        .map(createMachineOption);
+    const availableMachines = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        return posMachines
+            .filter((machine) => {
+                const isUnassigned = machine.assigned_to === null || machine.assigned_to === undefined;
+                if (!isUnassigned) return false;
+                if (!term) return true;
+                const serial = String(machine.device_serial_number || "").toLowerCase();
+                const tid = String(machine.tid_number || "").toLowerCase();
+                const mid = String(machine.mid_number || "").toLowerCase();
+                const company = String(machine.company_name || "").toLowerCase();
+                const bank = String(machine.bank_name || "").toLowerCase();
+                const status = String(machine.status || "").toLowerCase();
+                const remarks = String(machine.remarks || "").toLowerCase();
+                return (
+                    serial.includes(term) ||
+                    tid.includes(term) ||
+                    mid.includes(term) ||
+                    company.includes(term) ||
+                    bank.includes(term) ||
+                    status.includes(term) ||
+                    remarks.includes(term)
+                );
+            })
+            .map(createMachineOption);
+    }, [posMachines, searchTerm]);
+
+    const loadedMachinesCount = availableMachines.length;
 
     const toggleMachine = (machineOption) => {
         setSelectedMachines((current) => {
@@ -428,7 +452,7 @@ const AssignToFranchise = ({ returnPath, assignmentType = "franchise", fallbackP
                 {selectedFranchise && (
                     <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm text-gray-600">
                         <span>
-                            Showing {loadedMachinesCount} of {totalMachines} unassigned machines
+                            Showing {loadedMachinesCount} of {Math.max(totalMachines, loadedMachinesCount)} unassigned machines
                         </span>
                         {hasMorePosMachines && (
                             <button
