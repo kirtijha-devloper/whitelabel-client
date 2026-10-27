@@ -52,6 +52,10 @@ const getTransactionTypeBadgeClasses = (transactionType) => {
     case "razorpay_charge":
       return "bg-red-100 text-red-700 border-red-200";
     case "pos_credit":
+    case "payin":
+    case "pay_in":
+    case "pos_settlement":
+    case "pos_t0_settlement":
       return "bg-emerald-100 text-emerald-700 border-emerald-200";
     case "pos_franchise_earning":
     case "razorpay_franchise_earning":
@@ -270,11 +274,11 @@ const formatLedgerDate = (dateTime) => {
 const resolveTransactionTypeFilterValues = (values = []) =>
   Array.from(
     new Set(
-      values.flatMap((value) =>
-        value === ADMIN_TRANSACTION_COMBO_VALUE
-          ? ["admin_debit", "admin_credit"]
-          : [value]
-      )
+      values.flatMap((value) => {
+        if (value === ADMIN_TRANSACTION_COMBO_VALUE) return ["admin_debit", "admin_credit"];
+        if (value === "payin" || value === "pay_in") return ["payin", "pay_in", "pos_credit", "pos_settlement", "pos_t0_settlement"];
+        return [value];
+      })
     )
   );
 
@@ -410,6 +414,8 @@ const Ledger = ({ currentUser }) => {
   ];
 
   const transactionTypeOptions = [
+    { value: "payin", label: "payin" },
+    { value: "pay_in", label: "pay_in" },
     { value: "pos_credit", label: "pos_credit" },
     { value: "pos_charge", label: "pos_charge" },
     { value: "razorpay_commission", label: "razorpay_commission" },

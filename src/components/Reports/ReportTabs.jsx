@@ -15,39 +15,44 @@ const REPORT_TAB_CONFIG = [
 ];
 
 const getTargetPath = (basePath, tabKey) => {
+  const safeBase =
+    basePath ||
+    (typeof window !== "undefined" && window.location?.pathname?.startsWith("/super-admin")
+      ? "/super-admin/reports"
+      : "/admin/reports");
   if (tabKey === "pos" || tabKey === "wallet") {
-    return `${basePath}?tab=${tabKey}`;
+    return `${safeBase}?tab=${tabKey}`;
   }
 
   if (tabKey === "all-transactions") {
-    return `${basePath}/transactions`;
+    return `${safeBase}/transactions`;
   }
 
   if (tabKey === "commission") {
-    return `${basePath}/commission`;
+    return `${safeBase}/commission`;
   }
 
   if (tabKey === "service-wise") {
-    return `${basePath}/service-wise`;
+    return `${safeBase}/service-wise`;
   }
 
   if (tabKey === "payout") {
-    return `${basePath}/payout`;
+    return `${safeBase}/payout`;
   }
 
   if (tabKey === "cc-bill") {
-    return `${basePath}/cc-bill`;
+    return `${safeBase}/cc-bill`;
   }
 
   if (tabKey === "ba-cc-bill") {
-    return `${basePath}/ba-cc-bill`;
+    return `${safeBase}/ba-cc-bill`;
   }
 
   if (tabKey === "cc-bill-3") {
-    return `${basePath}/cc-bill-3`;
+    return `${safeBase}/cc-bill-3`;
   }
 
-  return basePath;
+  return safeBase;
 };
 
 const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_TAB_CONFIG, currentUser }) => {
@@ -60,7 +65,7 @@ const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_
           if((tab.key === "cc-bill-3" || tab.key === "ba-cc-bill" || tab.key === "cc-bill" || tab.key === "payout" || tab.key === "pos" || tab.key === "wallet") && currentUser?.role === "super_admin") {
             return null; 
           }
-          if((tab.key === "service-wise" || tab.key === "all-transactions" || tab.key === "commission") && currentUser?.role !== "super_admin") {
+          if((tab.key === "service-wise" || tab.key === "all-transactions" || tab.key === "commission") && currentUser?.role !== "super_admin" && currentUser?.role !== "admin") {
             return null; 
           }
           const isActive = activeTab === tab.key;

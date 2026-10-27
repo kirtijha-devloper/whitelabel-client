@@ -27,6 +27,37 @@ import CombinedReportDownloadButton from "../../components/Reports/CombinedRepor
 // Comprehensive Mock fallback transactions for seamless demonstration
 const SAMPLE_TRANSACTIONS = [
   {
+    id: "TXN100922",
+    utr_no: "UTR9823411030",
+    date: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    user_name: "Guru ji",
+    user_id: "USR-001",
+    role: "Admin",
+    service: "Payin",
+    mode: "UPI / POS",
+    amount: 50000,
+    charge: 0.0,
+    gst: 0.0,
+    net_amount: 50000.0,
+    status: "SUCCESS",
+  },
+  {
+    id: "TXN100923",
+    utr_no: "UTR9823411031",
+    date: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    user_name: "Apex Retail Solutions",
+    user_id: "USR-401",
+    role: "Merchant",
+    service: "Payin",
+    mode: "CARD (Visa POS)",
+    amount: 25000,
+    charge: 400.0,
+    gst: 72.0,
+    net_amount: 24528.0,
+    status: "SUCCESS",
+  },
+
+  {
     id: "TXN100921",
     utr_no: "UTR9823411029",
     date: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
@@ -161,6 +192,49 @@ const SERVICE_FILTER_OPTIONS = [
   "PG MID Routing",
 ];
 
+const resolveTransactionService = (item) => {
+  if (item.service && item.service !== "General" && item.service !== "Payment Service") {
+    return item.service;
+  }
+  const type = String(item.transaction_type || item.type || "").toLowerCase();
+  const desc = String(item.description || "").toLowerCase();
+  const category = String(item.category || "").toLowerCase();
+
+  if (
+    type === "payin" ||
+    type === "pay_in" ||
+    type === "pos_credit" ||
+    type === "pos_settlement" ||
+    type === "pos_t0_settlement" ||
+    category === "payin" ||
+    desc.includes("payin") ||
+    desc.includes("pos credit") ||
+    desc.includes("pos settlement") ||
+    desc.includes("t0 pos") ||
+    (Number(item.credit || 0) > 0 && !type.includes("payout"))
+  ) {
+    return "Payin";
+  }
+
+  if (type.includes("payout") || desc.includes("payout") || category.includes("payout")) {
+    return "Payout";
+  }
+
+  if (type.includes("cc_bill") || desc.includes("cc bill")) {
+    return "CC Bill Pay";
+  }
+
+  return item.description || item.service || "Payment Service";
+};
+
+const normalizeTransactionStatus = (status) => {
+  const s = String(status || "SUCCESS").toUpperCase();
+  if (s === "SETTLED" || s === "COMPLETED" || s === "CAPTURED" || s === "AUTHORIZED") {
+    return "SUCCESS";
+  }
+  return s;
+};
+
 const TransactionReports = ({ currentUser }) => {
   const navigate = useNavigate();
 
@@ -196,15 +270,15 @@ const TransactionReports = ({ currentUser }) => {
         user_name: item.user?.name || item.user_name || "Platform User",
         user_id: item.user?.id ? `USR-${item.user.id}` : "USR-100",
         role: item.user?.role || "Merchant",
-        service: item.description || item.service || "Payment Service",
+        service: resolveTransactionService(item),
         mode: item.mode || "ONLINE",
         amount: Number(item.credit || item.debit || item.amount || 0),
         charge: Number(item.charge || item.fee || 5.0),
         gst: Number(item.gst || 0.9),
         net_amount: Number(item.balance || item.credit || item.amount || 0),
-        status: String(item.status || "SUCCESS").toUpperCase(),
+        status: normalizeTransactionStatus(item.status),
       }));
-      return [...mapped, ...SAMPLE_TRANSACTIONS];
+      return mapped;
     }
 
     return SAMPLE_TRANSACTIONS;
@@ -273,6 +347,8 @@ const TransactionReports = ({ currentUser }) => {
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 space-y-6">
       <h1 className="mb-5 text-2xl font-bold text-gray-800">Reports</h1>
       <ReportTabs 
+        basePath={currentUser?.role === "super_admin" ? "/super-admin/reports" : "/admin/reports"}
+        activeTab="all-transactions"
         trailingAction={<CombinedReportDownloadButton />}
         currentUser={currentUser}
       />

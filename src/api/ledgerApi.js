@@ -24,6 +24,36 @@ const normalizeRoleString = (role) => {
   return normalized || null;
 };
 
+const resolveLedgerService = (row = {}) => {
+  const rawService = String(row.service || "").trim();
+  const rawType = String(row.type || row.transaction_type || "").trim().toLowerCase();
+  const rawDesc = String(row.description || "").trim().toLowerCase();
+
+  if (rawService && rawService !== "General" && rawService !== "N/A") {
+    return rawService;
+  }
+  if (
+    rawType === "payin" ||
+    rawType === "pay_in" ||
+    rawType === "pos_credit" ||
+    rawType === "pos_settlement" ||
+    rawType === "pos_t0_settlement" ||
+    rawDesc.includes("payin") ||
+    rawDesc.includes("pos credit") ||
+    rawDesc.includes("pos settlement") ||
+    rawDesc.includes("t0 pos")
+  ) {
+    return "Payin";
+  }
+  if (rawType.includes("payout") || rawDesc.includes("payout")) {
+    return "Payout";
+  }
+  if (rawType.includes("cc_bill") || rawDesc.includes("cc bill")) {
+    return "CC Bill Payment";
+  }
+  return row.service ?? row.transaction_type ?? row.description ?? "General";
+};
+
 const normalizeLedgerRow = (row = {}) => ({
   ...row,
   type: row.type ?? row.transaction_type ?? row.description ?? "N/A",
@@ -81,7 +111,7 @@ const normalizeLedgerRow = (row = {}) => ({
     row.transaction?.cardClassification ??
     row.event_json?.cardClassification ??
     "",
-  service: row.service ?? row.transaction_type ?? row.description ?? "General",
+  service: resolveLedgerService(row),
 });
 
 const normalizeLedgerResponse = (payload) => {
@@ -133,8 +163,8 @@ export const getLedgerStatements = async (filters = {}) => {
               : transaction_type,
           }
         : {}),
-      ...(normalizedFromDate ? { from_date: normalizedFromDate } : {}),
-      ...(normalizedToDate ? { to_date: normalizedToDate } : {}),
+      ...(normalizedFromDate ? { from_date: normalizedFromDate, start_date: normalizedFromDate, startDate: normalizedFromDate } : {}),
+      ...(normalizedToDate ? { to_date: normalizedToDate, end_date: normalizedToDate, endDate: normalizedToDate } : {}),
       ...(searched_role ? { role: searched_role, searched_role } : {}),
     };
 
