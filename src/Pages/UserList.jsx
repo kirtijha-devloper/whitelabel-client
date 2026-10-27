@@ -1009,19 +1009,22 @@ const UserList = ({
             ? "Disabled in Organization Settings by Admin"
             : undefined;
 
+          const serviceInlineLabel =
+            getUserServiceInlineLabels(currentUser)[service.key] || service.label;
+
           return (
             <div key={service.key} className="flex items-center min-w-0">
               <label
-                title={tooltip || service.label}
+                title={tooltip || serviceInlineLabel}
                 className={`flex items-center justify-between w-full gap-1.5 rounded px-1 py-0.5 text-xs transition-colors ${
                   isGloballyBlocked ? "cursor-not-allowed opacity-60 text-gray-400" : "cursor-pointer text-gray-700 hover:bg-gray-100/70"
                 }`}
               >
                 <span
                   className={`truncate font-medium ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}
-                  title={service.label}
+                  title={serviceInlineLabel}
                 >
-                  {getUserServiceInlineLabels(currentUser)[service.key] || service.label}
+                  {serviceInlineLabel}
                 </span>
 
                 <div className="flex items-center gap-1 shrink-0 ml-auto">
