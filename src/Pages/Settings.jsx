@@ -523,6 +523,12 @@ function Settings({ currentUser }) {
   }
 
   const user = userData?.user || {};
+  const isUserAdmin =
+    isAdmin ||
+    String(user?.role || '').toLowerCase() === 'admin' ||
+    sessRoot === 'admin';
+  // Hide right-side cards (InstantPay / KYC and T-PIN) across all layers
+  const shouldHideRightCards = true;
 
   const ipayOutletId =
     user?.ipay_outlet_id ??
@@ -871,20 +877,24 @@ function Settings({ currentUser }) {
           >
             Update Password
           </button>
-          <button
-            onClick={() => openModal('tpin')}
-            className="w-full sm:w-auto bg-primary rounded-lg px-3 py-2 text-sm sm:text-base font-medium text-white hover:opacity-70 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isEditingOtherUser}
-          >
-            Generate T-PIN
-          </button>
-          <button
-            onClick={() => openModal('verifyTpin')}
-            className="col-span-2 sm:col-span-1 w-full sm:w-auto bg-primary rounded-lg px-3 py-2 text-sm sm:text-base font-medium text-white hover:opacity-70 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isEditingOtherUser}
-          >
-            Verify T-PIN
-          </button>
+          {!isUserAdmin && (
+            <>
+              <button
+                onClick={() => openModal('tpin')}
+                className="w-full sm:w-auto bg-primary rounded-lg px-3 py-2 text-sm sm:text-base font-medium text-white hover:opacity-70 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isEditingOtherUser}
+              >
+                Generate T-PIN
+              </button>
+              <button
+                onClick={() => openModal('verifyTpin')}
+                className="col-span-2 sm:col-span-1 w-full sm:w-auto bg-primary rounded-lg px-3 py-2 text-sm sm:text-base font-medium text-white hover:opacity-70 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isEditingOtherUser}
+              >
+                Verify T-PIN
+              </button>
+            </>
+          )}
           {isAdmin && (
             <>
               {/* Upload BillAvenue Billers is temporarily hidden here. */}
@@ -916,7 +926,7 @@ function Settings({ currentUser }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 ${shouldHideRightCards ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
           <div className="lg:col-span-1 space-y-6">
             <Card title="Personal Information">
               <InfoField label="Name" value={user.name || 'N/A'} />
@@ -979,28 +989,18 @@ function Settings({ currentUser }) {
             </Card>
           </div>
 
-          <div className="lg:col-span-1 space-y-6">
-            <Card title="InstantPay / KYC">
-              <InfoField label="KYC Status" value={kycStatusLabel} badge />
-              <InfoField label="Outlet ID" value={ipayOutletId !== null ? String(ipayOutletId) : 'N/A'} />
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={handleGotoKyc}
-                  className="w-full rounded-lg bg-primary text-white px-4 py-3 text-sm font-medium transition hover:opacity-90"
-                >
-                  {isKycVerified ? 'Re-initiate InstantPay KYC' : 'Start InstantPay KYC'}
-                </button>
-                <p className="mt-3 text-sm text-gray-500">
-                  Use this setting to restart InstantPay onboarding and reset your InstantPay outlet ID if required.
-                </p>
-              </div>
-            </Card>
+          {!shouldHideRightCards && (
+            <div className="lg:col-span-1 space-y-6">
+              <Card title="InstantPay / KYC">
+                <InfoField label="KYC Status" value={kycStatusLabel} badge />
+                <InfoField label="Outlet ID" value={ipayOutletId !== null ? String(ipayOutletId) : 'N/A'} />
+              </Card>
 
-            <Card title="T-PIN">
-              <InfoField label="T-PIN Status" value={user.tpin ? 'Set' : 'Not Set'} badge />
-            </Card>
-          </div>
+              <Card title="T-PIN">
+                <InfoField label="T-PIN Status" value={user.tpin ? 'Set' : 'Not Set'} badge />
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Modals */}
