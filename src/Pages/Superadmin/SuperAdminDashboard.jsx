@@ -82,7 +82,7 @@ const SuperAdminDashboard = () => {
         </div>
 
         {/* Date Display */}
-        <div className="flex w-fit items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+        {/* <div className="flex w-fit items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00D3CD]/10 text-[#00D3CD]">
             <Calendar className="h-5 w-5" />
           </div>
@@ -95,7 +95,7 @@ const SuperAdminDashboard = () => {
               {todayFormatted}
             </p>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* ================= MAIN STAT CARDS ================= */}
