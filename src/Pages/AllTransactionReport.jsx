@@ -23,7 +23,11 @@ const AllTransactionReport = () => {
     queryKey: ['allTransactionsReport', filters, activeTab],
     queryFn: () => getLedgerStatements({
       ...filters,
-      ...(activeTab !== 'All Transactions' && { service: activeTab })
+      ...(activeTab === 'Payin'
+        ? { transaction_type: ['payin', 'pos_credit', 'pay_in', 'pos_settlement', 'pos_t0_settlement'], service: 'Payin' }
+        : activeTab !== 'All Transactions'
+          ? { service: activeTab }
+          : {})
     }),
     keepPreviousData: true,
   });
@@ -46,6 +50,7 @@ const AllTransactionReport = () => {
 
   const tabs = [
     { name: 'All Transactions', icon: <Layers className="w-4 h-4" /> },
+    { name: 'Payin', icon: <RotateCcw className="w-4 h-4" /> },
     { name: 'Payout', icon: <Banknote className="w-4 h-4" /> },
     { name: 'CC Bill Payment', icon: <CreditCard className="w-4 h-4" /> },
     { name: 'POS Settlement', icon: <Settings className="w-4 h-4" /> }
@@ -53,6 +58,7 @@ const AllTransactionReport = () => {
 
   const getServiceBadgeConfig = (service) => {
     switch (service) {
+      case 'Payin': return "bg-emerald-100 text-emerald-800";
       case 'Payout': return "bg-blue-100 text-blue-800";
       case 'CC Bill Payment': return "bg-orange-100 text-orange-800";
       case 'POS Settlement': return "bg-green-100 text-green-800";
