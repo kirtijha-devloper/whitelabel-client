@@ -102,7 +102,7 @@ const Sidebar = ({ currentUser }) => {
       permissions: ["stock.pos.read", "stock.pos.manage"],
     },
     {
-      name: "Razorpay Notifications",
+      name: "PoS Notifications",
       path: "/admin/razorpay-notifications",
       icon: <FaFileAlt />,
       permissions: [
@@ -209,7 +209,7 @@ const Sidebar = ({ currentUser }) => {
       icon: <FaMoneyBillWave />,
     },
     {
-      name: "Razorpay Notifications",
+      name: "PoS Notifications",
       path: "/super-admin/razorpay-notifications",
       icon: <FaFileAlt />,
     },

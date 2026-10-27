@@ -717,7 +717,7 @@ export default function BillAvenueCCBillPay({ currentUser }) {
       ) : (
         <>
       <h1 className="mb-4 text-2xl font-semibold text-gray-900">
-        BillAvenue CC Bill Pay
+        CC Bill 2
       </h1>
 
       <div className="mb-4 overflow-hidden rounded-2xl border border-[#00B9B2]/20 bg-[#00B9B2] shadow-sm">
@@ -726,7 +726,7 @@ export default function BillAvenueCCBillPay({ currentUser }) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100/90">
               Additional Flow
             </p>
-            <p className="mt-1 text-lg font-semibold text-white">BA CC Bill Pay</p>
+            <p className="mt-1 text-lg font-semibold text-white">CC Bill 2</p>
           </div>
           <button
             type="button"
@@ -787,7 +787,7 @@ export default function BillAvenueCCBillPay({ currentUser }) {
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-700">
             <FaExclamationCircle className="h-6 w-6" />
           </div>
-          <h2 className="mb-2 text-xl font-semibold text-gray-900">BA CC Bill Pay Disabled</h2>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">CC Bill 2 Disabled</h2>
           <p className="text-sm text-gray-600">
             This service is currently disabled by admin. Please try again later.
           </p>

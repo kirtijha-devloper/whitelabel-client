@@ -118,9 +118,9 @@ export const EMPLOYEE_PERMISSION_MODULES = [
   },
   {
     key: "razorpay-notifications",
-    section: "Razorpay Notifications",
-    label: "Razorpay Notifications",
-    description: "Allow employee to list and view Razorpay notifications.",
+    section: "PoS Notifications",
+    label: "PoS Notifications",
+    description: "Allow employee to list and view PoS notifications.",
     permissions: ["razorpay.notifications.list", "razorpay.notifications.read"],
     landingPath: "/admin/razorpay-notifications",
   },

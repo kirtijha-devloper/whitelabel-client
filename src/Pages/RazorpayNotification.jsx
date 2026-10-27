@@ -1020,9 +1020,9 @@ const RazorpayNotification = ({ currentUser }) => {
   if (!canViewNotifications) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-xl font-semibold text-gray-900">Razorpay Access Required</h2>
+        <h2 className="text-xl font-semibold text-gray-900">PoS Access Required</h2>
         <p className="mt-2 text-sm text-gray-500">
-          This account does not currently have permission to open Razorpay notifications.
+          This account does not currently have permission to open PoS notifications.
         </p>
       </div>
     );
@@ -1031,7 +1031,7 @@ const RazorpayNotification = ({ currentUser }) => {
   return (
     <div className="bg-gray-100 min-h-screen p-4 sm:p-6">
       <div className="bg-white shadow-sm rounded-lg p-4 mb-4">
-        <h2 className="text-xl font-semibold mb-4">Razorpay Notification Report</h2>
+        <h2 className="text-xl font-semibold mb-4">PoS Notification Report</h2>
         <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <select
             className="border rounded-lg px-3 py-2"

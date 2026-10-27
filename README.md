@@ -31,7 +31,7 @@ Dedicated onboarding flows allowing unverified users (Merchants/Franchises) to a
 ### 4. Financial & Activity Dashboards
 - **Payout Handling**: Remitter detail management and transaction history views.
 - **Ledger & Commission Setting**: Modular interfaces to review hierarchical slabs.
-- **Comprehensive Reporting**: Exportable Excel/PDF reports encompassing transaction history, POS machine status, payouts, and Razorpay notifications.
+- **Comprehensive Reporting**: Exportable Excel/PDF reports encompassing transaction history, POS machine status, payouts, and PoS notifications.
 - **Stock & POS Management**: Allows admins and franchises to allocate and track POS devices accurately.
 
 ## 📂 Project Structure Overview

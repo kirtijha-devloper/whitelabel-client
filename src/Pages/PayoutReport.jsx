@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ReportTabs from '../components/Reports/ReportTabs';
 import UserSelectWithSuggestions from '../components/Reports/UserSelectWithSuggestions';
+import { getPayoutProviderDisplayName, isChildRole } from '../utils/serviceDisplayNames';
 
 const inputClassName =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
@@ -180,7 +181,7 @@ const isCcBill3Payout = (row = {}) => {
 
 const getVisibleCcBill3ProviderLabel = (row, { isAdmin = false } = {}) => {
   if (isAdmin || !isCcBill3Payout(row)) {
-    return row?.payout_provider || 'Legacy';
+    return getPayoutProviderDisplayName(row?.payout_provider || 'Legacy', null, row?.payout_provider || 'Legacy');
   }
 
   return 'CC Bill 3';
@@ -573,7 +574,7 @@ const mapPayoutRowsToExport = (rows = [], startIndex = 1) =>
     'Merchant Mobile': row.merchant?.mobile_number || '',
     'Reference ID': row.reference_id,
     'RRN': getPayoutRrn(row) || '-',
-    'Payout Provider': row.payout_provider || 'Legacy',
+    'Payout Provider': getPayoutProviderDisplayName(row.payout_provider || 'Legacy', null, row.payout_provider || 'Legacy'),
     'Beneficiary Name': row.beneficiary?.beneficiary_name || '',
     'Account Number': row.beneficiary?.account_number || '',
     'Bank': row.beneficiary?.bank_name || '',
@@ -2431,9 +2432,9 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
                   className={compactInputClassName}
                 >
                   <option value="">All</option>
-                  <option value="branchx">BranchX</option>
-                  <option value="sevenpay">SevenPay</option>
-                  <option value="vimo">Vimo</option>
+                  <option value="branchx">{getPayoutProviderDisplayName('branchx', null, 'BranchX')}</option>
+                  <option value="sevenpay">{getPayoutProviderDisplayName('sevenpay', null, 'SevenPay')}</option>
+                  <option value="vimo">{getPayoutProviderDisplayName('vimo', null, 'Vimo')}</option>
                   <option value="mx_payout">Payout MX</option>
                   <option value="ndia5_payout">India5</option>
                 </select>
@@ -2520,9 +2521,9 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
                 className={inputClassName}
               >
                 <option value="">All</option>
-                <option value="branchx">BranchX</option>
-                <option value="sevenpay">SevenPay</option>
-                <option value="vimo">Vimo</option>
+                <option value="branchx">{getPayoutProviderDisplayName('branchx', null, 'BranchX')}</option>
+                <option value="sevenpay">{getPayoutProviderDisplayName('sevenpay', null, 'SevenPay')}</option>
+                <option value="vimo">{getPayoutProviderDisplayName('vimo', null, 'Vimo')}</option>
                 <option value="mx_payout">Payout MX</option>
                 <option value="ndia5_payout">India5</option>
               </select>

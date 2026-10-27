@@ -596,7 +596,7 @@ const VimoPayout = ({ currentUser }) => {
           toast.error('Insufficient wallet balance. Please top up and try again.');
         }
       } else if (msg.toLowerCase().includes('disabled')) {
-        toast.error('Vimo Payout is currently disabled.');
+        toast.error('Payout V is currently disabled.');
       } else {
         toast.error(msg);
       }
@@ -638,7 +638,7 @@ const VimoPayout = ({ currentUser }) => {
     e.preventDefault();
 
     if (!isPayoutEnabled) {
-      toast.error('Vimo Payout is currently disabled.');
+      toast.error('Payout V is currently disabled.');
       return;
     }
 
@@ -1444,7 +1444,7 @@ const VimoPayout = ({ currentUser }) => {
         <div className="mb-5 border-b border-gray-100 pb-4 sm:mb-6 sm:pb-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Payout</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Payout V</h1>
               <p className="mt-1 text-sm text-gray-600">
                 Role: {role}. Payout status:{' '}
                 <span
@@ -1479,7 +1479,7 @@ const VimoPayout = ({ currentUser }) => {
 
             {!isPayoutEnabled && (
               <div className="rounded-2xl border border-gray-200 bg-slate-100 px-4 py-3 text-sm text-gray-700">
-                Vimo Payout is currently disabled right now.
+                Payout V is currently disabled right now.
               </div>
             )}
 

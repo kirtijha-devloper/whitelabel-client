@@ -493,7 +493,7 @@ const SevenPayPayout = ({ currentUser }) => {
       return;
     }
     if (!isPayoutEnabled) {
-      toast.error('Payout-S is currently disabled.');
+      toast.error('Payout S is currently disabled.');
       return;
     }
 
@@ -573,7 +573,7 @@ const SevenPayPayout = ({ currentUser }) => {
   return (
     <div className="pb-1">
       <div className="mx-auto max-w-4xl rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 md:p-6">
-        <h1 className="mb-2 text-2xl font-bold">Payout-S</h1>
+        <h1 className="mb-2 text-2xl font-bold">Payout S</h1>
         <p className="mb-5 border-b border-gray-100 pb-4 text-sm text-gray-600 sm:mb-6 sm:pb-5">
           Role: {normalizedRole}. Payout status: {isPayoutEnabled ? 'Enabled' : 'Disabled'}.
         </p>
@@ -606,7 +606,7 @@ const SevenPayPayout = ({ currentUser }) => {
 
         {!isPayoutEnabled && (
           <div className="mb-4 rounded-2xl border border-gray-200 bg-slate-100 px-4 py-3 text-gray-700">
-            Payout-S is currently disabled right now.
+            Payout S is currently disabled right now.
           </div>
         )}
 
@@ -676,7 +676,7 @@ const SevenPayPayout = ({ currentUser }) => {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Beneficiaries</h2>
                 <p className="text-sm text-gray-500">
-                  Choose a saved account to continue with Payout-S.
+                  Choose a saved account to continue with Payout S.
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

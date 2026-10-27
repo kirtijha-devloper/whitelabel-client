@@ -29,6 +29,7 @@ import {
   SERVICE_FLAG_DEFAULTS,
   normalizeServiceFlags,
 } from '../utils/serviceFlags';
+import { getServiceDisplayName } from '../utils/serviceDisplayNames';
 import { recordLimitAuditLog } from '../utils/userLimit';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -1376,7 +1377,7 @@ function Settings({ currentUser }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="text-sm font-semibold text-gray-900">{service.label}</p>
+                              <p className="text-sm font-semibold text-gray-900">{getServiceDisplayName(service.key, currentUser, service.label)}</p>
                               <p className="mt-1 text-sm text-gray-600">{service.description}</p>
                             </div>
                             <div className="flex items-center gap-2">

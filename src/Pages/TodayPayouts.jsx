@@ -30,6 +30,7 @@ import { checkNdia5DebugStatus, getNdia5PayoutAuditLogsByPayout } from '../api/n
 import { fetchUserDetails } from '../api/authApi';
 import Modal from '../components/Modal';
 import Loader from '../components/Loader';
+import { getPayoutProviderDisplayName, isChildRole } from '../utils/serviceDisplayNames';
 
 // Helper: Format Currency (₹)
 const formatCurrency = (amount, decimals = 2) => {
@@ -101,13 +102,13 @@ const getProviderKey = (row) => {
 const PROVIDERS_CONFIG = {
   branchx: {
     label: 'BranchX',
-    badge: 'Payout 3',
+    badge: 'Payout-B',
     color: '#0EA5E9',
     bg: 'bg-sky-50 text-sky-700 border-sky-200',
   },
   vimo: {
     label: 'Vimo',
-    badge: 'Payout 1',
+    badge: 'Payout-V',
     color: '#00B9B2',
     bg: 'bg-teal-50 text-teal-700 border-teal-200',
   },
@@ -140,6 +141,16 @@ const TodayPayouts = ({ currentUser }) => {
   });
 
   const effectiveUser = userProfile || currentUser;
+  const isChild = isChildRole(effectiveUser);
+  const providersConfig = useMemo(() => {
+    if (!isChild) return PROVIDERS_CONFIG;
+    return {
+      ...PROVIDERS_CONFIG,
+      vimo: { ...PROVIDERS_CONFIG.vimo, label: 'Payout V', badge: 'Payout V' },
+      sevenpay: { ...PROVIDERS_CONFIG.sevenpay, label: 'Payout S', badge: 'Payout S' },
+      branchx: { ...PROVIDERS_CONFIG.branchx, label: 'Payout B', badge: 'Payout B' },
+    };
+  }, [isChild]);
   const role = String(effectiveUser?.role || '').trim().toLowerCase();
   const isAdmin = role === 'admin' || role === 'super_admin';
   const walletBalance = Number(effectiveUser?.available_balance ?? effectiveUser?.wallet ?? 0);
@@ -644,9 +655,9 @@ const TodayPayouts = ({ currentUser }) => {
               className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:border-[#00D3CD]"
             >
               <option value="ALL">All Providers</option>
-              <option value="BranchX">BranchX</option>
-              <option value="Vimo">Vimo</option>
-              <option value="SevenPay">SevenPay</option>
+              <option value="BranchX">{getPayoutProviderDisplayName('BranchX', effectiveUser, 'BranchX')}</option>
+              <option value="Vimo">{getPayoutProviderDisplayName('Vimo', effectiveUser, 'Vimo')}</option>
+              <option value="SevenPay">{getPayoutProviderDisplayName('SevenPay', effectiveUser, 'SevenPay')}</option>
               <option value="Payout-M-X">Payout MX</option>
               <option value="ndia5">NDIA5</option>
             </select>
@@ -739,7 +750,7 @@ const TodayPayouts = ({ currentUser }) => {
               <tbody className="divide-y divide-gray-100 text-gray-700">
                 {filteredRows.map((row, idx) => {
                   const provKey = getProviderKey(row);
-                  const provConf = PROVIDERS_CONFIG[provKey] || PROVIDERS_CONFIG.branchx;
+                  const provConf = providersConfig[provKey] || providersConfig.branchx;
                   const status = normalizePayoutStatus(row.status);
                   const isPending = status === 'PENDING';
                   const isSuccess = status === 'SUCCESS';
@@ -776,7 +787,7 @@ const TodayPayouts = ({ currentUser }) => {
                         </div>
                         <div className="mt-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${provConf.bg}`}>
-                            {row.payout_provider || provConf.label}
+                            {getPayoutProviderDisplayName(row.payout_provider || provKey, effectiveUser, provConf.label)}
                           </span>
                         </div>
                       </td>
@@ -1046,7 +1057,7 @@ const TodayPayouts = ({ currentUser }) => {
             </div>
             <div>
               <span className="text-gray-500 font-semibold">Gateway:</span>{' '}
-              <span className="font-bold text-gray-900">{selectedAuditLog?.payout_provider || 'BranchX'}</span>
+              <span className="font-bold text-gray-900">{getPayoutProviderDisplayName(selectedAuditLog?.payout_provider || 'BranchX', effectiveUser, selectedAuditLog?.payout_provider || 'BranchX')}</span>
             </div>
           </div>
 

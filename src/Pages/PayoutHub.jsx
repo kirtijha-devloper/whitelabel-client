@@ -9,30 +9,30 @@ import { normalizeServiceFlags } from "../utils/serviceFlags";
 const PAYOUT_SERVICES = [
   {
     serviceKey: "vimo_payout",
-    label: "Payout",
+    label: "Payout V",
     subtitle: "Vimo Network",
     description: "Send money instantly via Vimo payout channel.",
     path: "/merchant/vimo-payout",
     accent: "#00B9B2",   // teal
-    badge: "P-1",
+    badge: "Payout V",
   },
   {
     serviceKey: "sevenpay_payout",
-    label: "Payout-S",
+    label: "Payout S",
     subtitle: "SevenPay Network",
     description: "Fast and reliable payouts via SevenPay.",
     path: "/merchant/sevenpay-payout",
     accent: "#7C3AED",  // violet
-    badge: "P-S",
+    badge: "Payout S",
   },
   {
     serviceKey: "branchx_payout",
-    label: "Payout 3",
+    label: "Payout B",
     subtitle: "BranchX Network",
     description: "BranchX-powered secure money transfer.",
     path: "/merchant/branchx-payout",
     accent: "#0EA5E9",  // sky blue
-    badge: "P-3",
+    badge: "Payout B",
   },
   {
     serviceKey: "ndia5_payout",

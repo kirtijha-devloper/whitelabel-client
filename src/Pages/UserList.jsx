@@ -31,6 +31,7 @@ import { fetchServiceSettings, updateUserServiceSettings, updateBulkUserServiceS
 import { useServiceSettingsPolling } from "../hooks/useServiceSettingsPolling";
 import { updateAllUserSettlementType } from "../api/authApi";
 import { SERVICE_FLAG_CONFIG, normalizeServiceFlags } from "../utils/serviceFlags";
+import { getUserServiceInlineLabels, getServiceDisplayName } from "../utils/serviceDisplayNames";
 import { recordLimitAuditLog, dispatchLimitChangeEvent } from "../utils/userLimit";
 import { dispatchSettlementChangeEvent } from "../utils/userSettlement";
 
@@ -339,7 +340,7 @@ const isServiceToggleRole = (user = {}) => {
   return normalizedRole === "merchant" || normalizedRole === "franchise" || normalizedRole === "super_franchise";
 };
 
-const USER_SERVICE_INLINE_LABELS = {
+const DEFAULT_SERVICE_INLINE_LABELS = {
   vimo_payout: "Vimo",
   sevenpay_payout: "SevenPay",
   ndia5_payout: "PAYOUT-N",
@@ -364,10 +365,10 @@ const MASTER_SERVICE_CONTROLS = [
   { key: "pos_t0_settlement", label: "POS T0/T1 Settlement & Limit" },
 ];
 
-const getServiceStatusSummary = (user = {}) => {
+const getServiceStatusSummary = (user = {}, viewerUser = null) => {
   const serviceFlags = getUserServiceSettings(user);
 
-  return Object.entries(USER_SERVICE_INLINE_LABELS)
+  return Object.entries(getUserServiceInlineLabels(viewerUser))
     .map(([key, label]) => `${label}: ${serviceFlags[key] ? "Active" : "Inactive"}`)
     .join(", ");
 };
@@ -703,7 +704,7 @@ const UserList = ({
     }
 
     const serviceItem = MASTER_SERVICE_CONTROLS.find((s) => s.key === serviceKey);
-    const serviceLabel = serviceItem ? serviceItem.label : serviceKey;
+    const serviceLabel = getServiceDisplayName(serviceKey, currentUser, serviceItem ? serviceItem.label : serviceKey);
     const actionText = targetState ? "ENABLE" : "DISABLE";
 
     setConfirmConfig({
@@ -961,7 +962,7 @@ const UserList = ({
   const getServiceSettingUpdateKey = (userId, serviceKey) => `${userId}:${serviceKey}`;
 
   const confirmToggleUserService = (row, service, targetState) => {
-    const serviceLabel = USER_SERVICE_INLINE_LABELS[service.key] || service.label || service.key;
+    const serviceLabel = getUserServiceInlineLabels(currentUser)[service.key] || service.label || service.key;
     const userName = row?.name || row?.username || `User #${row?.id}`;
     const userRole = row?.role || "user";
     const actionText = targetState ? "Enable" : "Disable";
@@ -1020,7 +1021,7 @@ const UserList = ({
                   className={`truncate font-medium ${isGloballyBlocked ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800"}`}
                   title={service.label}
                 >
-                  {USER_SERVICE_INLINE_LABELS[service.key] || service.label}
+                  {getUserServiceInlineLabels(currentUser)[service.key] || service.label}
                 </span>
 
                 <div className="flex items-center gap-1 shrink-0 ml-auto">
@@ -2059,7 +2060,7 @@ const UserList = ({
         Settlement: settlementType === "next_day_settlement" ? "T+1" : "T+0",
         "POS Count": user?.pos_machine_count ?? 0,
         "User Status": user?.status || "-",
-        Services: getServiceStatusSummary(user),
+        Services: getServiceStatusSummary(user, currentUser),
         "Created At": formatExcelDate(user?.createdAt || user?.created_at),
       };
     });
