@@ -52,7 +52,9 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   const [loadingRates, setLoadingRates] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [editFlatValue, setEditFlatValue] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [flatValidationError, setFlatValidationError] = useState("");
 
   const [matrixRowsPerPage, setMatrixRowsPerPage] = useState(20);
   const [matrixPage, setMatrixPage] = useState(1);
@@ -106,6 +108,29 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   const hasEditableGst = (rate) => rate?.gst_required || rate?.gst_rate !== null && rate?.gst_rate !== undefined;
   const getAdminRateValue = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
   const getValidationTarget = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
+  const getAdminFlatRateValue = (rate) =>
+    Number(
+      rate?.base_flat_rate ??
+      rate?.admin_flat_rate ??
+      rate?.base_rule?.charge_flat ??
+      (rate?.isInherited ? rate?.charge_flat : 0) ??
+      0
+    );
+  const getEditableFlatRateValue = (rate) => Number(rate?.charge_flat ?? 0);
+  const getFlatValidationTarget = (rate) => getAdminFlatRateValue(rate);
+  const getFlatValidationMessage = (rate) => {
+    const minTarget = getFlatValidationTarget(rate);
+    const minTargetDisplay = Number.isFinite(minTarget) ? `₹${minTarget.toFixed(2)}` : "inherited flat rate";
+    if (activeTab === "default") {
+      return (isSuperFranchise ? "Downline default flat charge" : "Franchise default flat rate") + ` must be ≥ Inherited flat rate (${minTargetDisplay})`;
+    }
+    if (activeTab === "franchise") {
+      return `Franchise flat charge must be ≥ Inherited flat rate (${minTargetDisplay})`;
+    }
+    return isSuperFranchise
+      ? `Merchant flat charge must be ≥ Inherited flat rate (${minTargetDisplay})`
+      : `Merchant flat rate must be ≥ Inherited flat rate (${minTargetDisplay})`;
+  };
   const getValidationMessage = (rate) => {
     const minTarget = getValidationTarget(rate);
     const minTargetDisplay = Number.isFinite(minTarget) ? `${minTarget.toFixed(2)}%` : "inherited rate";
@@ -147,7 +172,9 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   useEffect(() => {
     setEditingId(null);
     setEditValue("");
+    setEditFlatValue("");
     setValidationError("");
+    setFlatValidationError("");
     setSelectedComboPopup(null);
   }, [settlementFilter]);
 
@@ -208,7 +235,9 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   useEffect(() => {
     setEditingId(null);
     setEditValue("");
+    setEditFlatValue("");
     setValidationError("");
+    setFlatValidationError("");
 
     const scrollContainer = document.getElementById("main-content");
     if (scrollContainer) {
@@ -298,22 +327,38 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   const handleEdit = (rate) => {
     setEditingId(rate.id);
     setEditValue(String(getEditableRateValue(rate) ?? ""));
+    setEditFlatValue(String(getEditableFlatRateValue(rate) ?? "0"));
     setValidationError("");
+    setFlatValidationError("");
   };
 
   const handleCancel = () => {
     setEditingId(null);
     setEditValue("");
+    setEditFlatValue("");
     setValidationError("");
+    setFlatValidationError("");
   };
 
   const handleChange = (e, baseRate, rate) => {
     const val = e.target.value;
     setEditValue(val);
-    if (Number(val) < Number(baseRate)) {
+    if (val !== "" && Number(val) < Number(baseRate)) {
       setValidationError(getValidationMessage(rate || { base_rate: baseRate, admin_rate: baseRate }));
     } else {
       setValidationError("");
+    }
+  };
+
+  const handleFlatChange = (e, baseFlatRate, rate) => {
+    const val = e.target.value;
+    setEditFlatValue(val);
+    if (val !== "" && Number(val) < Number(baseFlatRate)) {
+      setFlatValidationError(getFlatValidationMessage(rate || { base_flat_rate: baseFlatRate, admin_flat_rate: baseFlatRate }));
+    } else if (val !== "" && Number(val) < 0) {
+      setFlatValidationError("Flat rate cannot be negative");
+    } else {
+      setFlatValidationError("");
     }
   };
 
@@ -324,9 +369,23 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
       return;
     }
 
+    const flatThreshold = getFlatValidationTarget(rate);
+    const parsedFlat = Number(editFlatValue || 0);
+    if (parsedFlat < flatThreshold) {
+      toast.error(getFlatValidationMessage(rate));
+      return;
+    }
+    if (parsedFlat < 0) {
+      toast.error("Flat rate cannot be negative");
+      return;
+    }
+
     try {
       const updates = {
-        chargePercent: editValue
+        chargePercent: editValue,
+        charge_percent: Number(editValue),
+        chargeFlat: parsedFlat,
+        charge_flat: parsedFlat
       };
 
       let updatedRate;
@@ -359,25 +418,28 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
 
       toast.success("Rate updated successfully");
       setRates((prevRates) =>
-        prevRates.map((r) => (r.rule_key === rate.rule_key ? { ...r, ...updatedRate } : r))
+        prevRates.map((r) => (r.rule_key === rate.rule_key ? { ...r, ...updatedRate, charge_flat: parsedFlat } : r))
       );
       if (activeTab === "franchise" && selectedFranchiseId) {
         setMatrixData((prevMatrix) => ({
           ...prevMatrix,
           [selectedFranchiseId]: (prevMatrix[selectedFranchiseId] || []).map((r) =>
-            r.rule_key === rate.rule_key ? { ...r, ...updatedRate } : r
+            r.rule_key === rate.rule_key ? { ...r, ...updatedRate, charge_flat: parsedFlat } : r
           )
         }));
       } else if (activeTab === "specific" && selectedMerchantId) {
         setMatrixData((prevMatrix) => ({
           ...prevMatrix,
           [selectedMerchantId]: (prevMatrix[selectedMerchantId] || []).map((r) =>
-            r.rule_key === rate.rule_key ? { ...r, ...updatedRate } : r
+            r.rule_key === rate.rule_key ? { ...r, ...updatedRate, charge_flat: parsedFlat } : r
           )
         }));
       }
       setEditingId(null);
       setEditValue("");
+      setEditFlatValue("");
+      setValidationError("");
+      setFlatValidationError("");
     } catch (error) {
       toast.error("Failed to update rate: " + (error.response?.data?.message || error.message));
     }
@@ -822,6 +884,56 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       )}
                     </div>
 
+                    <div className="mt-2 rounded-lg bg-gray-100/70 border border-gray-200/80 px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-600 flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-gray-500" />
+                          Inherited Flat Rate
+                        </p>
+                        <p className="text-[10px] text-gray-500">Non-Editable Base</p>
+                      </div>
+                      <span className="text-sm font-bold text-gray-800">₹{formatRateValue(getAdminFlatRateValue(rate))}</span>
+                    </div>
+
+                    <div className="mt-2 rounded-lg bg-indigo-50/50 border border-indigo-100 px-3 py-2">
+                      <p className="text-[11px] font-semibold text-indigo-900">
+                        {isSuperFranchise
+                          ? (activeTab === "default"
+                              ? "Set Downline Flat Rate (Default) (₹)"
+                              : activeTab === "franchise"
+                              ? "Set Franchise Flat Rate (₹)"
+                              : "Set Merchant Flat Rate (₹)")
+                          : (activeTab === "default"
+                              ? "Default Merchant Flat Rate (₹)"
+                              : "Merchant Flat Rate (₹)")}
+                      </p>
+                      {editingId === rate.id ? (
+                        <div className="mt-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={getFlatValidationTarget(rate)}
+                            className={`w-full rounded border px-2 py-1.5 text-sm focus:ring-2 focus:border-transparent ${
+                              flatValidationError ? "border-red-500 focus:ring-red-500" : "border-[#00D3CD] focus:ring-[#00D3CD]"
+                            }`}
+                            value={editFlatValue}
+                            onChange={(e) => handleFlatChange(e, getFlatValidationTarget(rate), rate)}
+                          />
+                          {flatValidationError && (
+                            <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500 font-medium">
+                              {flatValidationError}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-sm font-bold text-gray-900">
+                            ₹{formatRateValue(getEditableFlatRateValue(rate))}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="mt-2 rounded-lg bg-emerald-50/50 border border-emerald-100 px-3 py-2 flex items-center justify-between">
                       <div>
                         <p className="text-[11px] font-semibold text-emerald-800">Profit Margin (%)</p>
@@ -835,9 +947,9 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                         <>
                           <button
                             onClick={() => handleUpdate(rate)}
-                            disabled={!!validationError}
+                            disabled={!!validationError || !!flatValidationError}
                             className={`rounded px-3 py-2 text-sm font-semibold text-white ${
-                              validationError ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
+                              (validationError || flatValidationError) ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
                             }`}
                           >
                             Update
@@ -896,6 +1008,27 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           : (activeTab === "default"
                               ? "Default Merchant Rate (%)"
                               : "Merchant Rate (%)")}
+                      </div>
+                      <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-r border-gray-200">
+                      <div className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-gray-500" />
+                        <span>Flat Rate (₹)</span>
+                      </div>
+                      <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider bg-indigo-50/60 border-r border-indigo-100">
+                      <div>
+                        {isSuperFranchise
+                          ? (activeTab === "default"
+                              ? "Set Downline Flat Rate (₹)"
+                              : activeTab === "franchise"
+                              ? "Set Franchise Flat Rate (₹)"
+                              : "Set Merchant Flat Rate (₹)")
+                          : (activeTab === "default"
+                              ? "Default Merchant Flat Rate (₹)"
+                              : "Set Downline Flat Rate (₹)")}
                       </div>
                       <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
                     </th>
@@ -959,6 +1092,39 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           </div>
                         )}
                       </td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm bg-gray-50/80 border-r border-gray-200">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-gray-800 bg-gray-200/70 px-2.5 py-1 rounded border border-gray-300">
+                          <Lock className="w-3 h-3 text-gray-500" />
+                          ₹{formatRateValue(getAdminFlatRateValue(rate))}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-900 bg-indigo-50/20 border-r border-indigo-100">
+                        {editingId === rate.id ? (
+                          <div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min={getFlatValidationTarget(rate)}
+                              className={`border rounded px-2.5 py-1 w-28 font-semibold focus:ring-2 focus:border-transparent ${
+                                flatValidationError ? "border-red-500 focus:ring-red-500" : "border-[#00D3CD] focus:ring-[#00D3CD]"
+                              }`}
+                              value={editFlatValue}
+                              onChange={(e) => handleFlatChange(e, getFlatValidationTarget(rate), rate)}
+                            />
+                            {flatValidationError && (
+                              <div className="mt-1 max-w-[200px] whitespace-pre-line text-xs leading-4 text-red-500 font-medium">
+                                {flatValidationError}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">
+                              ₹{formatRateValue(getEditableFlatRateValue(rate))}
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-emerald-600 bg-emerald-50/10 border-r border-emerald-100">
                         {editingId === rate.id
                           ? calculateMargin(editValue, getAdminRateValue(rate))
@@ -980,9 +1146,9 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           <>
                             <button
                               onClick={() => handleUpdate(rate)}
-                              disabled={!!validationError}
+                              disabled={!!validationError || !!flatValidationError}
                               className={`px-3 py-1 rounded transition-colors text-white ${
-                                validationError ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
+                                (validationError || flatValidationError) ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
                               }`}
                             >
                               Update
@@ -1007,7 +1173,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                   ))}
                   {filteredRates.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                         {emptyStateMessage}
                       </td>
                     </tr>

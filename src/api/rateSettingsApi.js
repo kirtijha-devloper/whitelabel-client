@@ -524,12 +524,20 @@ const mapRuleToSuperFranchiseFormat = (rule, options = {}) => ({
   card_classification: fromApiCardClassification(rule.card_classification),
   gst_required: Boolean(rule.gst_required),
   gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  base_rate: options.baseRule
+    ? toFiniteNumber(options.baseRule.charge_percent, 0)
+    : options.adminRule
+      ? toFiniteNumber(options.adminRule.charge_percent, 0)
+      : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
+  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : isAdminRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
+    : options.baseRule
+      ? toFiniteNumber(options.baseRule.charge_percent, 0)
+      : isAdminRule(rule)
+        ? toFiniteNumber(rule.charge_percent, 0)
+        : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
+  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -556,14 +564,22 @@ const mapRuleToFranchiseFormat = (rule, options = {}) => ({
   card_classification: fromApiCardClassification(rule.card_classification),
   gst_required: Boolean(rule.gst_required),
   gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  base_rate: options.baseRule
+    ? toFiniteNumber(options.baseRule.charge_percent, 0)
+    : options.adminRule
+      ? toFiniteNumber(options.adminRule.charge_percent, 0)
+      : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
+  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
-      ? toFiniteNumber(rule.admin_rate, 0)
-      : isAdminRule(rule)
-        ? toFiniteNumber(rule.charge_percent, 0)
-        : toFiniteNumber(rule.charge_percent, 0),
+    : options.baseRule
+      ? toFiniteNumber(options.baseRule.charge_percent, 0)
+      : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+        ? toFiniteNumber(rule.admin_rate, 0)
+        : isAdminRule(rule)
+          ? toFiniteNumber(rule.charge_percent, 0)
+          : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
+  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -626,14 +642,22 @@ const mapRuleToMerchantFormat = (rule, options = {}) => ({
   merchant_rate: toFiniteNumber(rule.charge_percent, 0),
   base_rate: options.baseRule
     ? toFiniteNumber(options.baseRule.charge_percent, 0)
-    : toFiniteNumber(rule.charge_percent, 0),
+    : options.franchiseRule
+      ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
+      : options.adminRule
+        ? toFiniteNumber(options.adminRule.charge_percent, 0)
+        : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
+  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
   admin_rate: options.adminRule
     ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : (rule.admin_rate !== undefined && rule.admin_rate !== null)
-      ? toFiniteNumber(rule.admin_rate, 0)
-      : isAdminRule(rule)
-        ? toFiniteNumber(rule.charge_percent, 0)
-        : toFiniteNumber(rule.charge_percent, 0),
+    : options.baseRule
+      ? toFiniteNumber(options.baseRule.charge_percent, 0)
+      : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+        ? toFiniteNumber(rule.admin_rate, 0)
+        : isAdminRule(rule)
+          ? toFiniteNumber(rule.charge_percent, 0)
+          : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
+  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
   franchise_rate: options.franchiseRule
     ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
     : isFranchiseRule(rule)
@@ -661,10 +685,15 @@ const enrichManagedFranchiseDefaultRate = (mappedRate, { adminRule = null, franc
     ? toFiniteNumber(franchiseRule.charge_percent, 0)
     : mappedRate.merchant_rate ?? mappedRate.franchise_rate ?? mappedRate.base_rate ?? adminRate;
 
+  const adminFlatRate = adminRule ? toFiniteNumber(adminRule.charge_flat, 0) : mappedRate.admin_flat_rate ?? mappedRate.base_flat_rate ?? 0;
+  const franchiseFlatRate = franchiseRule ? toFiniteNumber(franchiseRule.charge_flat, 0) : mappedRate.charge_flat ?? adminFlatRate;
   return {
     ...mappedRate,
     admin_rate: adminRate,
     base_rate: adminRate,
+    admin_flat_rate: adminFlatRate,
+    base_flat_rate: adminFlatRate,
+    charge_flat: franchiseFlatRate,
     merchant_rate: franchiseRate,
     franchise_rate: franchiseRule ? franchiseRate : null,
     source_scope: franchiseRule ? 'franchise' : 'admin',
@@ -1066,6 +1095,8 @@ const buildFranchiseManagedMerchantRates = (
       const baseRule = merchantRule
         ? franchiseRule || adminRule || null
         : franchiseRule || adminRule || effectiveRule;
+      const baseFlatRate = baseRule ? toFiniteNumber(baseRule.charge_flat, 0) : 0;
+      const adminFlatRate = adminRule ? toFiniteNumber(adminRule.charge_flat, 0) : baseFlatRate;
 
       const mappedRate = mapRuleToMerchantFormat(effectiveRule, {
         merchantId: resolvedMerchantId,
@@ -1078,6 +1109,8 @@ const buildFranchiseManagedMerchantRates = (
 
       return {
         ...mappedRate,
+        base_flat_rate: baseFlatRate,
+        admin_flat_rate: adminFlatRate,
         source_scope: merchantRule ? 'merchant' : franchiseRule ? 'franchise' : 'admin',
         base_source_scope: merchantRule
           ? franchiseRule
@@ -1883,6 +1916,31 @@ export const updateFranchiseRate = async (franchiseId, rateObject, updates, opti
 
 export const updateFranchiseManagedDefaultRate = async (franchiseId, rateObject, updates) =>
   updateFranchiseRate(franchiseId, rateObject, updates, { omitFranchiseId: true });
+
+export const createPOSChargeRule = async (ruleData) => {
+  try {
+    const payload = normalizeRulePayload(ruleData, {
+      user_id: ruleData.user_id !== undefined ? ruleData.user_id : null,
+      franchaise_id: ruleData.franchaise_id !== undefined ? ruleData.franchaise_id : null,
+      super_franchise_id: ruleData.super_franchise_id !== undefined ? ruleData.super_franchise_id : null,
+      is_active: typeof ruleData.is_active === 'boolean' ? ruleData.is_active : true
+    });
+
+    logRateInfo('pos-rates:create-rule:request', payload);
+
+    const response = await axios.post(POS_CHARGE_RULES_BASE, payload, getAuthHeaders());
+    const record = extractRuleRecord(response.data);
+
+    logRateInfo('pos-rates:create-rule:success', {
+      ruleId: record?.id
+    });
+
+    return record || response.data;
+  } catch (error) {
+    logRateError('pos-rates:create-rule:error', error, { ruleData });
+    throw error;
+  }
+};
 
 export const createDefaultFranchiseRate = async (rateData) => {
   try {
@@ -2770,6 +2828,12 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
       const sfRate = sfRule
         ? toFiniteNumber(sfRule.charge_percent ?? sfRule.base_rate, adminRate)
         : adminRate;
+      const adminFlatRate = adminRule
+        ? toFiniteNumber(adminRule.charge_flat ?? adminRule.base_flat_rate, 0)
+        : toFiniteNumber(effectiveRule.charge_flat ?? effectiveRule.base_flat_rate, 0);
+      const sfFlatRate = sfRule
+        ? toFiniteNumber(sfRule.charge_flat ?? sfRule.base_flat_rate, adminFlatRate)
+        : adminFlatRate;
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         superFranchiseId,
@@ -2784,6 +2848,9 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
         rule_id: sfRule?.id || null,
         admin_rate: adminRate,
         base_rate: adminRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: adminFlatRate,
+        charge_flat: sfFlatRate,
         merchant_rate: sfRate,
         franchise_rate: sfRate,
         super_franchise_rate: sfRate,
@@ -2813,12 +2880,15 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
   try {
     const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
     const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
+    const adminFlatRate = rateObject?.admin_flat_rate ?? rateObject?.base_flat_rate ?? 0;
     const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+    const inputFlatCharge = toFiniteNumber(updates?.chargeFlat ?? updates?.charge_flat, 0);
 
     if (isInherited) {
       const payloadOverrides = {
         ...updates,
         charge_percent: inputCharge,
+        charge_flat: inputFlatCharge,
         user_id: null,
         franchaise_id: null,
         super_franchise_id: Number(superFranchiseId),
@@ -2842,6 +2912,9 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
         rule_id: record?.id,
         admin_rate: adminRate,
         base_rate: adminRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: adminFlatRate,
+        charge_flat: toFiniteNumber(record?.charge_flat ?? inputFlatCharge, inputFlatCharge),
         merchant_rate: newSfRate,
         franchise_rate: newSfRate,
         super_franchise_rate: newSfRate,
@@ -2855,6 +2928,7 @@ export const updateSuperFranchiseManagedDefaultRate = async (superFranchiseId, r
         {
           ...updates,
           charge_percent: inputCharge,
+          charge_flat: inputFlatCharge,
           user_id: null,
           franchaise_id: null,
           super_franchise_id: Number(superFranchiseId)
@@ -2926,6 +3000,9 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
       const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
       const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
       const effectiveRateVal = sfFranchiseRule ? toFiniteNumber(sfFranchiseRule.charge_percent, sfDefaultRate) : sfDefaultRate;
+      const adminFlatRate = adminRule ? toFiniteNumber(adminRule.charge_flat, 0) : toFiniteNumber(effectiveRule.charge_flat, 0);
+      const sfDefaultFlatRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_flat, 0) : adminFlatRate;
+      const effectiveFlatVal = sfFranchiseRule ? toFiniteNumber(sfFranchiseRule.charge_flat, sfDefaultFlatRate) : sfDefaultFlatRate;
 
       const mapped = mapRuleToFranchiseFormat(effectiveRule, {
         franchiseId: Number(franchiseId),
@@ -2940,6 +3017,9 @@ export const getSuperFranchiseManagedFranchiseRates = async (franchiseId, superF
         rule_id: sfFranchiseRule?.id || null,
         admin_rate: adminRate,
         base_rate: sfDefaultRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: sfDefaultFlatRate,
+        charge_flat: effectiveFlatVal,
         merchant_rate: effectiveRateVal,
         franchise_rate: effectiveRateVal,
         super_franchise_rate: sfDefaultRate,
@@ -2970,12 +3050,16 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
     const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
     const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
     const baseRate = rateObject?.base_rate ?? adminRate;
+    const adminFlatRate = rateObject?.admin_flat_rate ?? rateObject?.base_flat_rate ?? 0;
+    const baseFlatRate = rateObject?.base_flat_rate ?? adminFlatRate;
     const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+    const inputFlatCharge = toFiniteNumber(updates?.chargeFlat ?? updates?.charge_flat, 0);
 
     if (isInherited) {
       const payloadOverrides = {
         ...updates,
         charge_percent: inputCharge,
+        charge_flat: inputFlatCharge,
         user_id: null,
         franchaise_id: Number(franchiseId),
         super_franchise_id: Number(superFranchiseId),
@@ -2999,6 +3083,9 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
         rule_id: record?.id,
         admin_rate: adminRate,
         base_rate: baseRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: baseFlatRate,
+        charge_flat: toFiniteNumber(record?.charge_flat ?? inputFlatCharge, inputFlatCharge),
         merchant_rate: newRate,
         franchise_rate: newRate,
         super_franchise_rate: baseRate,
@@ -3012,6 +3099,7 @@ export const updateSuperFranchiseManagedFranchiseRate = async (franchiseId, rate
         {
           ...updates,
           charge_percent: inputCharge,
+          charge_flat: inputFlatCharge,
           user_id: null,
           franchaise_id: Number(franchiseId),
           super_franchise_id: Number(superFranchiseId)
@@ -3083,6 +3171,9 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
       const adminRate = adminRule ? toFiniteNumber(adminRule.charge_percent, 0) : toFiniteNumber(effectiveRule.charge_percent, 0);
       const sfDefaultRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_percent, 0) : adminRate;
       const effectiveRateVal = sfMerchantRule ? toFiniteNumber(sfMerchantRule.charge_percent, sfDefaultRate) : sfDefaultRate;
+      const adminFlatRate = adminRule ? toFiniteNumber(adminRule.charge_flat, 0) : toFiniteNumber(effectiveRule.charge_flat, 0);
+      const sfDefaultFlatRate = sfDefaultRule ? toFiniteNumber(sfDefaultRule.charge_flat, 0) : adminFlatRate;
+      const effectiveFlatVal = sfMerchantRule ? toFiniteNumber(sfMerchantRule.charge_flat, sfDefaultFlatRate) : sfDefaultFlatRate;
 
       const mapped = mapRuleToMerchantFormat(effectiveRule, {
         merchantId: Number(merchantId),
@@ -3097,6 +3188,9 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
         rule_id: sfMerchantRule?.id || null,
         admin_rate: adminRate,
         base_rate: sfDefaultRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: sfDefaultFlatRate,
+        charge_flat: effectiveFlatVal,
         merchant_rate: effectiveRateVal,
         source_scope: sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise' : 'admin',
         base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
@@ -3125,12 +3219,16 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
     const isInherited = Boolean(rateObject?.isInherited) || !rateObject?.rule_id || !Number.isFinite(Number(rateObject?.rule_id));
     const adminRate = rateObject?.admin_rate ?? rateObject?.base_rate ?? 0;
     const baseRate = rateObject?.base_rate ?? adminRate;
+    const adminFlatRate = rateObject?.admin_flat_rate ?? rateObject?.base_flat_rate ?? 0;
+    const baseFlatRate = rateObject?.base_flat_rate ?? adminFlatRate;
     const inputCharge = toFiniteNumber(updates?.chargePercent ?? updates?.charge_percent, 0);
+    const inputFlatCharge = toFiniteNumber(updates?.chargeFlat ?? updates?.charge_flat, 0);
 
     if (isInherited) {
       const payloadOverrides = {
         ...updates,
         charge_percent: inputCharge,
+        charge_flat: inputFlatCharge,
         user_id: Number(merchantId),
         super_franchise_id: Number(superFranchiseId),
         is_active: true
@@ -3156,6 +3254,9 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
         rule_id: record?.id,
         admin_rate: adminRate,
         base_rate: baseRate,
+        admin_flat_rate: adminFlatRate,
+        base_flat_rate: baseFlatRate,
+        charge_flat: toFiniteNumber(record?.charge_flat ?? inputFlatCharge, inputFlatCharge),
         merchant_rate: newRate,
         source_scope: 'super_franchise_merchant',
         base_source_scope: 'super_franchise',
@@ -3167,6 +3268,7 @@ export const updateSuperFranchiseManagedMerchantRate = async (merchantId, rateOb
         {
           ...updates,
           charge_percent: inputCharge,
+          charge_flat: inputFlatCharge,
           user_id: Number(merchantId),
           super_franchise_id: Number(superFranchiseId)
         },
