@@ -58,7 +58,13 @@ const normalizeClassificationToken = (value) =>
     .replace(/\s+/g, ' ')
     .replace(/[/_\\-]/g, ' ');
 
-const normalizeKeyToken = (value) => normalizeToken(value).replace(/[/_\\-]/g, '');
+const normalizeKeyToken = (value) => {
+  const norm = normalizeToken(value).replace(/[/_\\-]/g, '');
+  if (!norm || norm === 'ANY' || norm === 'ALL' || norm === 'NULL' || norm === 'UNDEFINED' || norm === 'DEFAULT') {
+    return '';
+  }
+  return norm;
+};
 
 const logRateInfo = (event, payload = {}) => {
   if (!RATE_LOG_ALLOWLIST.has(event)) {
@@ -333,9 +339,9 @@ const isMerchantRule = (rule) => isAdminMerchantRule(rule) || isFranchiseMerchan
 const getRuleScope = (rule) => {
   const scope = getRawRuleScope(rule);
   if (scope === RULE_SCOPES.ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_DEFAULT || scope === RULE_SCOPES.SUPER_ADMIN_ADMIN) return 'admin';
-  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE) return 'super_franchise';
-  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT) return 'franchise';
-  if (scope === RULE_SCOPES.ADMIN_MERCHANT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'merchant';
+  if (scope === RULE_SCOPES.ADMIN_SUPER_FRANCHISE || scope === RULE_SCOPES.SUPER_FRANCHISE_DEFAULT || scope === RULE_SCOPES.SUPER_FRANCHISE_FRANCHISE || scope === RULE_SCOPES.SUPER_FRANCHISE_MERCHANT) return 'super_franchise';
+  if (scope === RULE_SCOPES.ADMIN_FRANCHISE || scope === RULE_SCOPES.FRANCHISE_DEFAULT || scope === RULE_SCOPES.FRANCHISE_MERCHANT) return 'franchise';
+  if (scope === RULE_SCOPES.ADMIN_MERCHANT) return 'merchant';
   if (isAdminSuperFranchiseRule(rule)) return 'super_franchise';
   if (isMerchantRule(rule)) return 'merchant';
   if (isFranchiseRule(rule)) return 'franchise';
@@ -538,6 +544,12 @@ const mapRuleToSuperFranchiseFormat = (rule, options = {}) => ({
         ? toFiniteNumber(rule.charge_percent, 0)
         : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
   admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
+  platform_default_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_percent, 0)
+    : toFiniteNumber(options.adminRule?.charge_percent ?? options.baseRule?.charge_percent ?? 0),
+  platform_default_flat_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_flat, 0)
+    : toFiniteNumber(options.adminRule?.charge_flat ?? options.baseRule?.charge_flat ?? 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -548,6 +560,7 @@ const mapRuleToSuperFranchiseFormat = (rule, options = {}) => ({
   base_rule: options.baseRule || null,
   original_rule: rule,
   rule_key: makeRuleKey(rule),
+  scope: rule.scope || getRawRuleScope(rule) || null,
   source_scope: getRuleScope(rule),
   base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
 });
@@ -606,12 +619,21 @@ export const mapRuleToAdminFormat = (rule, options = {}) => ({
   card_classification: fromApiCardClassification(rule.card_classification),
   gst_required: Boolean(rule.gst_required),
   gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: toFiniteNumber(rule.charge_percent, 0),
+  base_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_percent, toFiniteNumber(rule.charge_percent, 0))
+    : toFiniteNumber(rule.charge_percent, 0),
   merchant_rate: toFiniteNumber(rule.charge_percent, 0),
   admin_rate: toFiniteNumber(rule.charge_percent, 0),
   platform_default_rate: options.defaultRule
     ? toFiniteNumber(options.defaultRule.charge_percent, 0)
     : toFiniteNumber(rule.charge_percent, 0),
+  base_flat_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_flat, toFiniteNumber(rule.charge_flat, 0))
+    : toFiniteNumber(rule.charge_flat, 0),
+  platform_default_flat_rate: options.defaultRule
+    ? toFiniteNumber(options.defaultRule.charge_flat, 0)
+    : toFiniteNumber(rule.charge_flat, 0),
+  admin_flat_rate: toFiniteNumber(rule.charge_flat, 0),
   charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
   settlement_type: rule.settlement_type || null,
   company_name: rule.company_name || null,
@@ -696,8 +718,11 @@ const enrichManagedFranchiseDefaultRate = (mappedRate, { adminRule = null, franc
     charge_flat: franchiseFlatRate,
     merchant_rate: franchiseRate,
     franchise_rate: franchiseRule ? franchiseRate : null,
+    rule_id: franchiseRule?.id || null,
+    isInherited: !franchiseRule,
     source_scope: franchiseRule ? 'franchise' : 'admin',
-    base_source_scope: adminRule ? 'admin' : mappedRate.base_source_scope
+    scope: franchiseRule?.scope || (franchiseRule ? 'franchise_default' : 'admin_default'),
+    base_source_scope: adminRule ? getRuleScope(adminRule) : mappedRate.base_source_scope
   };
 };
 
@@ -1045,6 +1070,8 @@ const buildFranchiseManagedDefaultRates = (adminRules, franchiseOwnedRules, fran
       normalizeKeyToken(r.card_classification),
       normalizeKeyToken(r.settlement_type),
       normalizeKeyToken(r.company_name),
+      String(r.min_amount ?? 0),
+      r.max_amount !== null && r.max_amount !== undefined ? String(r.max_amount) : 'OPEN'
     ].join('|');
 
     const existing = coreMap.get(coreKey);
@@ -2754,6 +2781,14 @@ export const fetchSuperFranchiseBaseAndDefaultRules = async (superFranchiseId) =
   try {
     const listRules = await fetchSuperFranchiseListRules();
     if (Array.isArray(listRules) && listRules.length > 0) {
+      // Find admin overrides specifically targeting this super franchise (scope: admin_super_franchise)
+      const adminSfOverrides = listRules.filter(
+        r => (r.scope === 'admin_super_franchise' || isAdminSuperFranchiseRule(r)) &&
+             (!superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId))
+      );
+      if (adminSfOverrides.length > 0) {
+        adminRules = [...adminRules, ...adminSfOverrides];
+      }
       if (adminRules.length === 0) {
         adminRules = listRules.filter(
           r => isAdminDefaultRule(r) || isAdminSuperFranchiseRule(r) || r.scope === 'admin_default' || r.scope === 'admin_super_franchise' || r.scope === 'super_admin_default'
@@ -2779,10 +2814,9 @@ export const fetchSuperFranchiseBaseAndDefaultRules = async (superFranchiseId) =
     }
   }
 
-  // 4. Identify Super Franchise default rules (rules without merchant/franchise id)
+  // 4. Identify Super Franchise default rules (rules created by Super Franchise for its downline)
   const sfDefaultRules = sfRules.filter(r => {
-    const isSfScope = r.scope === 'super_franchise_default' ||
-      (!hasMerchantScope(r) && !hasFranchiseScope(r) && hasSuperFranchiseScope(r));
+    const isSfScope = r.scope === 'super_franchise_default';
     const matchesSfId = !superFranchiseId || Number(getRuleSuperFranchiseId(r)) === Number(superFranchiseId);
     return isSfScope && matchesSfId;
   });
@@ -2855,6 +2889,7 @@ export const getSuperFranchiseManagedDefaultRates = async (superFranchiseId) => 
         franchise_rate: sfRate,
         super_franchise_rate: sfRate,
         source_scope: sfRule ? 'super_franchise' : 'admin',
+        scope: sfRule?.scope || (sfRule ? 'super_franchise_default' : 'admin_default'),
         base_source_scope: adminRule ? 'admin' : mapped.base_source_scope,
         isInherited: !sfRule,
         _ruleKey: key,
@@ -3193,6 +3228,7 @@ export const getSuperFranchiseManagedMerchantRates = async (merchantId, superFra
         charge_flat: effectiveFlatVal,
         merchant_rate: effectiveRateVal,
         source_scope: sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise' : 'admin',
+        scope: sfMerchantRule?.scope || (sfMerchantRule ? 'super_franchise_merchant' : sfDefaultRule ? 'super_franchise_default' : 'admin_default'),
         base_source_scope: sfDefaultRule ? 'super_franchise' : 'admin',
         isInherited: !sfMerchantRule,
         _ruleKey: key,

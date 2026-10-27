@@ -240,8 +240,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const [isSavingRental, setIsSavingRental] = useState(false);
 
   const methodOptions = ["CARD", "UPI"];
-  const networkOptions = ["MASTER_CARD", "VISA", "RUPAY", "AMEX", "DINERS", " "];
-  const cardTypeOptions = ["CREDIT", "DEBIT", "PREPAID", "UNKNOWN"];
+  const networkOptions = ["ALL", "MASTER_CARD", "VISA", "RUPAY", "AMEX", "DINERS"];
+  const cardTypeOptions = ["ALL", "CREDIT", "DEBIT", "PREPAID", "UNKNOWN"];
   const cardClassificationOptions = [
     "SIGNATURE",
     "Mastercard World",
@@ -614,7 +614,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   const fetchGlobalRate = async () => {
     setLoadingGlobal(true);
     try {
-      const data = isSuperAdmin ? await getSuperAdminGlobalPosRate() : await getGlobalPOSRate();
+      const data = isSuperAdmin ? await getSuperAdminGlobalPosRate() : null;
       const val = data?.data?.percent_fee ?? data?.percent_fee ?? (typeof data === 'number' ? data : null);
       if (val !== null && val !== undefined) {
         setGlobalRate(val);
@@ -1289,12 +1289,18 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     }
 
     // ── Minimum rate guard: admin cannot charge downstream users less than their own cost ──
-    if (!isSuperAdmin && activeTab !== 'default') {
-      const adminCost = rate.platform_default_rate ?? rate.admin_rate ?? null;
-      const enteredRate = parseFloat(editValue);
-      if (adminCost !== null && !isNaN(enteredRate) && enteredRate < adminCost) {
+    if (activeTab !== 'default' && rate) {
+      const adminCost = Number(
+        rate.base_rate ??
+        rate.admin_rate ??
+        rate.platform_default_rate ??
+        (rate.isInherited ? rate.charge_percent : 0) ??
+        0
+      );
+      const enteredRate = parseFloat(editValue || '0');
+      if (adminCost > 0 && !isNaN(enteredRate) && enteredRate < adminCost) {
         toast.error(
-          `Rate cannot be less than your applicable rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
+          `Rate (%) cannot be less than default rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
         );
         return;
       }
@@ -1410,9 +1416,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         await createAdminPosRule({
           user_id: selectedFranchiseId,
           payment_mode: payload.method,
-          card_brand: payload.network,
-          card_type: payload.card_type,
-          card_classification: payload.card_classification,
+          card_brand: (!payload.network || payload.network === 'ALL') ? null : payload.network,
+          card_type: (!payload.card_type || payload.card_type === 'ALL') ? null : payload.card_type,
+          card_classification: (!payload.card_classification || payload.card_classification === 'ANY' || payload.card_classification === 'ALL') ? null : payload.card_classification,
           settlement_type: payload.settlement_type,
           min_amount: payload.min_amount,
           max_amount: payload.max_amount,
@@ -1423,8 +1429,61 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
           company_name: payload.company_name,
         });
         toast.success("Admin rate override created successfully.");
+      } else if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+        await updateSuperFranchiseRate(selectedSuperFranchiseId, { isInherited: true }, {
+          payment_mode: payload.method,
+          card_brand: (!payload.network || payload.network === 'ALL') ? null : payload.network,
+          card_type: (!payload.card_type || payload.card_type === 'ALL') ? null : payload.card_type,
+          card_classification: (!payload.card_classification || payload.card_classification === 'ANY' || payload.card_classification === 'ALL') ? null : payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("Super Franchise rate created successfully.");
+      } else if (activeTab === 'specific' && selectedFranchiseId) {
+        await updateFranchiseRate(selectedFranchiseId, { isInherited: true }, {
+          payment_mode: payload.method,
+          card_brand: (!payload.network || payload.network === 'ALL') ? null : payload.network,
+          card_type: (!payload.card_type || payload.card_type === 'ALL') ? null : payload.card_type,
+          card_classification: (!payload.card_classification || payload.card_classification === 'ANY' || payload.card_classification === 'ALL') ? null : payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("Franchise rate created successfully.");
+      } else if (activeTab === 'unassigned' && selectedMerchantId) {
+        await updateMerchantRate(selectedMerchantId, { isInherited: true }, {
+          payment_mode: payload.method,
+          card_brand: (!payload.network || payload.network === 'ALL') ? null : payload.network,
+          card_type: (!payload.card_type || payload.card_type === 'ALL') ? null : payload.card_type,
+          card_classification: (!payload.card_classification || payload.card_classification === 'ANY' || payload.card_classification === 'ALL') ? null : payload.card_classification,
+          settlement_type: payload.settlement_type,
+          min_amount: payload.min_amount,
+          max_amount: payload.max_amount,
+          charge_percent: payload.base_rate,
+          charge_flat: payload.charge_flat,
+          gst_required: payload.gst_required,
+          gst_percent: payload.gst_rate,
+          company_name: payload.company_name,
+        });
+        toast.success("Merchant rate created successfully.");
       } else {
-        await createDefaultFranchiseRate(payload);
+        await createDefaultFranchiseRate({
+          ...payload,
+          card_brand: (!payload.network || payload.network === 'ALL') ? null : payload.network,
+          card_type: (!payload.card_type || payload.card_type === 'ALL') ? null : payload.card_type,
+          card_classification: (!payload.card_classification || payload.card_classification === 'ANY' || payload.card_classification === 'ALL') ? null : payload.card_classification,
+        });
         toast.success("New default rate created successfully.");
       }
       setIsModalOpen(false);
@@ -1435,8 +1494,12 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       fetchInitialData();
       if (activeTab === 'default') {
         fetchFranchiseRates('default');
+      } else if (activeTab === 'super_franchise' && selectedSuperFranchiseId) {
+        fetchSuperFranchiseRates(selectedSuperFranchiseId);
       } else if (activeTab === 'specific' && selectedFranchiseId) {
         fetchFranchiseRates(selectedFranchiseId);
+      } else if (activeTab === 'unassigned' && selectedMerchantId) {
+        fetchMerchantRates(selectedMerchantId);
       }
     } catch (error) {
       toast.error('Failed to create rate: ' + (error.response?.data?.message || error.message));
@@ -1467,9 +1530,14 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       setPendingDelete(null);
       return;
     }
-    if (!rate?.id) return;
+    if (!rate?.id && !rate?.rule_id) return;
 
-    const deleteId = rate.rule_id || rate.id;
+    const deleteId =
+      (Number.isFinite(Number(rate.rule_id)) && Number(rate.rule_id) > 0 ? Number(rate.rule_id) : null) ||
+      (Number.isFinite(Number(rate.id)) && Number(rate.id) > 0 ? Number(rate.id) : null) ||
+      (Number.isFinite(Number(rate.original_rule?.id)) && Number(rate.original_rule?.id) > 0 ? Number(rate.original_rule?.id) : null) ||
+      rate.rule_id ||
+      rate.id;
     setIsDeleting(true);
     try {
       if (isSuperAdmin && tab === 'default') {
@@ -1485,6 +1553,8 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
       if (tab === 'default') {
         await fetchFranchiseRates('default');
+      } else if (tab === 'super_franchise' && selectedSuperFranchiseId) {
+        await fetchSuperFranchiseRates(selectedSuperFranchiseId);
       } else if (tab === 'specific' && selectedFranchiseId) {
         await fetchFranchiseRates(selectedFranchiseId);
       } else if (tab === 'unassigned' && selectedMerchantId) {
@@ -1518,11 +1588,17 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     const isUPI = method === 'UPI';
     const flatVal = rate.charge_flat !== null && rate.charge_flat !== undefined ? String(rate.charge_flat) : '';
     const pctVal = getRateValue(rate) !== null && getRateValue(rate) !== undefined ? String(getRateValue(rate)) : '';
+    const rawNetwork = rate.network || rate.card_brand;
+    const networkVal = isUPI ? '' : (!rawNetwork || rawNetwork === 'ALL' ? 'ALL' : String(rawNetwork).toUpperCase());
+    const rawCardType = rate.card_type;
+    const cardTypeVal = isUPI ? 'UNKNOWN' : (!rawCardType || rawCardType === 'N/A' || rawCardType === 'ALL' || rawCardType === 'ANY' ? 'ALL' : String(rawCardType).toUpperCase());
+    const rawClassification = rate.card_classification;
+    const classificationVal = isUPI ? 'ANY' : (!rawClassification || rawClassification === 'ANY' || rawClassification === 'ALL' ? 'ANY' : String(rawClassification).toUpperCase());
     setPosTxnEditForm({
       method,
-      network: isUPI ? '' : (String(rate.network || 'VISA').toUpperCase()),
-      cardType: isUPI ? 'UNKNOWN' : (String(rate.card_type || 'CREDIT').toUpperCase()),
-      cardClassification: isUPI ? 'ANY' : (String(rate.card_classification || 'ANY').toUpperCase()),
+      network: networkVal,
+      cardType: cardTypeVal,
+      cardClassification: classificationVal,
       settlementType: rate.settlement_type || '',
       minAmount: String(rate.min_amount ?? '0'),
       maxAmount: rate.max_amount !== null && rate.max_amount !== undefined ? String(rate.max_amount) : '',
@@ -1565,13 +1641,34 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       }
     }
 
-    // ── Minimum rate guard: admin cannot charge downstream users less than their own cost ──
-    if (!isSuperAdmin && activeTab !== 'default' && posTxnEditRate) {
-      const adminCost = posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? null;
+    // ── Minimum rate / slab guard: admin cannot charge downstream users less than their own cost ──
+    if (activeTab !== 'default' && posTxnEditRate) {
+      const adminCost = Number(
+        posTxnEditRate.base_rate ??
+        posTxnEditRate.admin_rate ??
+        posTxnEditRate.platform_default_rate ??
+        (posTxnEditRate.isInherited ? posTxnEditRate.charge_percent : 0) ??
+        0
+      );
       const enteredRate = parseFloat(posTxnEditForm.chargePercent || '0');
-      if (adminCost !== null && !isNaN(enteredRate) && enteredRate < adminCost) {
+      if (adminCost > 0 && !isNaN(enteredRate) && enteredRate < adminCost) {
         toast.error(
-          `Rate cannot be less than your applicable rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
+          `Rate (%) cannot be less than default rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
+        );
+        return;
+      }
+
+      const adminFlatCost = Number(
+        posTxnEditRate.base_flat_rate ??
+        posTxnEditRate.admin_flat_rate ??
+        posTxnEditRate.platform_default_flat_rate ??
+        (posTxnEditRate.isInherited ? posTxnEditRate.charge_flat : 0) ??
+        0
+      );
+      const enteredFlat = parseFloat(posTxnEditForm.chargeFlat || '0');
+      if (adminFlatCost > 0 && !isNaN(enteredFlat) && enteredFlat > 0 && enteredFlat < adminFlatCost) {
+        toast.error(
+          `Flat rate (₹) cannot be less than default flat rate of ₹${adminFlatCost} for this slab. You must charge at least ₹${adminFlatCost}.`
         );
         return;
       }
@@ -1580,9 +1677,9 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
     try {
       const updates = {
         payment_mode: posTxnEditForm.method,
-        card_brand: posTxnEditForm.network || null,
-        card_type: posTxnEditForm.cardType || null,
-        card_classification: posTxnEditForm.cardClassification || null,
+        card_brand: (!posTxnEditForm.network || posTxnEditForm.network === 'ALL') ? null : posTxnEditForm.network,
+        card_type: (!posTxnEditForm.cardType || posTxnEditForm.cardType === 'ALL') ? null : posTxnEditForm.cardType,
+        card_classification: (!posTxnEditForm.cardClassification || posTxnEditForm.cardClassification === 'ANY' || posTxnEditForm.cardClassification === 'ALL') ? null : posTxnEditForm.cardClassification,
         settlement_type: posTxnEditForm.settlementType || null,
         min_amount: posTxnEditForm.minAmount || '0',
         max_amount: posTxnEditForm.maxAmount || null,
@@ -2136,7 +2233,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                         </>
                       ) : (
                         <p className="font-semibold text-gray-900 mt-1">
-                          {formatRateValue(rate)} {rate.isInherited && <span className="text-xs text-gray-400 italic">(Default)</span>}
+                          {formatRateValue(rate)} {rate.isInherited ? (
+                            <span className="text-xs text-gray-400 italic">(Default)</span>
+                          ) : (
+                            <span className="text-xs text-emerald-600 font-semibold">(Configured)</span>
+                          )}
                         </p>
                       )}
                     </div>
@@ -2294,7 +2395,14 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                               onChange={(e) => setEditValue(e.target.value)}
                             />
                           ) : (
-                            <span>{formatRateValue(rate)} {rate.isInherited && <span className="text-xs text-gray-400 italic">(Default)</span>}</span>
+                            <span>
+                              {formatRateValue(rate)}{' '}
+                              {rate.isInherited ? (
+                                <span className="text-xs text-gray-400 italic">(Default)</span>
+                              ) : (
+                                <span className="text-xs text-emerald-600 font-semibold">(Configured)</span>
+                              )}
+                            </span>
                           )}
                         </td>
                         {!isReadOnlyDetail && (

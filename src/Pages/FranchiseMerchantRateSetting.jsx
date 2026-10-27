@@ -15,10 +15,11 @@ import {
   updateSuperFranchiseManagedMerchantRate,
   getSuperFranchiseManagedAllFranchiseRates,
   getSuperFranchiseManagedAllMerchantRates,
+  deleteDefaultPOSRate,
 } from "../api/rateSettingsApi";
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
-import { Lock } from "lucide-react";
+import { Lock, Trash2 } from "lucide-react";
 
 const DEFAULT_SETTLEMENT_FILTER = "today_settlement";
 
@@ -55,6 +56,8 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
   const [editFlatValue, setEditFlatValue] = useState("");
   const [validationError, setValidationError] = useState("");
   const [flatValidationError, setFlatValidationError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [matrixRowsPerPage, setMatrixRowsPerPage] = useState(20);
   const [matrixPage, setMatrixPage] = useState(1);
@@ -106,55 +109,133 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     return "Base Rate";
   };
   const hasEditableGst = (rate) => rate?.gst_required || rate?.gst_rate !== null && rate?.gst_rate !== undefined;
-  const getAdminRateValue = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
-  const getValidationTarget = (rate) => Number(rate?.base_rate ?? rate?.admin_rate ?? 0);
-  const getAdminFlatRateValue = (rate) =>
-    Number(
-      rate?.base_flat_rate ??
-      rate?.admin_flat_rate ??
-      rate?.base_rule?.charge_flat ??
-      (rate?.isInherited ? rate?.charge_flat : 0) ??
-      0
-    );
+  const getAdminRateValue = (rate) => {
+    const val = rate?.base_rate ?? rate?.admin_rate ?? rate?.platform_default_rate ?? rate?.base_rule?.charge_percent;
+    if (val !== undefined && val !== null && !isNaN(Number(val))) {
+      return Number(val);
+    }
+    if (rate?.isInherited && rate?.charge_percent !== undefined && rate?.charge_percent !== null && !isNaN(Number(rate.charge_percent))) {
+      return Number(rate.charge_percent);
+    }
+    return 0;
+  };
+
+  const getValidationTarget = (rate) => getAdminRateValue(rate);
+
+  const getAdminFlatRateValue = (rate) => {
+    const val = rate?.base_flat_rate ?? rate?.admin_flat_rate ?? rate?.platform_default_flat_rate ?? rate?.base_rule?.charge_flat;
+    if (val !== undefined && val !== null && !isNaN(Number(val))) {
+      return Number(val);
+    }
+    if (rate?.isInherited && rate?.charge_flat !== undefined && rate?.charge_flat !== null && !isNaN(Number(rate.charge_flat))) {
+      return Number(rate.charge_flat);
+    }
+    return 0;
+  };
+
   const getEditableFlatRateValue = (rate) => Number(rate?.charge_flat ?? 0);
   const getFlatValidationTarget = (rate) => getAdminFlatRateValue(rate);
+
   const getFlatValidationMessage = (rate) => {
     const minTarget = getFlatValidationTarget(rate);
     const minTargetDisplay = Number.isFinite(minTarget) ? `₹${minTarget.toFixed(2)}` : "inherited flat rate";
+    if (isSuperFranchise) {
+      if (activeTab === "default") {
+        return `Downline default flat charge must be ≥ Admin flat rate (${minTargetDisplay})`;
+      }
+      if (activeTab === "franchise") {
+        return `Franchise flat charge must be ≥ Super Franchise flat rate (${minTargetDisplay})`;
+      }
+      return `Merchant flat charge must be ≥ Super Franchise flat rate (${minTargetDisplay})`;
+    }
+    // Franchise user
     if (activeTab === "default") {
-      return (isSuperFranchise ? "Downline default flat charge" : "Franchise default flat rate") + ` must be ≥ Inherited flat rate (${minTargetDisplay})`;
+      return `Franchise default flat rate must be ≥ Super Franchise flat rate (${minTargetDisplay})`;
     }
-    if (activeTab === "franchise") {
-      return `Franchise flat charge must be ≥ Inherited flat rate (${minTargetDisplay})`;
-    }
-    return isSuperFranchise
-      ? `Merchant flat charge must be ≥ Inherited flat rate (${minTargetDisplay})`
-      : `Merchant flat rate must be ≥ Inherited flat rate (${minTargetDisplay})`;
+    return `Merchant flat rate must be ≥ Franchise flat rate (${minTargetDisplay})`;
   };
+
   const getValidationMessage = (rate) => {
     const minTarget = getValidationTarget(rate);
     const minTargetDisplay = Number.isFinite(minTarget) ? `${minTarget.toFixed(2)}%` : "inherited rate";
+    if (isSuperFranchise) {
+      if (activeTab === "default") {
+        return `Downline default charge must be ≥ Admin rate (${minTargetDisplay})`;
+      }
+      if (activeTab === "franchise") {
+        return `Franchise charge must be ≥ Super Franchise rate (${minTargetDisplay})`;
+      }
+      return `Merchant charge must be ≥ Super Franchise rate (${minTargetDisplay})`;
+    }
+    // Franchise user
     if (activeTab === "default") {
-      return (isSuperFranchise ? "Downline default charge" : "Franchise default rate") + ` must be ≥ Inherited rate (${minTargetDisplay})`;
+      return `Franchise default rate must be ≥ Super Franchise rate (${minTargetDisplay})`;
+    }
+    return `Merchant rate must be ≥ Franchise rate (${minTargetDisplay})`;
+  };
+
+  const getBaseRateLabel = () => {
+    if (isSuperFranchise) {
+      if (activeTab === "default") return "Admin Rate (%)";
+      return "Super Franchise Rate (%)";
+    }
+    if (activeTab === "default") {
+      return "Super Franchise Rate (%)";
+    }
+    return "Franchise Rate (%)";
+  };
+
+  const getBaseFlatRateLabel = () => {
+    if (isSuperFranchise) {
+      if (activeTab === "default") return "Admin Flat Rate (₹)";
+      return "Super Franchise Flat (₹)";
+    }
+    if (activeTab === "default") {
+      return "Super Franchise Flat (₹)";
+    }
+    return "Franchise Flat Rate (₹)";
+  };
+
+  const getBaseRateSubtext = () => {
+    if (isSuperFranchise) {
+      if (activeTab === "default") return "Inherited from Admin";
+      return "SF Baseline";
+    }
+    if (activeTab === "default") {
+      return "Inherited from Super Franchise";
+    }
+    return "Inherited from Franchise";
+  };
+
+  const getDownlineRateLabel = () => {
+    if (isSuperFranchise) {
+      if (activeTab === "default") return "Set Downline Rate (%)";
+      if (activeTab === "franchise") return "Set Franchise Rate (%)";
+      return "Set Merchant Rate (%)";
+    }
+    if (activeTab === "default") return "Set Default Rate (%)";
+    return "Set Merchant Rate (%)";
+  };
+
+  const getDownlineFlatRateLabel = () => {
+    if (isSuperFranchise) {
+      if (activeTab === "default") return "Set Downline Flat (₹)";
+      if (activeTab === "franchise") return "Set Franchise Flat (₹)";
+      return "Set Merchant Flat (₹)";
+    }
+    if (activeTab === "default") return "Set Default Flat (₹)";
+    return "Set Merchant Flat (₹)";
+  };
+
+  const getEditableRateValue = (rate) => {
+    if (activeTab === "default") {
+      return rate.merchant_rate ?? rate.franchise_rate ?? rate.super_franchise_rate ?? rate.base_rate ?? rate.admin_rate;
     }
     if (activeTab === "franchise") {
-      return `Franchise charge must be ≥ Inherited rate (${minTargetDisplay})`;
+      return rate.franchise_rate ?? rate.merchant_rate ?? rate.base_rate ?? rate.admin_rate;
     }
-    return isSuperFranchise
-      ? `Merchant charge must be ≥ Inherited rate (${minTargetDisplay})`
-      : `Merchant rate must be ≥ Inherited rate (${minTargetDisplay})`;
+    return rate.merchant_rate ?? rate.franchise_rate ?? rate.base_rate ?? rate.admin_rate;
   };
-  const getBaseRateLabel = () => "Inherited Rate (%)";
-  const getEditableRateValue = (rate) => {
-  if (activeTab === "default") {
-    // For default rates, prioritize overrides, then base, finally admin_rate as fallback
-    return rate.merchant_rate ?? rate.franchise_rate ?? rate.super_franchise_rate ?? rate.base_rate ?? rate.admin_rate;
-  }
-  if (activeTab === "franchise") {
-    return rate.franchise_rate ?? rate.merchant_rate ?? rate.base_rate ?? rate.admin_rate;
-  }
-  return rate.merchant_rate ?? rate.franchise_rate ?? rate.base_rate ?? rate.admin_rate;
-};
   const normalizeSettlementValue = (value) => String(value ?? "").trim().toLowerCase();
   const matchesSettlementFilter = (rate) => {
     if (settlementFilter === "all") return true;
@@ -326,10 +407,111 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
 
   const handleEdit = (rate) => {
     setEditingId(rate.id);
-    setEditValue(String(getEditableRateValue(rate) ?? ""));
-    setEditFlatValue(String(getEditableFlatRateValue(rate) ?? "0"));
+    const minRate = getValidationTarget(rate);
+    const currentRate = getEditableRateValue(rate);
+    const parsedRate = currentRate !== null && currentRate !== undefined && !isNaN(Number(currentRate)) ? Number(currentRate) : minRate;
+    setEditValue(String(Math.max(parsedRate, minRate)));
+
+    const minFlat = getFlatValidationTarget(rate);
+    const currentFlat = getEditableFlatRateValue(rate);
+    const parsedFlat = currentFlat !== null && currentFlat !== undefined && !isNaN(Number(currentFlat)) ? Number(currentFlat) : minFlat;
+    setEditFlatValue(String(Math.max(parsedFlat, minFlat)));
+
     setValidationError("");
     setFlatValidationError("");
+  };
+
+  const canDeleteRate = (rate) => {
+    if (!rate) return false;
+    // An inherited rate comes from upline and cannot be deleted here
+    if (rate.isInherited) return false;
+
+    // Must have a real database rule ID to delete
+    const ruleId =
+      (Number.isFinite(Number(rate.rule_id)) && Number(rate.rule_id) > 0 ? Number(rate.rule_id) : null) ||
+      (Number.isFinite(Number(rate.id)) && Number(rate.id) > 0 ? Number(rate.id) : null) ||
+      (Number.isFinite(Number(rate.original_rule?.id)) && Number(rate.original_rule?.id) > 0 ? Number(rate.original_rule?.id) : null);
+    if (!ruleId) return false;
+
+    const rawScope = String(
+      rate.scope ||
+      rate.source_scope ||
+      rate.original_rule?.scope ||
+      ""
+    ).toLowerCase();
+
+    // Match role with scope strictly:
+    if (isSuperFranchise) {
+      return rawScope.startsWith("super_franchise") || rate.source_scope === "super_franchise";
+    }
+
+    // Franchise can delete entries whose scope belongs to franchise (e.g. franchise_default, franchise_merchant)
+    return (rawScope.startsWith("franchise") || rate.source_scope === "franchise") && !rawScope.startsWith("super_franchise") && !rawScope.startsWith("admin");
+  };
+
+  const handleDelete = (rate) => {
+    if (!rate) return;
+    if (!canDeleteRate(rate)) {
+      toast.info(
+        isSuperFranchise
+          ? "This rate is inherited from Admin/Super Admin. Only Super Franchise custom rates can be deleted."
+          : "This rate is inherited from Super Franchise/Admin. Only Franchise custom rates can be deleted."
+      );
+      return;
+    }
+    setPendingDelete(rate);
+  };
+
+  const closeDeleteModal = () => {
+    if (isDeleting) return;
+    setPendingDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    const rate = pendingDelete;
+    if (!rate) return;
+
+    if (!canDeleteRate(rate)) {
+      toast.error(
+        isSuperFranchise
+          ? "Unauthorized: You can only delete custom overrides created under Super Franchise scope."
+          : "Unauthorized: You can only delete custom overrides created under Franchise scope."
+      );
+      setPendingDelete(null);
+      return;
+    }
+
+    const deleteId =
+      (Number.isFinite(Number(rate.rule_id)) && Number(rate.rule_id) > 0 ? Number(rate.rule_id) : null) ||
+      (Number.isFinite(Number(rate.id)) && Number(rate.id) > 0 ? Number(rate.id) : null) ||
+      (Number.isFinite(Number(rate.original_rule?.id)) && Number(rate.original_rule?.id) > 0 ? Number(rate.original_rule?.id) : null);
+
+    if (!deleteId) {
+      toast.error("Could not find a valid rule ID to delete for this entry.");
+      setPendingDelete(null);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteDefaultPOSRate(deleteId);
+      toast.success("Rate override deleted successfully. Reverted to inherited rate.");
+
+      if (activeTab === "default") {
+        await fetchRates(currentUserId);
+      } else if (activeTab === "franchise" && selectedFranchiseId) {
+        await fetchRates(selectedFranchiseId);
+      } else if (activeTab === "specific" && selectedMerchantId) {
+        await fetchRates(selectedMerchantId);
+      } else {
+        await fetchInitialData();
+      }
+      setPendingDelete(null);
+    } catch (error) {
+      toast.error("Failed to delete rate: " + (error?.response?.data?.message || error.message));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -449,6 +631,13 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     if (baseRate === undefined || baseRate === null || baseRate === "" || isNaN(Number(baseRate))) return "-";
     if (merchantRate === undefined || merchantRate === null || merchantRate === "" || isNaN(Number(merchantRate))) return "-";
     return (Number(merchantRate) - Number(baseRate)).toFixed(2);
+  };
+
+  const calculateFlatMargin = (editableFlat, baseFlat) => {
+    if (baseFlat === undefined || baseFlat === null || baseFlat === "" || isNaN(Number(baseFlat))) return "-";
+    if (editableFlat === undefined || editableFlat === null || editableFlat === "" || isNaN(Number(editableFlat))) return "-";
+    const diff = Number(editableFlat) - Number(baseFlat);
+    return `₹${diff.toFixed(2)}`;
   };
 
   const formatRateValue = (value) => {
@@ -638,7 +827,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 flex items-center gap-2">
                   <div className="rounded border border-gray-100 bg-gray-50 p-2">
                     <p className="text-[10px] uppercase tracking-wide text-gray-500">User ID</p>
                     <p className="mt-1 text-sm font-medium text-gray-900">{getEntityDisplayId(entity)}</p>
@@ -800,6 +989,11 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                     ? `${calculateMargin(editValue, getAdminRateValue(rate))}%`
                     : `${calculateMargin(getEditableRateValue(rate), getAdminRateValue(rate))}%`;
 
+                const flatMarginValue =
+                  editingId === rate.id
+                    ? calculateFlatMargin(editFlatValue, getAdminFlatRateValue(rate))
+                    : calculateFlatMargin(getEditableFlatRateValue(rate), getAdminFlatRateValue(rate));
+
                 return (
                   <div key={rate.id} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                     <div className="grid grid-cols-2 gap-2">
@@ -833,24 +1027,16 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       <div>
                         <p className="text-[11px] font-semibold text-gray-600 flex items-center gap-1">
                           <Lock className="w-3 h-3 text-gray-500" />
-                          Inherited Rate
+                          {getBaseRateLabel()}
                         </p>
-                        <p className="text-[10px] text-gray-500">Non-Editable Base</p>
+                        <p className="text-[10px] text-gray-500">{getBaseRateSubtext()}</p>
                       </div>
                       <span className="text-sm font-bold text-gray-800">{formatRateValue(getAdminRateValue(rate))}%</span>
                     </div>
 
                     <div className="mt-2 rounded-lg bg-indigo-50/50 border border-indigo-100 px-3 py-2">
                       <p className="text-[11px] font-semibold text-indigo-900">
-                        {isSuperFranchise
-                          ? (activeTab === "default"
-                              ? "Set Downline Charge (Default) (%)"
-                              : activeTab === "franchise"
-                              ? "Set Franchise Charge (%)"
-                              : "Set Merchant Charge (%)")
-                          : (activeTab === "default"
-                              ? "Default Merchant Rate (%)"
-                              : "Merchant Rate (%)")}
+                        {getDownlineRateLabel()}
                       </p>
                       {editingId === rate.id ? (
                         <div className="mt-1">
@@ -888,24 +1074,16 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       <div>
                         <p className="text-[11px] font-semibold text-gray-600 flex items-center gap-1">
                           <Lock className="w-3 h-3 text-gray-500" />
-                          Inherited Flat Rate
+                          {getBaseFlatRateLabel()}
                         </p>
-                        <p className="text-[10px] text-gray-500">Non-Editable Base</p>
+                        <p className="text-[10px] text-gray-500">{getBaseRateSubtext()}</p>
                       </div>
                       <span className="text-sm font-bold text-gray-800">₹{formatRateValue(getAdminFlatRateValue(rate))}</span>
                     </div>
 
                     <div className="mt-2 rounded-lg bg-indigo-50/50 border border-indigo-100 px-3 py-2">
                       <p className="text-[11px] font-semibold text-indigo-900">
-                        {isSuperFranchise
-                          ? (activeTab === "default"
-                              ? "Set Downline Flat Rate (Default) (₹)"
-                              : activeTab === "franchise"
-                              ? "Set Franchise Flat Rate (₹)"
-                              : "Set Merchant Flat Rate (₹)")
-                          : (activeTab === "default"
-                              ? "Default Merchant Flat Rate (₹)"
-                              : "Merchant Flat Rate (₹)")}
+                        {getDownlineFlatRateLabel()}
                       </p>
                       {editingId === rate.id ? (
                         <div className="mt-1">
@@ -934,12 +1112,21 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       )}
                     </div>
 
-                    <div className="mt-2 rounded-lg bg-emerald-50/50 border border-emerald-100 px-3 py-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold text-emerald-800">Profit Margin (%)</p>
-                        <p className="text-[10px] text-emerald-600">Downline - Inherited</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-emerald-50/50 border border-emerald-100 px-3 py-2 flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-emerald-800">Profit (%)</p>
+                          <p className="text-[10px] text-emerald-600">Margin</p>
+                        </div>
+                        <p className="text-sm font-bold text-emerald-600">{marginValue}</p>
                       </div>
-                      <p className="text-sm font-bold text-emerald-600">{marginValue}</p>
+                      <div className="rounded-lg bg-emerald-50/50 border border-emerald-100 px-3 py-2 flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-emerald-800">Profit (₹)</p>
+                          <p className="text-[10px] text-emerald-600">Flat Margin</p>
+                        </div>
+                        <p className="text-sm font-bold text-emerald-600">{flatMarginValue}</p>
+                      </div>
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -952,7 +1139,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                               (validationError || flatValidationError) ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
                             }`}
                           >
-                            Update
+                            Save
                           </button>
                           <button
                             onClick={handleCancel}
@@ -962,12 +1149,24 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           </button>
                         </>
                       ) : (
-                        <button
-                          onClick={() => handleEdit(rate)}
-                          className="col-span-2 rounded bg-[#4e73df] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
-                        >
-                          Edit Downline Charge
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleEdit(rate)}
+                            className="flex-1 rounded bg-[#4e73df] px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+                          >
+                            Edit Downline Charge
+                          </button>
+                          {canDeleteRate(rate) && (
+                            <button
+                              onClick={() => handleDelete(rate)}
+                              className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 flex items-center gap-1 shadow-sm"
+                              title="Delete custom rate and reset to inherited default"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -993,48 +1192,36 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                     <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-x border-gray-200">
                       <div className="flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Inherited Rate (%)</span>
+                        <span>{getBaseRateLabel()}</span>
                       </div>
-                      <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
+                      <span className="text-[10px] font-normal normal-case text-gray-500 block">{getBaseRateSubtext()}</span>
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider bg-indigo-50/60 border-r border-indigo-100">
                       <div>
-                        {isSuperFranchise
-                          ? (activeTab === "default"
-                              ? "Set Downline Charge (Default) (%)"
-                              : activeTab === "franchise"
-                              ? "Set Franchise Charge (%)"
-                              : "Set Merchant Charge (%)")
-                          : (activeTab === "default"
-                              ? "Default Merchant Rate (%)"
-                              : "Merchant Rate (%)")}
+                        {getDownlineRateLabel()}
                       </div>
                       <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-r border-gray-200">
                       <div className="flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Flat Rate (₹)</span>
+                        <span>{getBaseFlatRateLabel()}</span>
                       </div>
-                      <span className="text-[10px] font-normal normal-case text-gray-500 block">Non-Editable Base</span>
+                      <span className="text-[10px] font-normal normal-case text-gray-500 block">{getBaseRateSubtext()}</span>
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-indigo-700 uppercase tracking-wider bg-indigo-50/60 border-r border-indigo-100">
                       <div>
-                        {isSuperFranchise
-                          ? (activeTab === "default"
-                              ? "Set Downline Flat Rate (₹)"
-                              : activeTab === "franchise"
-                              ? "Set Franchise Flat Rate (₹)"
-                              : "Set Merchant Flat Rate (₹)")
-                          : (activeTab === "default"
-                              ? "Default Merchant Flat Rate (₹)"
-                              : "Set Downline Flat Rate (₹)")}
+                        {getDownlineFlatRateLabel()}
                       </div>
                       <span className="text-[10px] font-normal normal-case text-indigo-500 block">Editable for Downline</span>
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50/40 border-r border-emerald-100">
                       <span>Profit Margin (%)</span>
-                      <span className="text-[10px] font-normal normal-case text-emerald-600 block">Downline - Inherited</span>
+                      <span className="text-[10px] font-normal normal-case text-emerald-600 block">Downline - Base</span>
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50/40 border-r border-emerald-100">
+                      <span>Profit Flat (₹)</span>
+                      <span className="text-[10px] font-normal normal-case text-emerald-600 block">Downline - Base</span>
                     </th>
                     <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -1131,6 +1318,11 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                           : calculateMargin(getEditableRateValue(rate), getAdminRateValue(rate))}
                         %
                       </td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-emerald-600 bg-emerald-50/10 border-r border-emerald-100">
+                        {editingId === rate.id
+                          ? calculateFlatMargin(editFlatValue, getAdminFlatRateValue(rate))
+                          : calculateFlatMargin(getEditableFlatRateValue(rate), getAdminFlatRateValue(rate))}
+                      </td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-center space-x-2">
                         {detailReadOnly ? (
                           <button
@@ -1149,31 +1341,43 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                               disabled={!!validationError || !!flatValidationError}
                               className={`px-3 py-1 rounded transition-colors text-white ${
                                 (validationError || flatValidationError) ? "bg-gray-400 cursor-not-allowed" : "bg-[#1cc88a] hover:bg-green-600"
-                              }`}
+                              } text-xs font-semibold shadow-sm`}
                             >
-                              Update
+                              Save
                             </button>
                             <button
                               onClick={handleCancel}
-                              className="text-gray-600 bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition-colors"
+                              className="text-gray-600 bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition-colors text-xs font-semibold shadow-sm"
                             >
                               Cancel
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => handleEdit(rate)}
-                            className="bg-[#4e73df] px-3 py-1 rounded text-white transition-colors hover:bg-blue-600 text-xs font-semibold"
-                          >
-                            Edit
-                          </button>
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              onClick={() => handleEdit(rate)}
+                              className="bg-[#4e73df] px-3 py-1 rounded text-white transition-colors hover:bg-blue-600 text-xs font-semibold shadow-sm"
+                            >
+                              Edit
+                            </button>
+                            {canDeleteRate(rate) && (
+                              <button
+                                onClick={() => handleDelete(rate)}
+                                className="bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 px-2.5 py-1 rounded text-xs font-semibold inline-flex items-center gap-1 transition-colors shadow-sm"
+                                title="Delete custom rate and reset to inherited default"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
                   ))}
                   {filteredRates.length === 0 && (
                     <tr>
-                      <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                         {emptyStateMessage}
                       </td>
                     </tr>
@@ -1317,6 +1521,52 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
           {renderDownlineContent()}
         </div>
       </div>
+      {/* Delete Confirmation Modal */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-gray-100">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-red-100 p-3 text-red-600">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Delete Rate Override?
+                </h3>
+                <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                  Are you sure you want to delete this custom {isSuperFranchise ? "Super Franchise" : "Franchise"} rate for{" "}
+                  <span className="font-semibold text-gray-800">
+                    {pendingDelete.method} - {pendingDelete.network}
+                  </span>{" "}
+                  ({formatSettlementLabel(pendingDelete.settlement_type)})?
+                </p>
+                <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                  This will remove your custom rate rule and revert this downline charge back to the inherited base rate of{" "}
+                  <span className="font-bold">{formatRateValue(getAdminRateValue(pendingDelete))}%</span> (Flat: ₹{formatRateValue(getAdminFlatRateValue(pendingDelete))}).
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={isDeleting}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete Rule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
