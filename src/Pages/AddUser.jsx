@@ -1204,30 +1204,16 @@ function AddUser({ currentUser }) {
                 )}
               </div>
 
-                <div className="min-w-0">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 leading-5">
-                    PAN Card Number
-                  </label>
-                  <input
-                    type="text"
-                    name="pan_number"
-                    value={state.formData.pan_number}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter PAN Number"
-                    inputMode="text"
-                    maxLength={10}
-                    pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
-                    title="PAN must be 5 letters, 4 digits, and 1 letter"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                    aria-invalid={Boolean(panValidationMessage)}
-                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <p className={`mt-1 text-xs ${panValidationMessage ? 'text-red-600' : 'text-gray-500'}`}>
-                    {panValidationMessage || "Format: ABCDE1234F. Only valid characters for each position are allowed."}
-                  </p>
-                </div>
+                              {FILE_FIELD_CONFIG.map((field) => {
+                const selectedFile = state.formData[field.name];
+                const hasSelectedFile = selectedFile instanceof File;
+                const existingUrl = getExistingFileUrl(field.name);
+                const inputId = `upload-${field.name}`;
+                const fileField = (
+                  <div key={field.name} className={`${field.fullWidth ? 'md:col-span-2 ' : ''}min-w-0`}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 leading-5">
+                      {field.label}
+                    </label>
 
                     <div className={`w-full rounded-lg border px-3 py-3 ${
                       field.name === 'bank_passbook' && errors.bank_passbook ? 'border-red-500 bg-red-50/20' : 'border-gray-200'
@@ -1254,57 +1240,45 @@ function AddUser({ currentUser }) {
                             <span className="pointer-events-none absolute left-11 top-1/2 z-20 hidden -translate-y-1/2 rounded-md bg-white p-1 shadow-lg group-hover:block">
                               <img
                                 src={existingUrl}
-                                alt={`${field.label} thumbnail`}
-                                className="h-9 w-9 rounded border object-cover"
+                                alt={`${field.label} preview`}
+                                className="h-24 w-24 rounded border object-cover"
                                 onError={(e) => {
                                   e.currentTarget.onerror = null;
                                   e.currentTarget.src = FILE_FALLBACK_SRC;
                                 }}
                               />
-                              <span className="text-xs text-blue-700 underline">View</span>
-                              <span className="pointer-events-none absolute left-11 top-1/2 z-20 hidden -translate-y-1/2 rounded-md bg-white p-1 shadow-lg group-hover:block">
-                                <img
-                                  src={existingUrl}
-                                  alt={`${field.label} preview`}
-                                  className="h-24 w-24 rounded border object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src = FILE_FALLBACK_SRC;
-                                  }}
-                                />
-                              </span>
-                            </a>
-                          )}
+                            </span>
+                          </a>
+                        )}
 
-                          <label
-                            htmlFor={inputId}
-                            className="cursor-pointer rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20"
-                          >
-                            {hasSelectedFile
-                              ? "Change Image"
-                              : existingUrl
-                                ? "Replace Image"
-                                : "Select Image"}
-                          </label>
+                        <label
+                          htmlFor={inputId}
+                          className="cursor-pointer rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20"
+                        >
+                          {hasSelectedFile
+                            ? "Change Image"
+                            : existingUrl
+                              ? "Replace Image"
+                              : "Select Image"}
+                        </label>
 
-                          <span className="min-w-0 break-all text-xs text-gray-600">
-                            {hasSelectedFile
-                              ? selectedFile.name
-                              : existingUrl
-                                ? "Current image available"
-                                : "No image selected"}
-                          </span>
-                        </div>
-
-                        <input
-                          id={inputId}
-                          type="file"
-                          name={field.name}
-                          onChange={handleChange}
-                          accept={field.accept || 'image/*'}
-                          className="hidden"
-                        />
+                        <span className="min-w-0 break-all text-xs text-gray-600">
+                          {hasSelectedFile
+                            ? selectedFile.name
+                            : existingUrl
+                              ? "Current image available"
+                              : "No image selected"}
+                        </span>
                       </div>
+
+                      <input
+                        id={inputId}
+                        type="file"
+                        name={field.name}
+                        onChange={handleChange}
+                        accept={field.accept || 'image/*'}
+                        className="hidden"
+                      />
                     </div>
                     {field.name === 'bank_passbook' && errors.bank_passbook && (
                       <p className="mt-1 text-xs text-red-600 font-medium">{errors.bank_passbook}</p>
@@ -1312,8 +1286,8 @@ function AddUser({ currentUser }) {
                   </div>
                 );
 
-                  return fileField;
-                })}
+                return fileField;
+              })}
               </div>
             </div>
           )}
