@@ -2350,10 +2350,10 @@ const PayoutReport = ({ reportVariant = 'payout' }) => {
           <button
             type="button"
             onClick={openCombinedExportModal}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 md:w-auto"
+            className="h-10 shrink-0 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-[0.99] sm:w-auto"
           >
-            <Download className="h-4 w-4" />
-            DOWNLOAD ALL DATA
+            <Download className="h-4 w-4 shrink-0" />
+            <span>DOWNLOAD ALL DATA</span>
           </button>
         )}
       />
