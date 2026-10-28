@@ -101,7 +101,8 @@ const ComplaintBox = ({ currentUser }) => {
   const handleOpenReplyModal = (ticket) => {
     setSelectedTicket(ticket);
     setReplyText(ticket.admin_reply || ticket.reply || '');
-    setTargetStatus(ticket.status === 'closed' ? 'closed' : ticket.status === 'resolved' ? 'resolved' : 'resolved');
+    const currentSt = String(ticket.status || 'pending').toLowerCase();
+    setTargetStatus(['pending', 'open', 'in_progress', 'resolved', 'closed'].includes(currentSt) ? (currentSt === 'open' ? 'pending' : currentSt) : 'resolved');
     setIsReplyModalOpen(true);
   };
 
@@ -169,7 +170,7 @@ const ComplaintBox = ({ currentUser }) => {
       if (statusFilter !== 'all') {
         const itemStatus = String(item.status || 'pending').toLowerCase();
         if (statusFilter === 'pending' && !['pending', 'open'].includes(itemStatus)) return false;
-        if (statusFilter === 'in_progress' && itemStatus !== 'in_progress') return false;
+        if (statusFilter === 'in_progress' && !['in_progress', 'inprogress', 'in progress'].includes(itemStatus)) return false;
         if (statusFilter === 'resolved' && itemStatus !== 'resolved') return false;
         if (statusFilter === 'closed' && itemStatus !== 'closed') return false;
       }
@@ -188,14 +189,26 @@ const ComplaintBox = ({ currentUser }) => {
     });
   }, [complaints, isAdmin, userId, statusFilter, searchTerm]);
 
-  // Statistics
+  // User complaints based on role access
+  const userAccessibleComplaints = useMemo(() => {
+    return complaints.filter((item) => {
+      const itemUserId = item.user_details?.id || item.user_id || item.userId;
+      if (!isAdmin && userId && itemUserId && String(itemUserId) !== String(userId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [complaints, isAdmin, userId]);
+
+  // Statistics across all accessible tickets
   const stats = useMemo(() => {
-    const total = visibleComplaints.length;
-    const pending = visibleComplaints.filter((c) => ['pending', 'open'].includes(String(c.status || '').toLowerCase())).length;
-    const resolved = visibleComplaints.filter((c) => String(c.status).toLowerCase() === 'resolved').length;
-    const closed = visibleComplaints.filter((c) => String(c.status).toLowerCase() === 'closed').length;
-    return { total, pending, resolved, closed };
-  }, [visibleComplaints]);
+    const total = userAccessibleComplaints.length;
+    const pending = userAccessibleComplaints.filter((c) => ['pending', 'open'].includes(String(c.status || '').toLowerCase())).length;
+    const inProgress = userAccessibleComplaints.filter((c) => ['in_progress', 'inprogress', 'in progress'].includes(String(c.status || '').toLowerCase())).length;
+    const resolved = userAccessibleComplaints.filter((c) => String(c.status).toLowerCase() === 'resolved').length;
+    const closed = userAccessibleComplaints.filter((c) => String(c.status).toLowerCase() === 'closed').length;
+    return { total, pending, inProgress, resolved, closed };
+  }, [userAccessibleComplaints]);
 
   const getStatusBadge = (statusStr) => {
     const st = String(statusStr || 'pending').toLowerCase();
@@ -255,8 +268,14 @@ const ComplaintBox = ({ currentUser }) => {
       </div>
 
       {/* Stats Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {/* Total Tickets */}
+        <div
+          onClick={() => setStatusFilter('all')}
+          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            statusFilter === 'all' ? 'border-[#00D3CD] ring-2 ring-[#00D3CD]/20' : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase">Total Tickets</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
@@ -266,7 +285,13 @@ const ComplaintBox = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        {/* Open / Pending */}
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            statusFilter === 'pending' ? 'border-amber-500 ring-2 ring-amber-400/20' : 'border-gray-200 hover:border-amber-300'
+          }`}
+        >
           <div>
             <p className="text-xs font-medium text-amber-600 uppercase">Open / Pending</p>
             <p className="text-2xl font-bold text-amber-700 mt-1">{stats.pending}</p>
@@ -276,7 +301,29 @@ const ComplaintBox = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        {/* In Progress */}
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
+          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            statusFilter === 'in_progress' ? 'border-cyan-500 ring-2 ring-cyan-400/20' : 'border-gray-200 hover:border-cyan-300'
+          }`}
+        >
+          <div>
+            <p className="text-xs font-medium text-cyan-600 uppercase">In Progress</p>
+            <p className="text-2xl font-bold text-cyan-700 mt-1">{stats.inProgress}</p>
+          </div>
+          <div className="p-2.5 bg-cyan-50 rounded-lg text-cyan-600">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Resolved */}
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'resolved' ? 'all' : 'resolved')}
+          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            statusFilter === 'resolved' ? 'border-emerald-500 ring-2 ring-emerald-400/20' : 'border-gray-200 hover:border-emerald-300'
+          }`}
+        >
           <div>
             <p className="text-xs font-medium text-emerald-600 uppercase">Resolved</p>
             <p className="text-2xl font-bold text-emerald-700 mt-1">{stats.resolved}</p>
@@ -286,7 +333,13 @@ const ComplaintBox = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        {/* Closed */}
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'closed' ? 'all' : 'closed')}
+          className={`bg-white p-4 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            statusFilter === 'closed' ? 'border-gray-500 ring-2 ring-gray-400/20' : 'border-gray-200 hover:border-gray-400'
+          }`}
+        >
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase">Closed</p>
             <p className="text-2xl font-bold text-gray-800 mt-1">{stats.closed}</p>
@@ -421,6 +474,14 @@ const ComplaintBox = ({ currentUser }) => {
                 }`}
               >
                 Open
+              </button>
+              <button
+                onClick={() => setStatusFilter('in_progress')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  statusFilter === 'in_progress' ? 'bg-cyan-600 text-white shadow-sm' : 'text-cyan-700 hover:text-cyan-900'
+                }`}
+              >
+                In Progress
               </button>
               <button
                 onClick={() => setStatusFilter('resolved')}

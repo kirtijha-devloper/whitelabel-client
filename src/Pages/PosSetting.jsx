@@ -914,6 +914,10 @@ export default function PosSetting({ currentUser }) {
       if (uRole === "admin" || uRole === "superadmin" || uRole === "super_franchise") return;
 
       const uSfId = getSuperFranchiseParentId(u);
+      const uFranchiseId = getFranchiseParentId(u);
+
+      // Grandchild merchants belong to their parent Franchise's pool, not the Super Franchise's direct allocation pool
+      if (uRole !== "franchise" && uRole !== "employee" && uFranchiseId) return;
 
       if (String(uSfId) === sfIdStr) {
         children.push(u);
@@ -1147,7 +1151,18 @@ export default function PosSetting({ currentUser }) {
     const parentSuperFranchiseId =
       !isSuperFranchiseRole && sfParentId ? Number(sfParentId) : null;
 
-    if ((isSuperFranchise || isAdmin) && parentSuperFranchiseId && String(customer.id) !== String(parentSuperFranchiseId)) {
+    const customerParentFranchiseId = getFranchiseParentId(customer);
+    const isDirectChildOfSuperFranchise =
+      isFranchiseRole ||
+      normalizeUserRole(customer.role) === "employee" ||
+      !customerParentFranchiseId;
+
+    if (
+      (isSuperFranchise || isAdmin) &&
+      parentSuperFranchiseId &&
+      String(customer.id) !== String(parentSuperFranchiseId) &&
+      isDirectChildOfSuperFranchise
+    ) {
       const parentSuperFranchise =
         rawUsersList.find((u) => Number(u.id) === Number(parentSuperFranchiseId)) ||
         extractUsersArray(allUsersData).find((u) => Number(u.id) === Number(parentSuperFranchiseId)) ||
