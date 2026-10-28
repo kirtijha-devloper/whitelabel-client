@@ -76,6 +76,7 @@ const MerchantSideBar = ({ currentUser }) => {
     },
     { name: "Ledger", path: "/merchant/ledger", icon: <Wallet className="w-5 h-5" /> },
     { name: "Charges", path: "/merchant/charges", icon: <CreditCard className="w-5 h-5" /> },
+    { name: "Stock POS", path: "/merchant/stock-pos", icon: <Box className="w-5 h-5" /> },
     {
       name: "CC Bill 1",
       path: "/merchant/cc-bill-pay",

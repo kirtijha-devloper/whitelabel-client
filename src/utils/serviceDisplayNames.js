@@ -1,4 +1,4 @@
-import { normalizeUserRole, isSuperAdmin } from "./userAccess.js";
+import { normalizeUserRole } from "./userAccess.js";
 import { isSuperAdminUser } from "./accessControl.js";
 
 /**
@@ -7,10 +7,16 @@ import { isSuperAdminUser } from "./accessControl.js";
  * Strictly returns false for Super Admin.
  */
 export const isChildRole = (userOrRole) => {
+  // If window path is explicitly super-admin, this is Super Admin context
+  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/super-admin")) {
+    return false;
+  }
+
+  
   // 1. If explicit user object or role string is provided, evaluate it directly
   if (userOrRole) {
     if (typeof userOrRole === "object") {
-      if (isSuperAdminUser(userOrRole) || isSuperAdmin(userOrRole)) {
+      if (isSuperAdminUser(userOrRole)) {
         return false;
       }
     }
@@ -34,7 +40,7 @@ export const isChildRole = (userOrRole) => {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && typeof parsed === "object") {
-          if (isSuperAdminUser(parsed) || isSuperAdmin(parsed)) {
+          if (isSuperAdminUser(parsed)) {
             return false;
           }
           const norm = normalizeUserRole(parsed?.role);
