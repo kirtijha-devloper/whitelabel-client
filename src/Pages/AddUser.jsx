@@ -185,6 +185,7 @@ function AddUser({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMachines, setSelectedMachines] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
   const normalizedRole = normalizeUserRole(currentUser?.role);
   const isActualAdminUser = normalizedRole === "admin";
   const isEmployee = normalizedRole === "employee" || isEmployeeUser(currentUser);
@@ -350,20 +351,26 @@ function AddUser({ currentUser }) {
       });
     }
 
-    if (!isEmployeeRole && !isValidAadhaarNumber(sanitizedAadhaarNumber)) {
-      toast.error("Aadhaar number must contain exactly 12 digits.");
-      return;
-    }
+    const currentFormData = {
+      ...state.formData,
+      aadhar_number: sanitizedAadhaarNumber,
+      pan_number: sanitizedPanNumber,
+    };
 
-    if (!isEmployeeRole && !isValidPanNumber(sanitizedPanNumber)) {
-      toast.error("PAN number must be 5 letters, 4 digits, and 1 letter.");
-      return;
-    }
+    const validationErrors = validateForm(currentFormData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      toast.error("Please fill all mandatory fields correctly.");
 
-    if (isEmployeeRole && !state.formData.employee_access_role_id) {
-      toast.error("Please select an employee access role.");
+      const firstErrorField = Object.keys(validationErrors)[0];
+      const targetElement = document.querySelector(`[name="${firstErrorField}"]`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetElement.focus();
+      }
       return;
     }
+    setErrors({});
 
     const submissionFormData = {
       ...state.formData,
@@ -496,7 +503,30 @@ function AddUser({ currentUser }) {
     const { name, value, type, files } = e.target;
     let nextValue = type === 'file' ? files[0] : value;
 
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+
     if (type !== 'file') {
+      // Block numbers & special chars in Name
+      if (name === 'name') {
+        nextValue = String(value).replace(/[^a-zA-Z\s]/g, '');
+      }
+
+      // Block non-digits in Mobile Number (max 10 digits)
+      if (name === 'mobile_number') {
+        nextValue = String(value).replace(/\D/g, '').slice(0, 10);
+      }
+
+      // Block non-digits in Pincode (max 6 digits)
+      if (name === 'pincode') {
+        nextValue = String(value).replace(/\D/g, '').slice(0, 6);
+      }
+
       if (name === 'aadhar_number') {
         nextValue = sanitizeAadhaarNumber(value);
       }
@@ -533,6 +563,95 @@ function AddUser({ currentUser }) {
       type: 'UPDATE_FORM',
       payload,
     });
+  };
+
+  const validateForm = (formData) => {
+    const newErrors = {};
+    const currentRole = normalizeUserRole(formData.role);
+    const isEmp = currentRole === 'employee';
+
+    if (!formData.name || !formData.name.trim()) {
+      newErrors.name = 'Full Name is required';
+    } else if (/[0-9]/.test(formData.name)) {
+      newErrors.name = 'Numbers are not allowed in Full Name';
+    }
+
+    if (!formData.email || !formData.email.trim()) {
+      newErrors.email = 'Email Address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.mobile_number || !formData.mobile_number.trim()) {
+      newErrors.mobile_number = 'Mobile Number is required';
+    } else if (/\D/.test(formData.mobile_number.trim())) {
+      newErrors.mobile_number = 'Only digits allowed in Mobile Number';
+    } else if (!/^[6-9]\d{9}$/.test(formData.mobile_number.trim())) {
+      newErrors.mobile_number = 'Mobile number must be a 10-digit number starting with 6-9';
+    }
+
+    if (!formData.gender) {
+      newErrors.gender = 'Please select a gender';
+    }
+
+    if (!isEmp) {
+      if (!formData.dob) {
+        newErrors.dob = 'Date of Birth is required';
+      }
+    }
+
+    if (!isEditMode) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
+      }
+    }
+
+    if (isEmp) {
+      if (!formData.employee_access_role_id) {
+        newErrors.employee_access_role_id = 'Please select an employee access role';
+      }
+    } else {
+      if (!formData.address1 || !formData.address1.trim()) {
+        newErrors.address1 = 'Address Line 1 is required';
+      }
+      if (!formData.city || !formData.city.trim()) {
+        newErrors.city = 'City is required';
+      }
+
+      if (!formData.district || !formData.district.trim()) {
+        newErrors.district = 'District is required';
+      }
+
+      if (!formData.pincode || !formData.pincode.trim()) {
+        newErrors.pincode = 'Pincode is required';
+      } else if (!/^\d{6}$/.test(formData.pincode.trim())) {
+        newErrors.pincode = 'Pincode must be exactly 6 digits';
+      }
+
+      if (!formData.state || !formData.state.trim()) {
+        newErrors.state = 'State is required';
+      }
+
+      if (!formData.aadhar_number || !formData.aadhar_number.trim()) {
+        newErrors.aadhar_number = 'Aadhaar Card Number is required';
+      } else if (!isValidAadhaarNumber(formData.aadhar_number.trim())) {
+        newErrors.aadhar_number = 'Aadhaar number must contain exactly 12 digits';
+      }
+
+      if (!formData.pan_number || !formData.pan_number.trim()) {
+        newErrors.pan_number = 'PAN Card Number is required';
+      } else if (!isValidPanNumber(formData.pan_number.trim())) {
+        newErrors.pan_number = 'PAN must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F)';
+      }
+
+      if (!isEditMode && !formData.bank_passbook && !getExistingFileUrl('bank_passbook')) {
+        newErrors.bank_passbook = 'Bank passbook file is required';
+      }
+    }
+
+    return newErrors;
   };
 
   const aadharValidationMessage = getAadhaarValidationMessage(state.formData.aadhar_number);
@@ -628,7 +747,7 @@ function AddUser({ currentUser }) {
             {isEditMode ? "Update User" : isFranchiseUser ? "Create New Merchant" : "Create New User"}
           </h1>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="space-y-6">
               <div>
@@ -701,10 +820,14 @@ function AddUser({ currentUser }) {
                   name="name"
                   value={state.formData.name}
                   onChange={handleChange}
-                  required
                   placeholder="Enter full name"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.name ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.name && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.name}</p>
+                )}
               </div>
 
               {!isEmployeeRole && (
@@ -732,10 +855,14 @@ function AddUser({ currentUser }) {
                   name="email"
                   value={state.formData.email}
                   onChange={handleChange}
-                  required
                   placeholder="Enter email address"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.email ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.email && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.email}</p>
+                )}
               </div>
 
               <div>
@@ -744,15 +871,18 @@ function AddUser({ currentUser }) {
                 </label>
                 <input
                   type="text"
-                  pattern="^[6-9][0-9]{9}$"
                   name="mobile_number"
                   value={state.formData.mobile_number}
                   onChange={handleChange}
-                  required
                   maxLength={10}
                   placeholder="Enter mobile number"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.mobile_number ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.mobile_number && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.mobile_number}</p>
+                )}
               </div>
 
               <div>
@@ -791,6 +921,9 @@ function AddUser({ currentUser }) {
                     Other
                   </label>
                 </div>
+                {errors.gender && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.gender}</p>
+                )}
               </div>
 
               <div>
@@ -802,9 +935,13 @@ function AddUser({ currentUser }) {
                   name="dob"
                   value={state.formData.dob || ''}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.dob ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.dob && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.dob}</p>
+                )}
               </div>
 
               {isEmployeeRole && (
@@ -816,7 +953,9 @@ function AddUser({ currentUser }) {
                     name="employee_access_role_id"
                     value={state.formData.employee_access_role_id || ''}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.employee_access_role_id ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                     disabled={employeeAccessRolesLoading}
                   >
                     <option value="">Select access role</option>
@@ -826,6 +965,9 @@ function AddUser({ currentUser }) {
                       </option>
                     ))}
                   </select>
+                  {errors.employee_access_role_id && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.employee_access_role_id}</p>
+                  )}
                 </div>
               )}
 
@@ -840,9 +982,10 @@ function AddUser({ currentUser }) {
                       name="password"
                       value={state.formData.password}
                       onChange={handleChange}
-                      required
                       placeholder="Auto-generated password"
-                      className="w-full px-4 py-2 pr-11 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className={`w-full px-4 py-2 pr-11 border rounded-lg focus:ring-2 ${
+                        errors.password ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                      }`}
                     />
                     <button
                       type="button"
@@ -853,6 +996,9 @@ function AddUser({ currentUser }) {
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.password}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -869,10 +1015,14 @@ function AddUser({ currentUser }) {
                   name="address1"
                   value={state.formData.address1}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
                   placeholder="Enter Address Line 1"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.address1 ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.address1 && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.address1}</p>
+                )}
               </div>
 
               <div>
@@ -898,10 +1048,14 @@ function AddUser({ currentUser }) {
                   name="city"
                   value={state.formData.city}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
                   placeholder="Enter City"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.city ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.city && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.city}</p>
+                )}
               </div>
 
               <div>
@@ -913,10 +1067,14 @@ function AddUser({ currentUser }) {
                   name="district"
                   value={state.formData.district}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
                   placeholder="Enter District"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.district ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.district && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.district}</p>
+                )}
               </div>
 
               <div>
@@ -928,10 +1086,15 @@ function AddUser({ currentUser }) {
                   name="pincode"
                   value={state.formData.pincode}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
+                  maxLength={6}
                   placeholder="Enter Pincode"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.pincode ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.pincode && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.pincode}</p>
+                )}
               </div>
 
               <div>
@@ -943,10 +1106,14 @@ function AddUser({ currentUser }) {
                   name="state"
                   value={state.formData.state}
                   onChange={handleChange}
-                  required={!isEmployeeRole}
                   placeholder="Enter State"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.state ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.state && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.state}</p>
+                )}
               </div>
 
               <div>
@@ -959,8 +1126,13 @@ function AddUser({ currentUser }) {
                   value={state.formData.country}
                   onChange={handleChange}
                   placeholder="Enter Country"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.country ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
+                {errors.country && (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.country}</p>
+                )}
               </div>
             </div>
           </div>
@@ -978,18 +1150,20 @@ function AddUser({ currentUser }) {
                   name="aadhar_number"
                   value={state.formData.aadhar_number}
                   onChange={handleChange}
-                  required
                   placeholder="Enter Aadhar Number"
                   inputMode="numeric"
                   maxLength={12}
-                  pattern="[0-9]{12}"
-                  title="Aadhaar number must contain exactly 12 digits"
-                  aria-invalid={Boolean(aadharValidationMessage)}
-                  className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.aadhar_number ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
-                <p className={`mt-1 text-xs ${aadharValidationMessage ? 'text-red-600' : 'text-gray-500'}`}>
-                  {aadharValidationMessage || "Only 12 digits allowed. Spaces, letters, and special characters are blocked."}
-                </p>
+                {errors.aadhar_number ? (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.aadhar_number}</p>
+                ) : aadharValidationMessage ? (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{aadharValidationMessage}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">Only 12 digits allowed. Spaces, letters, and special characters are blocked.</p>
+                )}
               </div>
 
               <div className="min-w-0">
@@ -1001,20 +1175,22 @@ function AddUser({ currentUser }) {
                   name="pan_number"
                   value={state.formData.pan_number}
                   onChange={handleChange}
-                  required
                   placeholder="Enter PAN Number"
                   inputMode="text"
                   maxLength={10}
-                  pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
-                  title="PAN must be 5 letters, 4 digits, and 1 letter"
                   autoCapitalize="characters"
                   spellCheck={false}
-                  aria-invalid={Boolean(panValidationMessage)}
-                  className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 ${
+                    errors.pan_number ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                  }`}
                 />
-                <p className={`mt-1 text-xs ${panValidationMessage ? 'text-red-600' : 'text-gray-500'}`}>
-                  {panValidationMessage || "Format: ABCDE1234F. Only valid characters for each position are allowed."}
-                </p>
+                {errors.pan_number ? (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{errors.pan_number}</p>
+                ) : panValidationMessage ? (
+                  <p className="mt-1 text-xs text-red-600 font-medium">{panValidationMessage}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">Format: ABCDE1234F. Only valid characters for each position are allowed.</p>
+                )}
               </div>
 
               {FILE_FIELD_CONFIG.map((field) => {
@@ -1028,7 +1204,9 @@ function AddUser({ currentUser }) {
                       {field.label}
                     </label>
 
-                    <div className="w-full rounded-lg border border-gray-200 px-3 py-3">
+                    <div className={`w-full rounded-lg border px-3 py-3 ${
+                      field.name === 'bank_passbook' && errors.bank_passbook ? 'border-red-500 bg-red-50/20' : 'border-gray-200'
+                    }`}>
                       <div className="flex flex-wrap items-center gap-3">
                         {existingUrl && !hasSelectedFile && (
                           <a
@@ -1091,6 +1269,9 @@ function AddUser({ currentUser }) {
                         className="hidden"
                       />
                     </div>
+                    {field.name === 'bank_passbook' && errors.bank_passbook && (
+                      <p className="mt-1 text-xs text-red-600 font-medium">{errors.bank_passbook}</p>
+                    )}
                   </div>
                 );
 
