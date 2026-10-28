@@ -645,6 +645,13 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
     return Number.isFinite(parsed) ? parsed.toFixed(2) : "-";
   };
 
+  const formatAmountRange = (rate) => {
+    const min = rate?.min_amount ?? rate?.from_amount ?? rate?.original_rule?.min_amount ?? 0;
+    const max = rate?.max_amount ?? rate?.to_amount ?? rate?.original_rule?.max_amount;
+    if (max === null || max === undefined || max === '') return `${min}+`;
+    return `${min} - ${max}`;
+  };
+
   const formatGstValue = (rate) => hasEditableGst(rate) ? `${formatRateValue(rate.gst_rate)}%` : "-";
   const findMatchingRate = (rateList, attribute) => rateList.find((rate) => rate.rule_key === attribute.rule_key);
   const getRateMetaLine = (rate) =>
@@ -1018,6 +1025,10 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                         <p className="text-sm font-medium text-gray-900">{formatSettlementLabel(rate.settlement_type)}</p>
                       </div>
                       <div className="rounded-lg bg-gray-50 px-2.5 py-2">
+                        <p className="text-[11px] text-gray-500">Amount Range</p>
+                        <p className="text-sm font-medium text-gray-900">{formatAmountRange(rate)}</p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 px-2.5 py-2">
                         <p className="text-[11px] text-gray-500">GST (%)</p>
                         <p className="text-sm font-medium text-gray-900">{formatGstValue(rate)}</p>
                       </div>
@@ -1188,6 +1199,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                     <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
                     <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classification</th>
                     <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Settlement</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Range</th>
                     <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GST (%)</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-100/80 border-x border-gray-200">
                       <div className="flex items-center gap-1.5">
@@ -1234,6 +1246,7 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
                       <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">{rate.company_name || "—"}</td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">{rate.card_classification || "ANY"}</td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">{formatSettlementLabel(rate.settlement_type)}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">{formatAmountRange(rate)}</td>
                       <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatGstValue(rate)}
                       </td>

@@ -208,6 +208,13 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
     return Number.isFinite(num) ? num.toFixed(2) : "-";
   };
 
+  const formatAmountRange = (rate) => {
+    const min = rate?.min_amount ?? rate?.from_amount ?? rate?.original_rule?.min_amount ?? 0;
+    const max = rate?.max_amount ?? rate?.to_amount ?? rate?.original_rule?.max_amount;
+    if (max === null || max === undefined || max === '') return `${min}+`;
+    return `${min} - ${max}`;
+  };
+
   const normalizeSettlementValue = (value) => String(value ?? "").trim().toLowerCase();
 
   const matchesSettlementFilter = (rate) => {
@@ -570,6 +577,7 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Card Brand / Type</th>
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Classification</th>
                           <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Settlement</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Amount Range</th>
                           <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase bg-gray-100/80 border-x">
                             <div className="flex items-center justify-center gap-1">
                               <Lock className="w-3 h-3 text-gray-500" />
@@ -606,6 +614,7 @@ const SuperFranchiseRateSettings = ({ currentUser }) => {
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">{rate.card_classification || "ANY"}</td>
                               <td className="px-4 py-3 text-sm text-gray-600 font-mono">{rate.settlement_type || "Standard"}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{formatAmountRange(rate)}</td>
                               <td className="px-4 py-3 text-center text-sm font-semibold bg-gray-50/80 border-x">
                                 <span className="inline-flex items-center gap-1 font-semibold text-gray-800 bg-gray-200/70 px-2.5 py-1 rounded border border-gray-300">
                                   <Lock className="w-3 h-3 text-gray-500" />
