@@ -58,6 +58,99 @@ const FILE_FIELD_CONFIG = [
 ];
 
 // ==========================================
+// PAN & GST SANITIZERS & VALIDATORS
+// ==========================================
+
+const sanitizePanNumber = (value = '') => {
+  const normalizedValue = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let nextValue = '';
+
+  for (const character of normalizedValue) {
+    const currentIndex = nextValue.length;
+
+    // First 5 characters must be letters
+    if (currentIndex < 5) {
+      if (/[A-Z]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // Next 4 characters must be digits
+    if (currentIndex < 9) {
+      if (/[0-9]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // 10th character must be a letter
+    if (currentIndex === 9 && /[A-Z]/.test(character)) {
+      nextValue += character;
+    }
+
+    if (nextValue.length === 10) {
+      break;
+    }
+  }
+
+  return nextValue;
+};
+
+const sanitizeGstNumber = (value = '') => {
+  const normalizedValue = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let nextValue = '';
+
+  for (const character of normalizedValue) {
+    const currentIndex = nextValue.length;
+
+    // First 2 chars: digits (state code)
+    if (currentIndex < 2) {
+      if (/[0-9]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // Next 5 chars: letters (PAN first 5)
+    if (currentIndex < 7) {
+      if (/[A-Z]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // Next 4 chars: digits (PAN digits)
+    if (currentIndex < 11) {
+      if (/[0-9]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // 12th char: letter (PAN last letter)
+    if (currentIndex === 11) {
+      if (/[A-Z]/.test(character)) {
+        nextValue += character;
+      }
+      continue;
+    }
+
+    // 13th to 15th chars: entity code, Z, check digit
+    if (currentIndex < 15) {
+      if (/[A-Z0-9]/.test(character)) {
+        nextValue += character;
+      }
+    }
+  }
+
+  return nextValue;
+};
+
+const isValidPanNumber = (value = '') => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value);
+const isValidGstNumber = (value = '') => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value);
+
+// ==========================================
 // DOMAIN NORMALIZER
 // ==========================================
 
@@ -99,6 +192,7 @@ function CreateAdmin() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
   const initialDataRef = useRef({});
 
   // ==========================================
@@ -208,6 +302,19 @@ function CreateAdmin() {
 
     let nextValue = value;
 
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+
+    // Director Name: Block numbers & special chars
+    if (name === 'name') {
+      nextValue = value.replace(/[^a-zA-Z\s]/g, '');
+    }
+
     // Mobile Number
     if (name === 'mobile_number') {
       nextValue = value.replace(/\D/g, '').slice(0, 10);
@@ -223,20 +330,14 @@ function CreateAdmin() {
       nextValue = value.replace(/\D/g, '').slice(0, 12);
     }
 
-    // PAN Number
+    // PAN Number - strictly enforces 5 letters, 4 digits, 1 letter on keystroke
     if (name === 'pan_number') {
-      nextValue = value
-        .replace(/[^a-zA-Z0-9]/g, '')
-        .toUpperCase()
-        .slice(0, 10);
+      nextValue = sanitizePanNumber(value);
     }
 
-    // GST Number
+    // GST Number - strictly enforces GSTIN structure on keystroke
     if (name === 'gst_number') {
-      nextValue = value
-        .replace(/[^a-zA-Z0-9]/g, '')
-        .toUpperCase()
-        .slice(0, 15);
+      nextValue = sanitizeGstNumber(value);
     }
 
     if (name === 'domain_name') {
@@ -261,6 +362,14 @@ function CreateAdmin() {
     const file = e.target.files?.[0];
 
     if (!file) return;
+
+    if (errors[targetField]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[targetField];
+        return next;
+      });
+    }
 
     // Allowed file types
     const allowedTypes = [
@@ -287,6 +396,153 @@ function CreateAdmin() {
     });
   };
 
+  const validateForm = (form) => {
+    const newErrors = {};
+
+    if (!isEditMode) {
+      if (!form.name || !form.name.trim()) {
+        newErrors.name = 'Director Name is required';
+      } else if (/[0-9]/.test(form.name)) {
+        newErrors.name = 'Numbers are not allowed in Director Name';
+      }
+
+      if (!form.email || !form.email.trim()) {
+        newErrors.email = 'Email Address is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        newErrors.email = 'Please enter a valid email address';
+      }
+
+      if (!form.mobile_number || !form.mobile_number.trim()) {
+        newErrors.mobile_number = 'Mobile Number is required';
+      } else if (/\D/.test(form.mobile_number.trim())) {
+        newErrors.mobile_number = 'Only digits allowed in Mobile Number';
+      } else if (!/^[6-9]\d{9}$/.test(form.mobile_number.trim())) {
+        newErrors.mobile_number = 'Mobile number must be a 10-digit number starting with 6-9';
+      }
+
+      if (!form.password) {
+        newErrors.password = 'Password is required';
+      } else if (form.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
+      }
+
+      if (!form.gender) {
+        newErrors.gender = 'Please select a gender';
+      }
+
+      if (!form.dob) {
+        newErrors.dob = 'Date of Birth is required';
+      }
+
+      if (!form.address1 || !form.address1.trim()) {
+        newErrors.address1 = 'Address Line 1 is required';
+      }
+
+      if (!form.city || !form.city.trim()) {
+        newErrors.city = 'City is required';
+      }
+
+      if (!form.district || !form.district.trim()) {
+        newErrors.district = 'District is required';
+      }
+
+      if (!form.pincode || !form.pincode.trim()) {
+        newErrors.pincode = 'Pincode is required';
+      } else if (!/^\d{6}$/.test(form.pincode.trim())) {
+        newErrors.pincode = 'Pincode must be exactly 6 digits';
+      }
+
+      if (!form.state || !form.state.trim()) {
+        newErrors.state = 'State is required';
+      }
+
+      if (!form.country || !form.country.trim()) {
+        newErrors.country = 'Country is required';
+      }
+
+      if (!form.aadhar_number || !form.aadhar_number.trim()) {
+        newErrors.aadhar_number = 'Aadhaar Number is required';
+      } else if (!/^\d{12}$/.test(form.aadhar_number.trim())) {
+        newErrors.aadhar_number = 'Aadhaar number must contain exactly 12 digits';
+      }
+
+      if (!form.pan_number || !form.pan_number.trim()) {
+        newErrors.pan_number = 'PAN Number is required';
+      } else if (!isValidPanNumber(form.pan_number.trim().toUpperCase())) {
+        newErrors.pan_number = 'PAN must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F)';
+      }
+
+      if (!form.gst_number || !form.gst_number.trim()) {
+        newErrors.gst_number = 'GST Number is required';
+      } else if (!isValidGstNumber(form.gst_number.trim().toUpperCase())) {
+        newErrors.gst_number = 'GST number must be a valid 15-character GSTIN format';
+      }
+
+      if (!(form.aadhar_photo instanceof File)) {
+        newErrors.aadhar_photo = 'Aadhaar front photo is required';
+      }
+      if (!(form.aadhar_back_photo instanceof File)) {
+        newErrors.aadhar_back_photo = 'Aadhaar back photo is required';
+      }
+      if (!(form.pan_photo instanceof File)) {
+        newErrors.pan_photo = 'PAN card photo is required';
+      }
+      if (!(form.bank_passbook instanceof File)) {
+        newErrors.bank_passbook = 'Bank passbook document is required';
+      }
+
+      if (!form.company_or_shop_name || !form.company_or_shop_name.trim()) {
+        newErrors.company_or_shop_name = 'Company Name is required';
+      }
+
+      if (!form.domain_name || !form.domain_name.trim()) {
+        newErrors.domain_name = 'Domain Name is required';
+      } else if (normalizeDomain(form.domain_name).length < 3) {
+        newErrors.domain_name = 'Please enter a valid domain name';
+      }
+    } else {
+      if (form.name && /[0-9]/.test(form.name)) {
+        newErrors.name = 'Numbers are not allowed in Director Name';
+      }
+
+      if (form.email && form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        newErrors.email = 'Please enter a valid email address';
+      }
+
+      if (form.mobile_number && form.mobile_number.trim()) {
+        if (!/^[6-9]\d{9}$/.test(form.mobile_number.trim())) {
+          newErrors.mobile_number = 'Mobile number must be a 10-digit number starting with 6-9';
+        }
+      }
+
+      if (form.password && form.password.trim() && form.password.trim().length < 8) {
+        newErrors.password = 'New password must be at least 8 characters long';
+      }
+
+      if (form.pincode && form.pincode.trim() && !/^\d{6}$/.test(form.pincode.trim())) {
+        newErrors.pincode = 'Pincode must be exactly 6 digits';
+      }
+
+      if (form.aadhar_number && form.aadhar_number.trim() && !/^\d{12}$/.test(form.aadhar_number.trim())) {
+        newErrors.aadhar_number = 'Aadhaar number must contain exactly 12 digits';
+      }
+
+      if (form.pan_number && form.pan_number.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.pan_number.trim().toUpperCase())) {
+        newErrors.pan_number = 'PAN must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F)';
+      }
+
+      if (form.gst_number && form.gst_number.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst_number.trim().toUpperCase())) {
+        newErrors.gst_number = 'GST number must be a valid 15-character GSTIN format';
+      }
+
+      if (form.domain_name && form.domain_name.trim() && normalizeDomain(form.domain_name).length < 3) {
+        newErrors.domain_name = 'Please enter a valid domain name';
+      }
+    }
+
+    return newErrors;
+  };
+
 
   // ==========================================
   // HANDLE FORM SUBMIT (CREATE OR EDIT)
@@ -296,124 +552,20 @@ function CreateAdmin() {
     e.preventDefault();
     const form = state.formData;
 
-    // In CREATE mode, fields are strictly required:
-    if (!isEditMode) {
-      // if (!form.name?.trim()) {
-      //   toast.error('Director name is required');
-      //   return;
-      // }
-      // if (!form.email?.trim()) {
-      //   toast.error('Email address is required');
-      //   return;
-      // }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(form.email.trim())) {
-        toast.error('Please enter a valid email address');
-        return;
+    const validationErrors = validateForm(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      toast.error('Please fill all mandatory fields correctly.');
+
+      const firstErrorField = Object.keys(validationErrors)[0];
+      const targetElement = document.querySelector(`[name="${firstErrorField}"]`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetElement.focus();
       }
-      if (!form.mobile_number?.trim() || form.mobile_number.trim().length !== 10) {
-        toast.error('Valid 10-digit Indian mobile number is required');
-        return;
-      }
-      if (!form.password || form.password.length < 8) {
-        toast.error('Password must be at least 8 characters long');
-        return;
-      }
-      // if (!form.gender) {
-      //   toast.error('Please select gender');
-      //   return;
-      // }
-      // if (!form.dob) {
-      //   toast.error('Date of birth is required');
-      //   return;
-      // }
-      // if (!form.address1?.trim()) {
-      //   toast.error('Address line 1 is required');
-      //   return;
-      // }
-      // if (!form.city?.trim()) {
-      //   toast.error('City is required');
-      //   return;
-      // }
-      // if (!form.district?.trim()) {
-      //   toast.error('District is required');
-      //   return;
-      // }
-      // if (!form.state?.trim()) {
-      //   toast.error('State is required');
-      //   return;
-      // }
-      // if (!form.pincode?.trim() || form.pincode.trim().length !== 6) {
-      //   toast.error('Valid 6-digit Pincode is required');
-      //   return;
-      // }
-      // if (!form.aadhar_number?.trim() || form.aadhar_number.trim().length !== 12) {
-      //   toast.error('Valid 12-digit Aadhaar number is required');
-      //   return;
-      // }
-      // const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      // if (!form.pan_number?.trim() || !panRegex.test(form.pan_number.trim().toUpperCase())) {
-      //   toast.error('Valid 10-character PAN number is required (e.g. ABCDE1234F)');
-      //   return;
-      // }
-      // if (!form.company_or_shop_name?.trim()) {
-      //   toast.error('Company / Shop Name is required');
-      //   return;
-      // }
-      // if (!form.domain_name?.trim()) {
-      //   toast.error('Domain Name is required');
-      //   return;
-      // }
-      // if (!(form.aadhar_photo instanceof File)) {
-      //   toast.error('Aadhaar front photo is required');
-      //   return;
-      // }
-      // if (!(form.aadhar_back_photo instanceof File)) {
-      //   toast.error('Aadhaar back photo is required');
-      //   return;
-      // }
-      // if (!(form.pan_photo instanceof File)) {
-      //   toast.error('PAN card photo is required');
-      //   return;
-      // }
-      // if (!(form.bank_passbook instanceof File)) {
-      //   toast.error('Bank passbook document is required');
-      //   return;
-      // }
-    } else {
-      // In EDIT mode: NO fields are mandatory!
-      // Only validate format IF a field is provided:
-      if (form.password && form.password.trim() && form.password.trim().length < 8) {
-        toast.error('New password must be at least 8 characters long');
-        return;
-      }
-      if (form.mobile_number && form.mobile_number.trim() && form.mobile_number.trim().length !== 10) {
-        toast.error('Mobile number must be exactly 10 digits');
-        return;
-      }
-      if (form.email && form.email.trim()) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(form.email.trim())) {
-          toast.error('Invalid email address format');
-          return;
-        }
-      }
-      // if (form.aadhar_number && form.aadhar_number.trim() && form.aadhar_number.trim().length !== 12) {
-      //   toast.error('Aadhaar number must be exactly 12 digits');
-      //   return;
-      // }
-      // if (form.pan_number && form.pan_number.trim()) {
-      //   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      //   if (!panRegex.test(form.pan_number.trim().toUpperCase())) {
-      //     toast.error('PAN number format must be valid (e.g. ABCDE1234F)');
-      //     return;
-      //   }
-      // }
-      // if (form.pincode && form.pincode.trim() && form.pincode.trim().length !== 6) {
-      //   toast.error('Pincode must be exactly 6 digits');
-      //   return;
-      // }
+      return;
     }
+    setErrors({});
 
     setLoading(true);
 
@@ -696,8 +848,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter full name"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.name && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.name}</p>
+                  )}
 
                 </div>
 
@@ -718,8 +875,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter email address"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.email}</p>
+                  )}
 
                 </div>
 
@@ -755,10 +917,15 @@ function CreateAdmin() {
                       pattern="[0-9]{10}"
                       placeholder="Enter 10-digit mobile number"
                       title="Mobile number must contain exactly 10 digits"
-                      className="w-full px-4 py-2 border rounded-r-lg focus:ring-2 focus:ring-indigo-500"
+                      className={`w-full px-4 py-2 border rounded-r-lg focus:ring-2 ${
+                        errors.mobile_number ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                      }`}
                     />
 
                   </div>
+                  {errors.mobile_number && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.mobile_number}</p>
+                  )}
 
                 </div>
 
@@ -797,7 +964,9 @@ function CreateAdmin() {
                           ? 'Leave blank to keep existing password'
                           : 'Enter password (min 8 chars)'
                       }
-                      className="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 ${
+                        errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                      }`}
                     />
 
                     <button
@@ -809,6 +978,9 @@ function CreateAdmin() {
                     </button>
                   </div>
 
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.password}</p>
+                  )}
                   {isEditMode && (
                     <p className="mt-1 text-xs text-gray-500">
                       Only fill this if you want to reset the admin password.
@@ -874,6 +1046,9 @@ function CreateAdmin() {
                     </label>
 
                   </div>
+                  {errors.gender && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.gender}</p>
+                  )}
 
                 </div>
 
@@ -893,8 +1068,13 @@ function CreateAdmin() {
                     required={!isEditMode}
                     value={state.formData.dob || ''}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.dob ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.dob && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.dob}</p>
+                  )}
 
                 </div>
 
@@ -932,8 +1112,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter address line 1"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.address1 ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.address1 && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.address1}</p>
+                  )}
 
                 </div>
 
@@ -973,8 +1158,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter city"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.city ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.city && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.city}</p>
+                  )}
 
                 </div>
 
@@ -994,8 +1184,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter district"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.district ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.district && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.district}</p>
+                  )}
 
                 </div>
 
@@ -1019,8 +1214,13 @@ function CreateAdmin() {
                     pattern="[0-9]{6}"
                     placeholder="Enter 6-digit pincode"
                     title="Pincode must contain exactly 6 digits"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.pincode ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.pincode && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.pincode}</p>
+                  )}
 
                 </div>
 
@@ -1040,8 +1240,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter state"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.state ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.state && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.state}</p>
+                  )}
 
                 </div>
 
@@ -1061,8 +1266,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter country"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.country ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.country && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.country}</p>
+                  )}
 
                 </div>
 
@@ -1109,12 +1319,18 @@ function CreateAdmin() {
                     pattern={!isEditMode ? "[0-9]{12}" : undefined}
                     placeholder="Enter 12-digit Aadhaar number"
                     title="Aadhaar number must contain exactly 12 digits"
-                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.aadhar_number ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    Only 12 digits allowed.
-                  </p>
+                  {errors.aadhar_number ? (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.aadhar_number}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Only 12 digits allowed.
+                    </p>
+                  )}
 
                 </div>
 
@@ -1142,12 +1358,18 @@ function CreateAdmin() {
                     title="PAN must be 5 letters, 4 digits, and 1 letter"
                     autoCapitalize="characters"
                     spellCheck={false}
-                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
+                    className={`w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 uppercase ${
+                      errors.pan_number ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    Format: ABCDE1234F
-                  </p>
+                  {errors.pan_number ? (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.pan_number}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Format: ABCDE1234F
+                    </p>
+                  )}
 
                 </div>
 
@@ -1175,12 +1397,18 @@ function CreateAdmin() {
                     title="GST number must be 15 characters in the correct format"
                     autoCapitalize="characters"
                     spellCheck={false}
-                    className="w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
+                    className={`w-full min-w-0 px-4 py-2 border rounded-lg focus:ring-2 uppercase ${
+                      errors.gst_number ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    Format: 07AAAAA0000A1Z5
-                  </p>
+                  {errors.gst_number ? (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.gst_number}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Format: 07AAAAA0000A1Z5
+                    </p>
+                  )}
 
                 </div>
 
@@ -1205,7 +1433,9 @@ function CreateAdmin() {
                         {field.label} {!isEditMode && field.name !== 'shop_photo' && <span className="text-red-500">*</span>}
                       </label>
 
-                      <div className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3">
+                      <div className={`w-full rounded-lg border bg-white px-3 py-3 ${
+                        errors[field.name] ? 'border-red-500' : 'border-gray-200'
+                      }`}>
                         <div className="flex flex-wrap items-center gap-3">
 
                           <label
@@ -1234,6 +1464,9 @@ function CreateAdmin() {
                           className="hidden"
                         />
                       </div>
+                      {errors[field.name] && (
+                        <p className="mt-1 text-xs text-red-600 font-medium">{errors[field.name]}</p>
+                      )}
                     </div>
                   );
                 })}
@@ -1268,8 +1501,13 @@ function CreateAdmin() {
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter company or shop name"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.company_or_shop_name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {errors.company_or_shop_name && (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.company_or_shop_name}</p>
+                  )}
                 </div>
 
                 {/* COMPANY LOGO */}
@@ -1338,13 +1576,19 @@ function CreateAdmin() {
                     }}
                     required={!isEditMode}
                     placeholder="e.g. google.com"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 ${
+                      errors.domain_name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500'
+                    }`}
                   />
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    Enter domain like google.com. Protocol, www, path,
-                    query and trailing slash will be removed automatically.
-                  </p>
+                  {errors.domain_name ? (
+                    <p className="mt-1 text-xs text-red-600 font-medium">{errors.domain_name}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter domain like google.com. Protocol, www, path,
+                      query and trailing slash will be removed automatically.
+                    </p>
+                  )}
                 </div>
 
                 {/* COMPANY TITLE */}
