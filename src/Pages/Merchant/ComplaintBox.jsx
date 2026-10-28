@@ -101,7 +101,8 @@ const ComplaintBox = ({ currentUser }) => {
   const handleOpenReplyModal = (ticket) => {
     setSelectedTicket(ticket);
     setReplyText(ticket.admin_reply || ticket.reply || '');
-    setTargetStatus(ticket.status === 'closed' ? 'closed' : ticket.status === 'resolved' ? 'resolved' : 'resolved');
+    const currentSt = String(ticket.status || 'pending').toLowerCase();
+    setTargetStatus(['pending', 'open', 'in_progress', 'resolved', 'closed'].includes(currentSt) ? (currentSt === 'open' ? 'pending' : currentSt) : 'resolved');
     setIsReplyModalOpen(true);
   };
 
@@ -169,7 +170,7 @@ const ComplaintBox = ({ currentUser }) => {
       if (statusFilter !== 'all') {
         const itemStatus = String(item.status || 'pending').toLowerCase();
         if (statusFilter === 'pending' && !['pending', 'open'].includes(itemStatus)) return false;
-        if (statusFilter === 'in_progress' && itemStatus !== 'in_progress') return false;
+        if (statusFilter === 'in_progress' && !['in_progress', 'inprogress', 'in progress'].includes(itemStatus)) return false;
         if (statusFilter === 'resolved' && itemStatus !== 'resolved') return false;
         if (statusFilter === 'closed' && itemStatus !== 'closed') return false;
       }
@@ -421,6 +422,14 @@ const ComplaintBox = ({ currentUser }) => {
                 }`}
               >
                 Open
+              </button>
+              <button
+                onClick={() => setStatusFilter('in_progress')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  statusFilter === 'in_progress' ? 'bg-cyan-600 text-white shadow-sm' : 'text-cyan-700 hover:text-cyan-900'
+                }`}
+              >
+                In Progress
               </button>
               <button
                 onClick={() => setStatusFilter('resolved')}
