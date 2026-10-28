@@ -119,16 +119,16 @@ const extractSearchUsersArray = (payload) => {
 const getSearchEntityFranchiseId = (entity) =>
   entity?.franchaise_id ?? entity?.franchise_id ?? entity?.franchiseId ?? null;
 
-const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin = false }) => {
+const AdminRateSetting = ({ mode = 'full', initialTab = 'default', isSuperAdmin = false }) => {
   const location = useLocation();
   const isPosTxnMode = mode === 'pos_txn';
-  const effectiveInitialTab = isSuperAdmin ? 'default' : initialTab;
+  const effectiveInitialTab = initialTab || 'default';
   const [activeTab, setActiveTab] = useState(effectiveInitialTab); // 'default' | 'specific' | 'unassigned' | 'rental' | 'cc_bill' | 'payout'
   const [viewMode, setViewMode] = useState(effectiveInitialTab === 'default' ? 'detail' : 'matrix'); // 'matrix' or 'detail'
   const [specificSettlementFilter, setSpecificSettlementFilter] = useState(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
 
   useEffect(() => {
-    const tabToSet = isSuperAdmin ? 'default' : initialTab;
+    const tabToSet = initialTab || 'default';
     setActiveTab(tabToSet);
     setViewMode(tabToSet === 'default' ? 'detail' : 'matrix');
     setSpecificSettlementFilter(DEFAULT_SPECIFIC_SETTLEMENT_FILTER);
@@ -1274,10 +1274,6 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
       toast.error('Unauthorized: Super Admin can only configure default/admin-level rates.');
       return;
     }
-    if (!isSuperAdmin && activeTab === 'default') {
-      toast.error('Admins cannot modify Super Admin default rates. Please configure downstream rates.');
-      return;
-    }
     if (editValue === '') {
       toast.error('Please enter a valid rate.');
       return;
@@ -1317,7 +1313,11 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
 
       let updatedRate;
       if (activeTab === 'default') {
-        updatedRate = await updateFranchiseRate('default', rate, updates);
+        if (isSuperAdmin) {
+          updatedRate = await updatePlatformDefaultPosRule(rate.rule_id || rate.id, updates);
+        } else {
+          updatedRate = await updateFranchiseRate('default', rate, updates);
+        }
       } else if (activeTab === 'super_franchise') {
         updatedRate = await updateSuperFranchiseRate(selectedSuperFranchiseId, rate, updates);
       } else if (activeTab === 'specific') {
@@ -1396,22 +1396,40 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         company_name: newRateForm.companyName || null
       };
 
-      if (isSuperAdmin && activeTab === 'default') {
-        await createPlatformDefaultPosRule({
-          payment_mode: payload.method,
-          card_brand: payload.network,
-          card_type: payload.card_type,
-          card_classification: payload.card_classification,
-          settlement_type: payload.settlement_type,
-          min_amount: payload.min_amount,
-          max_amount: payload.max_amount,
-          charge_percent: payload.base_rate,
-          charge_flat: payload.charge_flat,
-          gst_required: payload.gst_required,
-          gst_percent: payload.gst_rate,
-          company_name: payload.company_name,
-        });
-        toast.success("New platform default rate created successfully.");
+      if (activeTab === 'default') {
+        if (isSuperAdmin) {
+          await createPlatformDefaultPosRule({
+            payment_mode: payload.method,
+            card_brand: payload.network,
+            card_type: payload.card_type,
+            card_classification: payload.card_classification,
+            settlement_type: payload.settlement_type,
+            min_amount: payload.min_amount,
+            max_amount: payload.max_amount,
+            charge_percent: payload.base_rate,
+            charge_flat: payload.charge_flat,
+            gst_required: payload.gst_required,
+            gst_percent: payload.gst_rate,
+            company_name: payload.company_name,
+          });
+          toast.success("New platform default rate created successfully.");
+        } else {
+          await createDefaultFranchiseRate({
+            method: payload.method,
+            network: payload.network,
+            cardType: payload.card_type,
+            cardClassification: payload.card_classification,
+            settlementType: payload.settlement_type,
+            minAmount: payload.min_amount,
+            maxAmount: payload.max_amount,
+            chargePercent: payload.base_rate,
+            chargeFlat: payload.charge_flat,
+            gstRequired: payload.gst_required,
+            gstPercent: payload.gst_rate,
+            companyName: payload.company_name,
+          });
+          toast.success("New default rate created successfully.");
+        }
       } else if (isSuperAdmin && activeTab === 'specific' && selectedFranchiseId) {
         await createAdminPosRule({
           user_id: selectedFranchiseId,
@@ -1691,12 +1709,13 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
         company_name: posTxnEditForm.companyName || null
       };
       if (activeTab === 'default') {
-        if (!isSuperAdmin) {
-          toast.error('Admins cannot modify Super Admin default rates.');
-          return;
+        if (isSuperAdmin) {
+          await updatePlatformDefaultPosRule(posTxnEditRate.rule_id || posTxnEditRate.id, updates);
+          toast.success('Platform default rate updated successfully.');
+        } else {
+          await updateFranchiseRate('default', posTxnEditRate, updates);
+          toast.success('Default rate updated successfully.');
         }
-        await updatePlatformDefaultPosRule(posTxnEditRate.rule_id || posTxnEditRate.id, updates);
-        toast.success('Platform default rate updated successfully.');
       } else if (isSuperAdmin && activeTab === 'specific') {
         const ruleId = posTxnEditRate.rule_id || posTxnEditRate.id;
         if (posTxnEditRate.isInherited) {
@@ -2070,7 +2089,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
   };
 
   const renderDetailTable = () => {
-    const isReadOnlyDetail = (detailReadOnly && activeTab !== 'default') || (!isSuperAdmin && activeTab === 'default');
+    const isReadOnlyDetail = detailReadOnly && activeTab !== 'default';
     const shouldShowSpecificSettlementFilter =
       isPosTxnMode &&
       viewMode === 'detail' &&
@@ -2108,24 +2127,13 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
             </div>
           </div>
         )}
-        {activeTab === 'default' && !isSuperAdmin && (
-          <div className="mx-4 mt-4 p-3.5 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2.5 text-blue-900 text-sm">
-            <Info className="w-5 h-5 flex-shrink-0 text-blue-600 mt-0.5" />
-            <div>
-              <p className="font-semibold text-blue-950">Inherited from Super Admin (Read-Only)</p>
-              <p className="text-xs text-blue-800 mt-0.5">
-                These are global platform default POS rates set by Super Admin. Admins inherit these defaults and cannot alter them directly. To configure custom rates for your downstream users, switch to the <strong>Super Franchise Specific Rates</strong>, <strong>Franchise Specific Rates</strong>, or <strong>Merchants Under Admin Rates</strong> tabs.
-              </p>
-            </div>
-          </div>
-        )}
-        {activeTab === 'default' && isSuperAdmin && (
+        {activeTab === 'default' && (
           <div className="flex justify-stretch md:justify-end p-4 pb-0">
             <button
               onClick={openCreateRateModal}
-              className="w-full md:w-auto bg-[#00D3CD] text-white px-4 py-2 rounded shadow hover:bg-[#00b8b3] transition-colors font-medium"
+              className="w-full md:w-auto bg-[#00D3CD] text-white px-4 py-2 rounded shadow hover:bg-[#00b8b3] transition-colors font-medium flex items-center justify-center gap-1.5"
             >
-              + Add New Rule
+              <Plus className="w-4 h-4" /> Add New Rule
             </button>
           </div>
         )}
@@ -3179,7 +3187,7 @@ const AdminRateSetting = ({ mode = 'full', initialTab = 'specific', isSuperAdmin
                 setSelectedMerchantId('');
               }}
             >
-              {isSuperAdmin ? 'Default POS Rates (Global for Every User)' : 'Default POS Rates (Inherited)'}
+              {isSuperAdmin ? 'Default POS Rates (Global for Every User)' : 'Default POS Rates'}
             </button>
             {!isSuperAdmin && (
               <button

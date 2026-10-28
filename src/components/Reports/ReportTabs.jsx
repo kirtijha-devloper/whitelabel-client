@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { isChildRole } from "../../utils/serviceDisplayNames";
 
@@ -57,40 +57,58 @@ const getTargetPath = (basePath, tabKey) => {
 
 const ReportTabs = ({ basePath, activeTab, trailingAction = null, tabs = REPORT_TAB_CONFIG, currentUser }) => {
   const navigate = useNavigate();
+  const activeTabRef = useRef(null);
+
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [activeTab]);
 
   return (
-    <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-      <div className="flex flex-wrap gap-3 md:flex-nowrap md:gap-4">
-        {tabs.map((tab) => {
-          if((tab.key === "cc-bill-3" || tab.key === "ba-cc-bill" || tab.key === "cc-bill" || tab.key === "payout" || tab.key === "pos" || tab.key === "wallet") && currentUser?.role === "super_admin") {
-            return null; 
-          }
-          if((tab.key === "service-wise" || tab.key === "all-transactions" || tab.key === "commission") && currentUser?.role !== "super_admin" && currentUser?.role !== "admin") {
-            return null; 
-          }
-          const isActive = activeTab === tab.key;
+    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0 flex-1 overflow-x-auto py-1.5 pr-3 sm:pr-4 report-tabs-scrollbar">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {tabs.map((tab) => {
+            if((tab.key === "cc-bill-3" || tab.key === "ba-cc-bill" || tab.key === "cc-bill" || tab.key === "payout" || tab.key === "pos" || tab.key === "wallet") && currentUser?.role === "super_admin") {
+              return null; 
+            }
+            if((tab.key === "service-wise" || tab.key === "all-transactions" || tab.key === "commission") && currentUser?.role !== "super_admin" && currentUser?.role !== "admin") {
+              return null; 
+            }
+            const isActive = activeTab === tab.key;
 
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => navigate(getTargetPath(basePath, tab.key))}
-              className={`w-[calc(50%-0.375rem)] rounded-md border px-3 py-2 font-medium transition md:w-auto md:px-4 ${
-                isActive
-                  ? "border-[#00D3CD] bg-[#00D3CD] text-white"
-                  : "border-gray-300 bg-white text-gray-600 hover:border-[#00D3CD] hover:text-[#00D3CD]"
-              }`}
-            >
-              {isChildRole(currentUser) && tab.key === "cc-bill"
-                ? "CC Bill 1 Payment"
-                : isChildRole(currentUser) && tab.key === "ba-cc-bill"
-                ? "CC Bill 2 Payment"
-                : tab.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={tab.key}
+                ref={isActive ? activeTabRef : null}
+                type="button"
+                onClick={() => navigate(getTargetPath(basePath, tab.key))}
+                className={`h-10 shrink-0 whitespace-nowrap rounded-lg border px-4 text-sm font-medium transition-all inline-flex items-center justify-center ${
+                  isActive
+                    ? "border-primary bg-primary text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-primary hover:text-primary hover:bg-gray-50/50"
+                }`}
+              >
+                {isChildRole(currentUser) && tab.key === "cc-bill"
+                  ? "CC Bill 1 Payment"
+                  : isChildRole(currentUser) && tab.key === "ba-cc-bill"
+                  ? "CC Bill 2 Payment"
+                  : tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      {trailingAction ? <div className="w-full md:w-auto md:shrink-0">{trailingAction}</div> : null}
+      {trailingAction ? (
+        <div className="shrink-0 flex items-center py-1.5">
+          {trailingAction}
+        </div>
+      ) : null}
     </div>
   );
 };

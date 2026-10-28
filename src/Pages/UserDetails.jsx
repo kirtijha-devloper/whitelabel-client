@@ -824,7 +824,7 @@ function UserDetails({ currentUser }) {
             )}
 
             {/* Charge Slabs Card */}
-            <Card title="Charges">
+            {/* <Card title="Charges">
               {userData?.pos_rental_slabs && userData?.pos_rental_slabs?.length > 0 ? (
                 <div className="space-y-2">
                   {userData?.pos_rental_slabs.map((slab, index) => (
@@ -847,7 +847,7 @@ function UserDetails({ currentUser }) {
                   </Link>
                 </div>
               )}
-            </Card>
+            </Card> */}
           </div>
         </div>
 

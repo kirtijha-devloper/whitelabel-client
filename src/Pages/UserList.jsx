@@ -490,7 +490,7 @@ const UserList = ({
     (isAdmin ||
       (hasPermission(currentUser, "users.update") &&
         hasPermission(currentUser, "users.settlement.update")));
-  const canBulkUpdateSettlementType = isAdmin;
+  const canBulkUpdateSettlementType = !isEmployeeDirectory && isAdmin;
   const canViewAssignedPosMachines = !isEmployeeDirectory && canReadUsers;
   const canManageUserServiceSettings =
     !isEmployeeDirectory &&
@@ -2215,10 +2215,7 @@ const UserList = ({
                 >
                   <option value="">All</option>
                   {normalizedCurrentUserRole === "admin" && (
-                    <>
-                      <option value="admin">Admin</option>
-                      <option value="employee">Employee</option>
-                    </>
+                    <option value="employee">Employee</option>
                   )}
                   {(normalizedCurrentUserRole === "admin" || normalizedCurrentUserRole === "employee") && (
                     <option value="super_franchise">Super Franchise</option>

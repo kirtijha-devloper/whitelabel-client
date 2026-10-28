@@ -1,7 +1,7 @@
 import {
   Routes,
   Route,
-  useNavigate,
+
   Navigate,
   useLocation,
 } from "react-router-dom";
@@ -12,7 +12,7 @@ import UserList from "../Pages/UserList";
 import PosMachineList from "../Pages/PosMachineList";
 import CreateMerchant from "../Pages/CreateMerchant";
 import CreateFranchise from "../Pages/CreateFranchise";
-import StockPOSMachine from "../Pages/StockPOSMachine";
+import StockPOS from "../Pages/Merchant/StockPOS";
 import POSRazarpayReport from "../Pages/POSRazorPayReport";
 import Reports from "../Pages/Reports";
 import AllPOSTxnReport from "../Pages/AllPOSTxnReports";
@@ -72,6 +72,7 @@ const getMerchantPageTitle = (pathname) => {
     ["/merchant/payout-hub", "Payout Services"],
     ["/merchant/payout", "Payout"],
     ["/merchant/charges", "Charges"],
+    ["/merchant/stock-pos", "Stock POS"],
     ["/merchant/reports/ba-cc-bill", "CC Bill 2 Report"],
     ["/merchant/reports/cc-bill", "CC Bill 1 Report"],
     ["/merchant/reports/payout", "Payout Report"],
@@ -95,13 +96,13 @@ const getMerchantPageTitle = (pathname) => {
 };
 
 const MerchantLayout = () => {
-  const navigate = useNavigate();
+
   const location = useLocation();
 
   const {
     data: dashboardData,
     isLoading: dashboardLoading,
-    isError: dashboardError,
+
   } = useDashboardData();
 
   const {
@@ -167,6 +168,7 @@ const MerchantLayout = () => {
     location.pathname.startsWith("/merchant/mx-payout") ||
     location.pathname.startsWith("/merchant/ledger") ||
     location.pathname.startsWith("/merchant/charges") ||
+    location.pathname.startsWith("/merchant/stock-pos") ||
     location.pathname.startsWith("/merchant/reports") ||
     location.pathname.startsWith("/merchant/cc-bill-pay") ||
     location.pathname.startsWith("/merchant/ba-cc-bill-pay");
@@ -269,6 +271,10 @@ const MerchantLayout = () => {
           <Route
             path="charges"
             element={<MerchantCharges currentUser={currentUser} />}
+          />
+          <Route
+            path="stock-pos"
+            element={<StockPOS currentUser={currentUser} />}
           />
           <Route
             path="reports"
