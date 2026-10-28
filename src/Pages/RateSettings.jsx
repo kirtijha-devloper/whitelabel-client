@@ -1167,7 +1167,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
         {/* Payout Charges */}
         {activeTab === "payout" && (
           <div className="space-y-6">
-            <div className="bg-white p-4 rounded-xl shadow-sm">
+            {/* <div className="bg-white p-4 rounded-xl shadow-sm">
               <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
                 {payoutEditingId ? "Edit Payout Charge Rule" : "Create Payout Charge Rule"}
               </h2>
@@ -1271,9 +1271,9 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
                   )}
                 </div>
               </form>
-            </div>
+            </div> */}
 
-            <div className="bg-white p-4 rounded-xl shadow-sm">
+            {/* <div className="bg-white p-4 rounded-xl shadow-sm">
               <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Payout Charge Rules</h2>
               {payoutLoading ? (
                 <div className="flex items-center justify-center py-4">
@@ -1313,7 +1313,7 @@ const RateSettings = ({ hideTabs = false, initialTab = "pos_rental", isSuperAdmi
                   </div>
                 </>
               )}
-            </div>
+            </div> */}
           </div>
         )}
 

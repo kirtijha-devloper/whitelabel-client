@@ -2717,10 +2717,23 @@ export const listAllUserPayoutCharges = async (params) => {
 
 export const getUserPayoutChargesByUser = async (userId) => {
   try {
-    const res = await axios.get(`${BASE_URL}/user-payout-charge/user/${userId}`, getAuthHeaders());
+    const idParam = userId ? userId : 'me';
+    const res = await axios.get(`${BASE_URL}/user-payout-charge/user/${idParam}`, getAuthHeaders());
     return res.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Failed to fetch user payout charges');
+  }
+};
+
+export const getCompanyPayoutCharges = async (companyId = '') => {
+  try {
+    const url = companyId
+      ? `${BASE_URL}/user-payout-charge/company/${companyId}`
+      : `${BASE_URL}/user-payout-charge/company`;
+    const res = await axios.get(url, getAuthHeaders());
+    return res.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch company payout charges');
   }
 };
 

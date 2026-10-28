@@ -1,23 +1,45 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Select from 'react-select';
 import Loader from '../components/Loader';
 import { Loader2, Plus, UserCheck, Layers, Building2, User, Search, X, CheckCircle2 } from 'lucide-react';
 import { MerchantAllUsers, FranchiseAllUsers, SuperFranchiseAllUsers } from '../api/FranchiseApi';
+import { getAdminList } from '../api/superAdminApi';
 import { toast } from 'react-toastify';
+import { getAuthToken } from '../utils/auth';
+import { fetchUserDetails } from '../api/authApi';
 import {
-  createPayoutCharge,
-  listPayoutCharges,
-  updatePayoutCharge,
-  deletePayoutCharge,
-  createUserPayoutCharge,
-  listAllUserPayoutCharges,
   getUserPayoutChargesByUser,
+  getCompanyPayoutCharges,
+  createUserPayoutCharge,
   updateUserPayoutCharge,
   deleteUserPayoutCharge,
 } from '../api/rateSettingsApi';
 
 const PayoutRateSettings = ({ isSuperAdmin = false }) => {
   const queryClient = useQueryClient();
+
+  const { data: userProfileData } = useQuery({
+    queryKey: ['userDetails'],
+    queryFn: fetchUserDetails,
+  });
+
+  const currentUserId = useMemo(() => {
+    if (userProfileData?.data?.id) return Number(userProfileData.data.id);
+    if (userProfileData?.id) return Number(userProfileData.id);
+    const token = getAuthToken();
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length >= 2) {
+          const decoded = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          return Number(decoded?.id ?? decoded?.user_id ?? decoded?.sub ?? 0) || null;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }, [userProfileData]);
+
   const [activeSubTab, setActiveSubTab] = useState('user_override'); // 'user_override' | 'global_default'
   const [selectedUserId, setSelectedUserId] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('ALL'); // 'ALL' | 'Super Franchise' | 'Franchise' | 'Merchant'
@@ -28,26 +50,47 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
   const [showUserForm, setShowUserForm] = useState(false);
   const [showGlobalForm, setShowGlobalForm] = useState(false);
 
-  // ── Super Franchise List Query ────────────────────────────────────────────
+  // ── Admin List Query (Super Admin only) ──────────────────────────────────
+  const { data: adminUsersData } = useQuery({
+    queryKey: ['admin_users', 'active'],
+    queryFn: () => getAdminList({ page: 1, limit: 1000 }),
+    enabled: isSuperAdmin,
+  });
+
+  // ── Super Franchise List Query (Admin only) ──────────────────────────────
   const { data: superFranchisesData } = useQuery({
     queryKey: ['super_franchises', 'active'],
     queryFn: () => SuperFranchiseAllUsers({ page: 1, limit: 1000 }),
+    enabled: !isSuperAdmin,
   });
 
-  // ── Franchise List Query ──────────────────────────────────────────────────
+  // ── Franchise List Query (Admin only) ────────────────────────────────────
   const { data: franchisesData } = useQuery({
     queryKey: ['franchises', 'active'],
     queryFn: () => FranchiseAllUsers({ page: 1, limit: 1000 }),
+    enabled: !isSuperAdmin,
   });
 
-  // ── Merchant List Query ───────────────────────────────────────────────────
+  // ── Merchant List Query (Admin only) ─────────────────────────────────────
   const { data: merchantsData } = useQuery({
     queryKey: ['merchants', 'active'],
     queryFn: () => MerchantAllUsers({ page: 1, limit: 1000 }),
+    enabled: !isSuperAdmin,
   });
 
-  // Combine Super Franchises, Franchises and Merchants into unified user list — deduplicate by ID
+  // Combine target users according to hierarchy role
   const allTargetUsers = useMemo(() => {
+    if (isSuperAdmin) {
+      const list = (
+        Array.isArray(adminUsersData)
+          ? adminUsersData
+          : Array.isArray(adminUsersData?.data)
+          ? adminUsersData.data
+          : []
+      ).map((adm) => ({ ...adm, userType: 'Admin' }));
+      return list;
+    }
+
     const superFranchisesList = (
       Array.isArray(superFranchisesData)
         ? superFranchisesData
@@ -79,7 +122,7 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
       seen.add(u.id);
       return true;
     });
-  }, [superFranchisesData, franchisesData, merchantsData]);
+  }, [isSuperAdmin, adminUsersData, superFranchisesData, franchisesData, merchantsData]);
 
   const filteredTargetUsers = useMemo(() => {
     let list = allTargetUsers;
@@ -100,10 +143,18 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
     );
   }, [allTargetUsers, userRoleFilter, activeSearchTerm]);
 
-  // ── Global Payout Charges Slabs Query ─────────────────────────────────────
+  const targetUserOptions = useMemo(() => {
+    return allTargetUsers.map((u) => ({
+      value: String(u.id),
+      label: (u.name != null) ? `${u.name || u.username} (${u.userType})` : '',
+      user: u,
+    }));
+  }, [allTargetUsers]);
+
+  // ── Base / Company Payout Charges Slabs Query ────────────────────────────
   const { data: globalChargesData, isLoading: globalLoading } = useQuery({
-    queryKey: ['global_payout_charges'],
-    queryFn: listPayoutCharges,
+    queryKey: ['base_company_payout_charges', isSuperAdmin],
+    queryFn: () => (isSuperAdmin ? getUserPayoutChargesByUser('me') : getCompanyPayoutCharges()),
   });
 
   const globalRules = useMemo(() => {
@@ -112,11 +163,10 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
     return Array.isArray(globalChargesData.data) ? globalChargesData.data : [];
   }, [globalChargesData]);
 
-  // ── User Payout Charges Query ─────────────────────────────────────────────
+  // ── User Payout Charges Query (returns franchise_id, super_franchise_id, user_id payouts) ──
   const { data: userChargesData, isLoading: userLoading } = useQuery({
     queryKey: ['user_payout_charges', selectedUserId],
-    queryFn: () =>
-      selectedUserId ? getUserPayoutChargesByUser(selectedUserId) : listAllUserPayoutCharges(),
+    queryFn: () => getUserPayoutChargesByUser(selectedUserId || 'me'),
   });
 
   const userRules = useMemo(() => {
@@ -137,33 +187,39 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
   const [globalEditingId, setGlobalEditingId] = useState(null);
 
   const createGlobalMutation = useMutation({
-    mutationFn: createPayoutCharge,
+    mutationFn: (payload) => createUserPayoutCharge({
+      ...payload,
+      user_id: selectedUserId || userForm.user_id || undefined,
+    }),
     onSuccess: () => {
-      toast.success('Global payout charge rule created successfully!');
-      queryClient.invalidateQueries(['global_payout_charges']);
+      toast.success('Payout charge rule created successfully!');
+      queryClient.invalidateQueries(['base_company_payout_charges']);
+      queryClient.invalidateQueries(['user_payout_charges']);
       setGlobalForm({ from_amount: '', to_amount: '', rate: '', rate_type: 'percentage', is_active: true, description: '' });
       setShowGlobalForm(false);
     },
-    onError: (err) => toast.error(err.message || 'Failed to create global payout charge rule'),
+    onError: (err) => toast.error(err.message || 'Failed to create payout charge rule'),
   });
 
   const updateGlobalMutation = useMutation({
-    mutationFn: ({ id, payload }) => updatePayoutCharge(id, payload),
+    mutationFn: ({ id, payload }) => updateUserPayoutCharge(id, payload),
     onSuccess: () => {
-      toast.success('Global payout charge rule updated successfully!');
-      queryClient.invalidateQueries(['global_payout_charges']);
+      toast.success('Payout charge rule updated successfully!');
+      queryClient.invalidateQueries(['base_company_payout_charges']);
+      queryClient.invalidateQueries(['user_payout_charges']);
       setGlobalEditingId(null);
       setGlobalForm({ from_amount: '', to_amount: '', rate: '', rate_type: 'percentage', is_active: true, description: '' });
       setShowGlobalForm(false);
     },
-    onError: (err) => toast.error(err.message || 'Failed to update global payout charge rule'),
+    onError: (err) => toast.error(err.message || 'Failed to update payout charge rule'),
   });
 
   const deleteGlobalMutation = useMutation({
-    mutationFn: deletePayoutCharge,
+    mutationFn: deleteUserPayoutCharge,
     onSuccess: () => {
-      toast.success('Global payout charge rule deleted');
-      queryClient.invalidateQueries(['global_payout_charges']);
+      toast.success('Payout charge rule deleted');
+      queryClient.invalidateQueries(['base_company_payout_charges']);
+      queryClient.invalidateQueries(['user_payout_charges']);
     },
     onError: (err) => toast.error(err.message || 'Failed to delete rule'),
   });
@@ -352,7 +408,7 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Global Default Slabs
+              Company Default Slabs
             </button>
           </div>
         </div>
@@ -374,9 +430,15 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                     className="w-full sm:w-44 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-[#00D3CD] focus:outline-none focus:ring-1 focus:ring-[#00D3CD]"
                   >
                     <option value="ALL">All Roles</option>
-                    <option value="Super Franchise">Super Franchise</option>
-                    <option value="Franchise">Franchise</option>
-                    <option value="Merchant">Merchant</option>
+                    {isSuperAdmin ? (
+                      <option value="Admin">Admin</option>
+                    ) : (
+                      <>
+                        <option value="Super Franchise">Super Franchise</option>
+                        <option value="Franchise">Franchise</option>
+                        <option value="Merchant">Merchant</option>
+                      </>
+                    )}
                   </select>
 
                   <div className="relative flex-1 w-full">
@@ -427,7 +489,7 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
 
               </form>
 
-              {/* Selected User Banner */}
+               {/* Selected User Banner */}
               {selectedUserObj ? (
                 <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -508,17 +570,45 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                   </div>
 
                   <form onSubmit={handleUserSubmit} className="space-y-4">
-                    {/* Target User Info */}
-                    <div className="bg-gray-50 p-3.5 rounded-xl border flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-700">Target User:</span>
-                      {selectedUserObj ? (
-                        <span className="text-sm font-bold text-gray-900">
-                          {selectedUserObj.name || selectedUserObj.username}
-                          {selectedUserObj.username ? ` (${selectedUserObj.username})` : ` (ID: #${selectedUserObj.id})`}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-amber-600 font-medium">Please search and select a user first</span>
-                      )}
+                    {/* Target User Column / Selector */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          Target User *
+                        </label>
+                        {selectedUserObj && (
+                          <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            Role: {selectedUserObj.userType}
+                          </span>
+                        )}
+                      </div>
+                      <Select
+                        options={targetUserOptions}
+                        value={
+                          targetUserOptions.find(
+                            (opt) => String(opt.value) === String(userForm.user_id || selectedUserId)
+                          ) || null
+                        }
+                        onChange={(selected) => {
+                          const newUserId = selected ? String(selected.value) : '';
+                          setUserForm((prev) => ({ ...prev, user_id: newUserId }));
+                          if (newUserId) {
+                            setSelectedUserId(newUserId);
+                          }
+                        }}
+                        placeholder={
+                          isSuperAdmin
+                            ? "Search or select Admin user..."
+                            : "Search or select user (Super Franchise, Franchise, Merchant)..."
+                        }
+                        isClearable
+                        isSearchable
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                        className="text-sm"
+                        classNamePrefix="select"
+                        noOptionsMessage={() => "No matching users found"}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -665,7 +755,30 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                     <tbody className="divide-y divide-gray-100">
                       {userRules.map((rule) => {
                         const matchedUser = allTargetUsers.find((u) => Number(u.id) === Number(rule.user_id));
-                        const roleLabel = matchedUser?.userType || rule.user?.role || 'User';
+                        const rawRole = matchedUser?.userType || matchedUser?.role || rule.user?.role || '';
+                        const normalizedRowRole = String(rawRole).trim().toLowerCase().replace(/[-_]/g, '');
+
+                        const isRowSuperAdmin = normalizedRowRole === 'superadmin' || normalizedRowRole === 'super_admin';
+                        const isRowAdmin =
+                          normalizedRowRole === 'admin' ||
+                          matchedUser?.userType === 'Admin' ||
+                          rule.user?.role === 'admin' ||
+                          (isSuperAdmin && allTargetUsers.some((u) => Number(u.id) === Number(rule.user_id)));
+
+                        const roleLabel = isRowSuperAdmin
+                          ? 'Super Admin'
+                          : isRowAdmin
+                          ? 'Admin'
+                          : matchedUser?.userType || rule.user?.role || 'User';
+
+                        const isAllocatedBySuperAdmin =
+                          !isSuperAdmin && ((currentUserId && Number(rule.user_id) === Number(currentUserId)) || isRowAdmin);
+
+                        // Don't show edit and delete button if the role is super admin.
+                        // Only if the row is admin (for super admin) or downline (for admin), show edit and delete button.
+                        const canEditDelete = isSuperAdmin
+                          ? isRowAdmin && !isRowSuperAdmin
+                          : !isRowSuperAdmin && !isAllocatedBySuperAdmin;
 
                         return (
                           <tr key={rule.id} className="hover:bg-gray-50/50">
@@ -673,11 +786,41 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">
-                                    {matchedUser?.name || rule.user?.name || matchedUser?.username || rule.user?.username || `User #${rule.user_id}`}
+                                    {matchedUser?.name || rule.user?.name || matchedUser?.username || rule.user?.username || (isSuperAdmin ? "User Under Admin" : 'User')}
                                   </span>
                                   {roleLabel && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800">
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                      isRowSuperAdmin
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : isRowAdmin
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
                                       {roleLabel}
+                                    </span>
+                                  )}
+                                  {isAllocatedBySuperAdmin && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-100 text-purple-800">
+                                      Super Admin Allocated
+                                    </span>
+                                  )}
+                                  {!isAllocatedBySuperAdmin && !isRowSuperAdmin && rule.payout_type && (
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                      rule.payout_type === 'user_id'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : rule.payout_type === 'franchise_id'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : rule.payout_type === 'super_franchise_id'
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      {rule.payout_type === 'user_id'
+                                        ? 'User Override'
+                                        : rule.payout_type === 'franchise_id'
+                                        ? 'Franchise Payout'
+                                        : rule.payout_type === 'super_franchise_id'
+                                        ? 'Super Franchise Payout'
+                                        : 'Company Base'}
                                     </span>
                                   )}
                                 </div>
@@ -704,37 +847,61 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                             </td>
                             <td className="p-3 text-xs text-gray-500">{rule.description || '—'}</td>
                             <td className="p-3 text-right space-x-2">
-                              <button
-                                onClick={() => {
-                                  setUserEditingId(rule.id);
-                                  setUserForm({
-                                    user_id: String(rule.user_id),
-                                    from_amount: String(rule.from_amount),
-                                    to_amount: String(rule.to_amount),
-                                    rate: String(rule.rate),
-                                    rate_type: rule.rate_type,
-                                    is_active: rule.is_active,
-                                    description: rule.description || '',
-                                  });
-                                  if (matchedUser) {
-                                    setSelectedUserId(String(matchedUser.id));
-                                  }
-                                  setShowUserForm(true); // Open modal popup on edit
-                                }}
-                                className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded hover:bg-blue-100"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm('Are you sure you want to delete this user override rule?')) {
-                                    deleteUserMutation.mutate(rule.id);
-                                  }
-                                }}
-                                className="text-xs px-3 py-1.5 bg-red-50 text-red-700 font-semibold rounded hover:bg-red-100"
-                              >
-                                Delete
-                              </button>
+                              {canEditDelete ? (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setUserEditingId(rule.id);
+                                      setUserForm({
+                                        user_id: String(rule.user_id),
+                                        from_amount: String(rule.from_amount),
+                                        to_amount: String(rule.to_amount),
+                                        rate: String(rule.rate),
+                                        rate_type: rule.rate_type,
+                                        is_active: rule.is_active,
+                                        description: rule.description || '',
+                                      });
+                                      if (matchedUser) {
+                                        setSelectedUserId(String(matchedUser.id));
+                                      }
+                                      setShowUserForm(true); // Open modal popup on edit
+                                    }}
+                                    className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded hover:bg-blue-100"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm('Are you sure you want to delete this user override rule?')) {
+                                        deleteUserMutation.mutate(rule.id);
+                                      }
+                                    }}
+                                    className="text-xs px-3 py-1.5 bg-red-50 text-red-700 font-semibold rounded hover:bg-red-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              ) : isAllocatedBySuperAdmin ? (
+                                <span
+                                  className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-gray-100 text-gray-500 border border-gray-200"
+                                  title="This rate was allocated by Super Admin and cannot be edited or deleted"
+                                >
+                                  Allocated by Super Admin
+                                </span>
+                              ) : isRowSuperAdmin ? (
+                                <span
+                                  className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-gray-100 text-gray-500 border border-gray-200"
+                                  title="Super Admin rate cannot be edited or deleted"
+                                >
+                                  Super Admin
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-gray-100 text-gray-500 border border-gray-200"
+                                >
+                                  Read-only
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
