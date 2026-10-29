@@ -18,8 +18,12 @@ import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
 import { getCompanyLogoUrl } from "../../utils/userAccess";
+import { useBranding } from "../../context/BrandingContext";
 
 const MerchantSideBar = ({ currentUser }) => {
+  const { branding } = useBranding();
+  const companyLogoUrl = getCompanyLogoUrl(currentUser);
+  const displayLogo = branding.companyLogoUrl || companyLogoUrl || AbheePayLogo;
   const location = useLocation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(
@@ -39,7 +43,6 @@ const MerchantSideBar = ({ currentUser }) => {
   }, [location.pathname]);
 
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
-  const companyLogoUrl = getCompanyLogoUrl(currentUser);
   const currentFullPath = location.pathname + location.search;
   const isActivePath = (path) => {
     if (path.includes("?")) {
@@ -126,8 +129,8 @@ const MerchantSideBar = ({ currentUser }) => {
           {!isCollapsed && (
             <Link to="/merchant/dashboard" className="flex items-center">
               <img
-                src={companyLogoUrl || AbheePayLogo}
-                alt={currentUser?.company?.company_name || "Company Logo"}
+                src={displayLogo}
+                alt={currentUser?.company?.company_name || branding.companyName || "Company Logo"}
                 width={150}
                 className="max-h-12 w-auto object-contain rounded"
                 onError={(e) => {

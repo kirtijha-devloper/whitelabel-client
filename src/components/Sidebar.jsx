@@ -31,7 +31,8 @@ import {
   isAdminUser,
   isSuperAdminUser,
 } from "../utils/accessControl";
-import { getCompanyLogoUrl, resolveLogoUrl } from "../utils/userAccess";
+import { getCompanyLogoUrl } from "../utils/userAccess";
+import { useBranding } from "../context/BrandingContext";
 
 const Sidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -46,6 +47,10 @@ const Sidebar = ({ currentUser }) => {
   const landingPath = getAdminLandingPathForUser(currentUser);
 
   const companyLogoUrl = getCompanyLogoUrl(currentUser);
+  const { branding } = useBranding();
+  const displayLogo = isSuperAdmin
+    ? AbheePayLogo
+    : branding.companyLogoUrl || companyLogoUrl || AbheePayLogo;
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const isActivePath = (path) => {
@@ -286,8 +291,8 @@ const Sidebar = ({ currentUser }) => {
           {!isCollapsed && (
             <Link to={landingPath} className="flex items-center">
               <img
-                src={companyLogoUrl || AbheePayLogo}
-                alt={currentUser?.company?.company_name || "Company Logo"}
+                src={displayLogo}
+                alt={currentUser?.company?.company_name || branding.companyName || "Company Logo"}
                 width={150}
                 className="max-h-12 w-auto object-contain rounded"
                 onError={(e) => {

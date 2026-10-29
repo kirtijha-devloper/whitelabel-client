@@ -8,6 +8,7 @@ import { PiLayout } from "react-icons/pi";
 import { logoutCurrentSession } from "../../utils/auth";
 import { normalizeServiceFlags } from "../../utils/serviceFlags";
 import { getCompanyLogoUrl } from "../../utils/userAccess";
+import { useBranding } from "../../context/BrandingContext";
 
 const FranchiseSidebar = ({ currentUser }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -15,6 +16,8 @@ const FranchiseSidebar = ({ currentUser }) => {
   const location = useLocation();
   const serviceFlags = normalizeServiceFlags(currentUser?.service_flags, true);
   const companyLogoUrl = getCompanyLogoUrl(currentUser);
+  const { branding } = useBranding();
+  const displayLogo = branding.companyLogoUrl || companyLogoUrl || AbheePayLogo;
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const currentPath = location.pathname + location.search
@@ -113,8 +116,8 @@ const FranchiseSidebar = ({ currentUser }) => {
           {!isCollapsed && (
             <Link to="/franchise/dashboard" className="flex items-center">
               <img
-                src={companyLogoUrl || AbheePayLogo}
-                alt={currentUser?.company?.company_name || "Company Logo"}
+                src={displayLogo}
+                alt={currentUser?.company?.company_name || branding.companyName || "Company Logo"}
                 width={150}
                 className="max-h-12 w-auto object-contain rounded"
                 onError={(e) => {

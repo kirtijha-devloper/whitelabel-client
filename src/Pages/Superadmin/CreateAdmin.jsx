@@ -387,6 +387,18 @@ function CreateAdmin() {
       return;
     }
 
+    if (targetField === 'company_logo' && file.type === 'application/pdf') {
+      toast.error('Company logo must be an image file (PNG, JPG, JPEG, WEBP).');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size cannot exceed 5MB.');
+      e.target.value = '';
+      return;
+    }
+
     // File is valid
     dispatch({
       type: 'UPDATE_FORM',

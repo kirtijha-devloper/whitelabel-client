@@ -1,8 +1,9 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { BrandingProvider, BrandingTitleSync } from './context/BrandingContext';
 
 // Lazy Load Pages & Layouts
 const Login = lazy(() => import('./Pages/Auth/Login'));
@@ -12,8 +13,6 @@ const SuperFranchiseLayout = lazy(() => import('./layouts/SuperFranchiseLayout')
 const FranchiseLayout = lazy(() => import('./layouts/FranchiseLayout'));
 const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
 const Logout = lazy(() => import('./Pages/Logout'));
-import ananyaPayFavicon from './assets/favicon-96x96.png';
-import abheePayFavicon from './assets/FORMAT-PNG.png';
 
 // Simple Loading Component
 const Loading = () => (
@@ -23,57 +22,35 @@ const Loading = () => (
 );
 
 export default function App() {
-  const isAnanyaPay =
-    typeof window !== 'undefined' &&
-    (window.location.hostname.toLowerCase().includes("ananyapay"));
-
-  useEffect(() => {
-    document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
-
-    const faviconUrl = isAnanyaPay ? ananyaPayFavicon : abheePayFavicon;
-
-    // Recreate/replace the link element to force modern browsers to redraw the title bar tab icon
-    const existingIcon = document.getElementById("icon") || document.querySelector("link[rel*='icon']");
-    const newIcon = document.createElement("link");
-    newIcon.id = "icon";
-    newIcon.rel = "icon";
-    newIcon.type = "image/png";
-
-    newIcon.href = `${faviconUrl}?v=${Date.now()}`;
-
-    if (existingIcon && existingIcon.parentNode) {
-      existingIcon.parentNode.replaceChild(newIcon, existingIcon);
-    } else {
-      document.head.appendChild(newIcon);
-    }
-  }, [isAnanyaPay]);
-
   return (
-    <Router>
-      <ToastContainer />
-      <Suspense fallback={<Loading />}>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/logout" element={<Logout />} />
+    <BrandingProvider>
+      <Router>
+        <BrandingTitleSync />
+        <ToastContainer />
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/logout" element={<Logout />} />
 
-          {/* Admin Routes */}
-          <Route path="/admin/*" element={<AdminLayout />} />
-          {/* Super admin routes */}
-          <Route path="/super-admin/*" element={<AdminLayout />} />
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminLayout />} />
+            {/* Super admin routes */}
+            <Route path="/super-admin/*" element={<AdminLayout />} />
 
-          {/* Super Franchise Routes */}
-          <Route path="/super-franchise/*" element={<SuperFranchiseLayout />} />
+            {/* Super Franchise Routes */}
+            <Route path="/super-franchise/*" element={<SuperFranchiseLayout />} />
 
-          {/* Franchise Routes */}
-          <Route path="/franchise/*" element={<FranchiseLayout />} />
+            {/* Franchise Routes */}
+            <Route path="/franchise/*" element={<FranchiseLayout />} />
 
-          {/* Merchant Routes */}
-          <Route path="/merchant/*" element={<MerchantLayout />} />
-        </Routes>
-      </Suspense>
-    </Router>
+            {/* Merchant Routes */}
+            <Route path="/merchant/*" element={<MerchantLayout />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    </BrandingProvider>
   );
 }
