@@ -223,7 +223,7 @@ function CreateAdmin() {
           district: adminData.district || comp.district || '',
           pincode: adminData.pincode || comp.pincode || '',
           state: adminData.state || comp.state || '',
-          country: adminData.country || comp.country || 'India',
+          country: adminData.country || comp.country,
           aadhar_number: adminData.aadhar_number || '',
           pan_number: adminData.pan_number || comp.pan_number || '',
           gst_number: comp.gst_number || '',
@@ -724,7 +724,7 @@ function CreateAdmin() {
 
         formData.set(
           'country',
-          form.country || 'India'
+          form.country
         );
 
         formData.set(
@@ -1262,7 +1262,7 @@ function CreateAdmin() {
                   <input
                     type="text"
                     name="country"
-                    value={state.formData.country || 'India'}
+                    value={state.formData.country}
                     onChange={handleChange}
                     required={!isEditMode}
                     placeholder="Enter country"
