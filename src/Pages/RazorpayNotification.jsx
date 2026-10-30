@@ -938,6 +938,8 @@ const RazorpayNotification = ({ currentUser }) => {
       key: "processing_error",
       render: (val, row) => getProcessingError(row) || "-",
     },
+    ...(!isSuperAdmin
+    ? [
     {
       header: "Admin Actions",
       key: "admin_actions",
@@ -987,7 +989,10 @@ const RazorpayNotification = ({ currentUser }) => {
           </div>
         );
       },
-    },
+       },
+      ]
+      : []),
+    ,
     { header: "Processed", key: "processed", render: (val, row) => String(val ?? row?.processed ?? "-") },
     {
       header: "User",
@@ -1067,6 +1072,7 @@ const RazorpayNotification = ({ currentUser }) => {
           >
             <option value="">Status</option>
             <option value="AUTHORIZED">AUTHORIZED</option>
+            <option value="SUCCESS">SUCCESS</option>
             <option value="FAILED">FAILED</option>
             <option value="SETTLED">SETTLED</option>
             <option value="CAPTURED">CAPTURED</option>

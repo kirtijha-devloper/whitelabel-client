@@ -861,7 +861,7 @@ export default function SuperAdminReports({ currentUser }) {
                 {/* Net Merchant Payout */}
                 <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Net Merchant Payout</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Net Merchant Payin</span>
                     <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
                       <CheckCircle2 className="h-5 w-5" />
                     </span>
