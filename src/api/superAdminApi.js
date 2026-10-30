@@ -311,7 +311,11 @@ export const getSuperAdminCommissionReport = async (params = {}) => {
     if (company_id) query.push(`company_id=${encodeURIComponent(company_id)}`);
     if (from_date) query.push(`from_date=${encodeURIComponent(from_date)}`);
     if (to_date) query.push(`to_date=${encodeURIComponent(to_date)}`);
-    if (payment_method) query.push(`payment_method=${encodeURIComponent(payment_method)}`);
+    if (Array.isArray(payment_method)) {
+      payment_method.forEach((pm) => query.push(`payment_method=${encodeURIComponent(pm)}`));
+    } else if (payment_method) {
+      query.push(`payment_method=${encodeURIComponent(payment_method)}`);
+    }
     const searchTerm = search || q;
     if (searchTerm) query.push(`search=${encodeURIComponent(searchTerm)}`);
     if (query.length) url += `?${query.join("&")}`;

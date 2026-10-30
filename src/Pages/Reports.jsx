@@ -663,8 +663,10 @@ const Reports = ({ currentUser }) => {
       }
       if (stlQuery) {
         const stl = String(row?.settlement_type || '').toLowerCase();
-        if (stlQuery === 'today_settlement' && stl !== 'today_settlement') return false;
-        if (stlQuery === 'next_day_settlement' && stl !== 'next_day_settlement') return false;
+        const isT0 = stl.includes('t0') || stl.includes('today') || stl.includes('t+0');
+        const isT1 = stl.includes('t1') || stl.includes('next_day') || stl.includes('t+1');
+        if ((stlQuery.includes('t0') || stlQuery.includes('today')) && !isT0) return false;
+        if ((stlQuery.includes('t1') || stlQuery.includes('next')) && !isT1) return false;
       }
       if (cClassQuery) {
         const cClass = String(getRowCardClassification(row) || '').toLowerCase();
@@ -672,7 +674,11 @@ const Reports = ({ currentUser }) => {
       }
       if (statusQuery) {
         const st = String(row?.status || '').toLowerCase();
-        if (st !== statusQuery) return false;
+        if (statusQuery === 'success' || statusQuery === 'completed') {
+          if (st !== 'success' && st !== 'completed' && st !== 'captured' && st !== 'authorized') return false;
+        } else if (st !== statusQuery) {
+          return false;
+        }
       }
       return true;
     });
@@ -739,8 +745,8 @@ const Reports = ({ currentUser }) => {
                       className={compactInputClassName}
                     >
                       <option value="">All</option>
-                      <option value="completed">Completed</option>
-                      <option value="failed">Failed</option>
+                      <option value="SUCCESS">Success / Completed</option>
+                      <option value="FAILED">Failed</option>
                     </select>
                   </div>
                 </div>
@@ -805,8 +811,8 @@ const Reports = ({ currentUser }) => {
                       className={inputClassName}
                     >
                       <option value="">All Settlement Types</option>
-                      <option value="today_settlement">T+0 (Today Settlement)</option>
-                      <option value="next_day_settlement">T+1 (Next Day Settlement)</option>
+                      <option value="T0">T+0 (Today Settlement)</option>
+                      <option value="T1">T+1 (Next Day Settlement)</option>
                     </select>
                     <input
                       type="text"
@@ -896,8 +902,8 @@ const Reports = ({ currentUser }) => {
                     className={inputClassName}
                   >
                     <option value="">All</option>
-                    <option value="completed">Completed</option>
-                    <option value="failed">Failed</option>
+                    <option value="SUCCESS">Success / Completed</option>
+                    <option value="FAILED">Failed</option>
                   </select>
                 </div>
                 <div>
@@ -985,8 +991,8 @@ const Reports = ({ currentUser }) => {
                     className={inputClassName}
                   >
                     <option value="">All Settlement Types</option>
-                    <option value="today_settlement">T+0 (Today Settlement)</option>
-                    <option value="next_day_settlement">T+1 (Next Day Settlement)</option>
+                    <option value="T0">T+0 (Today Settlement)</option>
+                    <option value="T1">T+1 (Next Day Settlement)</option>
                   </select>
                 </div>
                 <div>
