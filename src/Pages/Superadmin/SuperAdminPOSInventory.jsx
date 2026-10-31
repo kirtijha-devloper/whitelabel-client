@@ -410,7 +410,7 @@ const SuperAdminPOSInventory = () => {
     try {
       await unassignPosMachine(machineToDeassign.id);
       toast.success(
-        `Machine (${machineToDeassign.tid_number || `#${machineToDeassign.id}`}) de-assigned successfully`
+        `Machine (${machineToDeassign.tid_number || `#${machineToDeassign.id}`}) unassigned successfully`
       );
       setMachineToDeassign(null);
       if (selectedMachine?.id === machineToDeassign.id) {
@@ -418,7 +418,7 @@ const SuperAdminPOSInventory = () => {
       }
       await fetchPosData();
     } catch (error) {
-      toast.error(error?.message || "Failed to de-assign POS machine");
+      toast.error(error?.message || "Failed to unassign POS machine");
     } finally {
       setIsDeassigning(false);
     }
@@ -671,16 +671,16 @@ const SuperAdminPOSInventory = () => {
                           <FaEye className="w-4 h-4" />
                         </button>
 
-                        {/* DE-ASSIGN */}
+                        {/* UNASSIGN */}
                         {isMachineAssigned(machine) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenDeassign(machine)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all shadow-sm"
-                            title={`De-assign machine from ${getAssignedMachineName(machine)}`}
+                            title={`unassign machine from ${getAssignedMachineName(machine)}`}
                           >
                             <FaUserMinus className="w-3.5 h-3.5" />
-                            De-assign
+                            Unassign
                           </button>
                         ) : (
                           <span
@@ -909,7 +909,7 @@ const SuperAdminPOSInventory = () => {
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 font-semibold text-sm hover:bg-red-100 transition shadow-sm"
                 >
                   <FaUserMinus className="w-3.5 h-3.5" />
-                  De-assign Machine
+                  Unassign Machine
                 </button>
               ) : <div />}
 
@@ -925,11 +925,11 @@ const SuperAdminPOSInventory = () => {
         </div>
       )}
 
-      {/* DE-ASSIGN CONFIRMATION MODAL */}
+      {/* UNASSIGN CONFIRMATION MODAL */}
       <Modal
         isOpen={Boolean(machineToDeassign)}
         onClose={handleCloseDeassign}
-        title="Confirm De-assign POS Machine"
+        title="Confirm un-assign POS Machine"
         className="max-w-md"
       >
         <div className="space-y-4">
@@ -938,7 +938,7 @@ const SuperAdminPOSInventory = () => {
             <div className="text-sm">
               <p className="font-semibold text-red-800">Return Machine to Unassigned Stock</p>
               <p className="text-xs text-red-600 mt-0.5">
-                Are you sure you want to de-assign this POS machine?
+                Are you sure you want to un-assign this POS machine?
               </p>
             </div>
           </div>
@@ -959,7 +959,7 @@ const SuperAdminPOSInventory = () => {
           </div>
 
           <p className="text-xs text-gray-500">
-            Once de-assigned, the machine will be freed from the user/admin and returned to central available inventory.
+            Once un-assigned, the machine will be freed from the user/admin and returned to central available inventory.
           </p>
 
           <div className="flex justify-end gap-2 pt-2 border-t">
@@ -978,11 +978,11 @@ const SuperAdminPOSInventory = () => {
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {isDeassigning ? (
-                <>De-assigning...</>
+                <>Unassigning......</>
               ) : (
                 <>
                   <FaUserMinus className="w-3.5 h-3.5" />
-                  De-assign Machine
+                  Unassigning
                 </>
               )}
             </button>

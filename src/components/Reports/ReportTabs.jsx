@@ -5,9 +5,6 @@ import { isChildRole } from "../../utils/serviceDisplayNames";
 const REPORT_TAB_CONFIG = [
   { key: "pos", label: "POS Transactions" },
   { key: "wallet", label: "Wallet Transactions" },
-  { key: "all-transactions", label: "Transaction Reports" },
-  { key: "commission", label: "Commission Report" },
-  { key: "service-wise", label: "Service Wise Reports" },
   { key: "cc-bill", label: "CC Bill Payment" },
   { key: "ba-cc-bill", label: "BA CC Bill Payment" },
   { key: "cc-bill-3", label: "CC Bill 3" },
@@ -24,17 +21,17 @@ const getTargetPath = (basePath, tabKey) => {
     return `${safeBase}?tab=${tabKey}`;
   }
 
-  if (tabKey === "all-transactions") {
-    return `${safeBase}/transactions`;
-  }
+  // if (tabKey === "all-transactions") {
+  //   return `${safeBase}/transactions`;
+  // }
 
-  if (tabKey === "commission") {
-    return `${safeBase}/commission`;
-  }
+  // if (tabKey === "commission") {
+  //   return `${safeBase}/commission`;
+  // }
 
-  if (tabKey === "service-wise") {
-    return `${safeBase}/service-wise`;
-  }
+  // if (tabKey === "service-wise") {
+  //   return `${safeBase}/service-wise`;
+  // }
 
   if (tabKey === "payout") {
     return `${safeBase}/payout`;
