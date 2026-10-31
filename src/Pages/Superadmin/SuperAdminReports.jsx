@@ -58,7 +58,7 @@ export default function SuperAdminReports({ currentUser }) {
   };
 
   // ── Filter States ──────────────────────────────────────────────────────────
-  const [selectedDomain, setSelectedDomain] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -104,7 +104,7 @@ export default function SuperAdminReports({ currentUser }) {
     () => ({
       page,
       limit: pageSize,
-      domain: selectedDomain || undefined,
+      company_id: selectedCompanyId || undefined,
       from_date: fromDate || undefined,
       to_date: toDate || undefined,
       status: activeTab === "transactions" && selectedStatus ? selectedStatus : undefined,
@@ -116,7 +116,7 @@ export default function SuperAdminReports({ currentUser }) {
           : undefined,
       search: committedSearch || undefined,
     }),
-    [page, pageSize, selectedDomain, fromDate, toDate, selectedStatus, selectedPaymentMethod, committedSearch, activeTab]
+    [page, pageSize, selectedCompanyId, fromDate, toDate, selectedStatus, selectedPaymentMethod, committedSearch, activeTab]
   );
 
   // ── Transaction Report Query ───────────────────────────────────────────────
@@ -165,7 +165,7 @@ export default function SuperAdminReports({ currentUser }) {
   };
 
   const handleResetFilters = () => {
-    setSelectedDomain("");
+    setSelectedCompanyId("");
     setFromDate("");
     setToDate("");
     setSelectedStatus("");
@@ -898,7 +898,7 @@ export default function SuperAdminReports({ currentUser }) {
                 </div>
               </div>
 
-              {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
+              {(selectedCompanyId || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -915,16 +915,16 @@ export default function SuperAdminReports({ currentUser }) {
               <div className="lg:col-span-3">
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Partner Domain / Company</label>
                 <select
-                  value={selectedDomain}
+                  value={selectedCompanyId}
                   onChange={(e) => {
-                    setSelectedDomain(e.target.value);
+                    setSelectedCompanyId(e.target.value);
                     setPage(1);
                   }}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 shadow-sm transition-all focus:border-[#00D3CD] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00D3CD]/20"
                 >
                   <option value="">All Domains & Companies</option>
                   {domainOptions.map((opt) => (
-                    <option key={opt.company_id} value={opt.domain_name !== "-" ? opt.domain_name : opt.company_id}>
+                    <option key={opt.company_id} value={opt.company_id}>
                       {opt.domain_name !== "-" ? `${opt.domain_name} (${opt.company_name})` : opt.company_name}
                     </option>
                   ))}
@@ -1075,11 +1075,11 @@ export default function SuperAdminReports({ currentUser }) {
                           No {activeTab === "transactions" ? "Transactions" : "Commissions"} Found
                         </h4>
                         <p className="mt-1 text-xs text-gray-500 leading-relaxed">
-                          {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
+                          {(selectedCompanyId || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
                             ? "No records matched your selected filters or search keyword. Try clearing or expanding your date range."
                             : `There are currently no recorded ${activeTab === "transactions" ? "transactions" : "commissions"} in the system.`}
                         </p>
-                        {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
+                        {(selectedCompanyId || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
                           <button
                             type="button"
                             onClick={handleResetFilters}
@@ -1123,11 +1123,11 @@ export default function SuperAdminReports({ currentUser }) {
                 No {activeTab === "transactions" ? "Transactions" : "Commissions"}
               </h4>
               <p className="mt-1 text-xs text-gray-500 max-w-xs">
-                {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
+                {(selectedCompanyId || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch)
                   ? "No results match your active filters."
                   : "No data available."}
               </p>
-              {(selectedDomain || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
+              {(selectedCompanyId || fromDate || toDate || selectedStatus || selectedPaymentMethod || committedSearch) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}

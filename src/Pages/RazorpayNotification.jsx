@@ -941,61 +941,61 @@ const RazorpayNotification = ({ currentUser }) => {
       key: "processing_error",
       render: (val, row) => getProcessingError(row) || "-",
     },
-    ...(!isSuperAdmin
-    ? [
-    {
-      header: "Admin Actions",
-      key: "admin_actions",
-      render: (_, row) => {
-        if (isWorldlineRecord(row)) {
-          const rawStatus = String(row?.processing_status || row?.processingStatus || "").trim().toLowerCase();
-          if (["needs_admin", "needs-admin", "needsadmin", "needs admin", "pending"].includes(rawStatus)) {
-            return (
-              <button
-                className="px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
-                disabled={isProcessing}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleWorldlineAdminProcess(row);
-                }}
-              >
-                Admin Process
-              </button>
-            );
-          }
-          return "-";
-        }
+    // ...(!isSuperAdmin
+    // ? [
+    // {
+    //   header: "Admin Actions",
+    //   key: "admin_actions",
+    //   render: (_, row) => {
+    //     if (isWorldlineRecord(row)) {
+    //       const rawStatus = String(row?.processing_status || row?.processingStatus || "").trim().toLowerCase();
+    //       if (["needs_admin", "needs-admin", "needsadmin", "needs admin", "pending"].includes(rawStatus)) {
+    //         return (
+    //           <button
+    //             className="px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
+    //             disabled={isProcessing}
+    //             onClick={(e) => {
+    //               e.stopPropagation();
+    //               handleWorldlineAdminProcess(row);
+    //             }}
+    //           >
+    //             Admin Process
+    //           </button>
+    //         );
+    //       }
+    //       return "-";
+    //     }
 
-        if (!isProcessable(row)) {
-          return "-";
-        }
-        return (
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                openProcessModal(row, "rule");
-              }}
-            >
-              Process now
-            </button>
-            <button
-              className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
-              onClick={(e) => {
-                e.stopPropagation();
-                openProcessModal(row, "custom");
-              }}
-            >
-              Process custom
-            </button>
-          </div>
-        );
-      },
-       },
-      ]
-      : []),
-    ,
+    //     if (!isProcessable(row)) {
+    //       return "-";
+    //     }
+    //     return (
+    //       <div className="flex flex-wrap gap-2">
+    //         <button
+    //           className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+    //           onClick={(e) => {
+    //             e.stopPropagation();
+    //             openProcessModal(row, "rule");
+    //           }}
+    //         >
+    //           Process now
+    //         </button>
+    //         <button
+    //           className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+    //           onClick={(e) => {
+    //             e.stopPropagation();
+    //             openProcessModal(row, "custom");
+    //           }}
+    //         >
+    //           Process custom
+    //         </button>
+    //       </div>
+    //     );
+    //   },
+    //    },
+    //   ]
+    //   : []),
+    // ,
     { header: "Processed", key: "processed", render: (val, row) => String(val ?? row?.processed ?? "-") },
     {
       header: "User",

@@ -181,9 +181,9 @@ const SAMPLE_TRANSACTIONS = [
 
 const SERVICE_FILTER_OPTIONS = [
   "All Services",
-  "Vimo Payout",
-  "SevenPay Payout",
-  "BranchX Payout",
+  "Payout V",
+  "Payout S",
+  "Payout B",
   "PAYOUT-N",
   "CC Bill Pay",
   "BA CC Bill Pay",
