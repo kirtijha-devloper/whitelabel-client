@@ -27,6 +27,8 @@ const normalizeReportFilters = (filters = {}) => {
     user_id,
     userSearch,
     user_search,
+    settlementType,
+    settlement_type,
     ...rest
   } = filters || {};
 
@@ -40,6 +42,7 @@ const normalizeReportFilters = (filters = {}) => {
   const resolvedDeviceNo = device_no ?? deviceNo;
   const resolvedUserId = user_id ?? userId;
   const resolvedUserSearch = user_search ?? userSearch;
+  const resolvedSettlementType = settlement_type ?? settlementType;
 
   if (resolvedStartDate) {
     normalized.start_date = resolvedStartDate;
@@ -58,6 +61,18 @@ const normalizeReportFilters = (filters = {}) => {
   }
   if (resolvedUserSearch) {
     normalized.user_search = resolvedUserSearch;
+  }
+  if (resolvedSettlementType) {
+    const sLower = String(resolvedSettlementType).toLowerCase();
+    normalized.settlement_type = sLower.includes('t0') || sLower.includes('today') ? 'T0' : (sLower.includes('t1') || sLower.includes('next') ? 'T1' : resolvedSettlementType);
+  }
+  if (normalized.status) {
+    const stLower = String(normalized.status).toLowerCase();
+    if (stLower === 'completed' || stLower === 'success') {
+      normalized.status = 'SUCCESS';
+    } else if (stLower === 'failed') {
+      normalized.status = 'FAILED';
+    }
   }
 
   return normalized;

@@ -427,6 +427,9 @@ const RazorpayNotification = ({ currentUser }) => {
           return true;
         })
       );
+      if (queryParams.paymentMode === "CARD") {
+        queryParams.paymentMode = ["CARD", "CRDB"];
+      }
       const requestedSource = String(queryParams.source || "").trim().toLowerCase();
       console.log("Querying notifications with params", { page, limit, ...queryParams });
 
@@ -938,6 +941,8 @@ const RazorpayNotification = ({ currentUser }) => {
       key: "processing_error",
       render: (val, row) => getProcessingError(row) || "-",
     },
+    ...(!isSuperAdmin
+    ? [
     {
       header: "Admin Actions",
       key: "admin_actions",
@@ -987,7 +992,10 @@ const RazorpayNotification = ({ currentUser }) => {
           </div>
         );
       },
-    },
+       },
+      ]
+      : []),
+    ,
     { header: "Processed", key: "processed", render: (val, row) => String(val ?? row?.processed ?? "-") },
     {
       header: "User",
@@ -1067,10 +1075,12 @@ const RazorpayNotification = ({ currentUser }) => {
           >
             <option value="">Status</option>
             <option value="AUTHORIZED">AUTHORIZED</option>
+            <option value="SUCCESS">SUCCESS</option>
             <option value="FAILED">FAILED</option>
             <option value="SETTLED">SETTLED</option>
             <option value="CAPTURED">CAPTURED</option>
             <option value="PENDING">PENDING</option>
+            <option value="VOIDED">VOIDED</option>
           </select>
           <select
             className="border rounded-lg px-3 py-2"

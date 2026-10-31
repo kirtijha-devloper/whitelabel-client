@@ -386,10 +386,13 @@ const MerchantLedger = () => {
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm shadow-sm outline-none transition-colors focus:border-[#00D3CD]"
                 >
                   <option value="">All Types</option>
-                  <option value="payin">Payin</option>
+                  <option value="pos_credit">POS Credit</option>
+                  <option value="pos_charge">POS Charge</option>
                   <option value="payout">Payout</option>
-                  <option value="pos">POS</option>
                   <option value="bbps_payment">BBPS Payment</option>
+                  <option value="wallet_credit">Wallet Credit</option>
+                  <option value="admin_credit">Admin Credit</option>
+                  <option value="admin_debit">Admin Debit</option>
                 </select>
               </div>
             </div>

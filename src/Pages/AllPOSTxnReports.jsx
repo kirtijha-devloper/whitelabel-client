@@ -107,8 +107,9 @@ const AllPOSTxnReport = () => {
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">All</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
+              <option value="SUCCESS">Success / Captured</option>
+              <option value="AUTHORIZED">Authorized</option>
+              <option value="FAILED">Failed</option>
             </select>
           </div>
         </div>
