@@ -14,6 +14,7 @@ const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
 const Logout = lazy(() => import('./Pages/Logout'));
 import ananyaPayFavicon from './assets/favicon-96x96.png';
 import abheePayFavicon from './assets/FORMAT-PNG.png';
+import { getLogo } from './api/logoApi';
 
 // Simple Loading Component
 const Loading = () => (
@@ -28,24 +29,40 @@ export default function App() {
     (window.location.hostname.toLowerCase().includes("ananyapay"));
 
   useEffect(() => {
-    document.title = isAnanyaPay ? "ANANYA PAY" : "ABHEEPAY";
 
-    const faviconUrl = isAnanyaPay ? ananyaPayFavicon : abheePayFavicon;
+    const fetchLogo = async () => {
+      try {
+        const response = await getLogo();
+        console.log('Fetched logo response:', response);
+        const faviconUrl = response.logo ? response.logo : abheePayFavicon;
+        if (response.company_name) {
+          document.title = response.company_name;
+        } else {
+          document.title = "ABHEEPAY";
+        }
 
-    // Recreate/replace the link element to force modern browsers to redraw the title bar tab icon
-    const existingIcon = document.getElementById("icon") || document.querySelector("link[rel*='icon']");
-    const newIcon = document.createElement("link");
-    newIcon.id = "icon";
-    newIcon.rel = "icon";
-    newIcon.type = "image/png";
+        // Recreate/replace the link element to force modern browsers to redraw the title bar tab icon
+        const existingIcon = document.getElementById("icon") || document.querySelector("link[rel*='icon']");
+        const newIcon = document.createElement("link");
+        newIcon.id = "icon";
+        newIcon.rel = "icon";
+        newIcon.type = "image/png";
 
-    newIcon.href = `${faviconUrl}?v=${Date.now()}`;
+        newIcon.href = `${faviconUrl}?v=${Date.now()}`;
 
-    if (existingIcon && existingIcon.parentNode) {
-      existingIcon.parentNode.replaceChild(newIcon, existingIcon);
-    } else {
-      document.head.appendChild(newIcon);
+        if (existingIcon && existingIcon.parentNode) {
+          existingIcon.parentNode.replaceChild(newIcon, existingIcon);
+        } else {
+          document.head.appendChild(newIcon);
+        }
+      } catch (error) {
+        console.error('Error fetching logo:', error);
+        document.title = "ABHEEPAY";
+      }
     }
+
+
+    fetchLogo();
   }, [isAnanyaPay]);
 
   return (
