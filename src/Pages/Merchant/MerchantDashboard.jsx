@@ -99,52 +99,6 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
     },
   ];
 
-  // Quick Action Services (One-tap navigation on all screens)
-  const quickServices = [
-    {
-      label: "CC Bill 1",
-      to: "/merchant/cc-bill-pay",
-      icon: CreditCard,
-      disabled: !serviceFlags.cc_bill_pay,
-    },
-    {
-      label: "CC Bill 2",
-      to: "/merchant/ba-cc-bill-pay",
-      icon: CreditCard,
-      disabled: !serviceFlags.ba_cc_bill_pay,
-    },
-    {
-      label: "Payout Hub",
-      to: "/merchant/payout-hub",
-      icon: HandCoins,
-      disabled: false,
-    },
-    {
-      label: "Ledger",
-      to: "/merchant/ledger",
-      icon: BookText,
-      disabled: false,
-    },
-    {
-      label: "Charges",
-      to: "/merchant/charges",
-      icon: ReceiptIndianRupee,
-      disabled: false,
-    },
-    {
-      label: "Reports",
-      to: "/merchant/reports",
-      icon: FileBarChart,
-      disabled: false,
-    },
-    {
-      label: "Settings",
-      to: "/merchant/setting",
-      icon: Settings,
-      disabled: false,
-    },
-  ];
-
   // CC Payment Breakdown Cards
   const ccPaymentCards = [
     {
@@ -237,62 +191,8 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
         })}
       </div>
 
-      {/* ================= SECTION 2: QUICK ACTIONS STRIP ================= */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 sm:p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-[#00a8a3]" />
-            Quick Services
-          </p>
-          <span className="text-[11px] font-medium text-gray-400 hidden sm:inline-block">
-            One-tap service shortcuts
-          </span>
-        </div>
 
-        <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-7 gap-2 sm:gap-2.5">
-          {quickServices.map((service, index) => {
-            const Icon = service.icon;
-            const content = (
-              <div
-                className={`group flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 sm:p-2.5 text-center transition-all duration-150 ${
-                  service.disabled
-                    ? "opacity-40 cursor-not-allowed bg-gray-50"
-                    : "bg-gray-50/80 hover:bg-[#00D3CD]/10 hover:text-[#008b87] active:scale-95 cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl transition-colors ${
-                    service.disabled
-                      ? "bg-gray-200 text-gray-400"
-                      : "bg-[#00D3CD]/10 text-[#00a8a3] group-hover:bg-[#00D3CD] group-hover:text-white"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <span className="text-[10px] sm:text-xs font-semibold text-gray-700 truncate w-full group-hover:text-[#008b87]">
-                  {service.label}
-                </span>
-              </div>
-            );
-
-            if (service.disabled) {
-              return (
-                <div key={index} title="Service is temporarily unavailable">
-                  {content}
-                </div>
-              );
-            }
-
-            return (
-              <Link key={index} to={service.to}>
-                {content}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ================= SECTION 3: CREDIT CARD BILL PAYMENTS ================= */}
+      {/* ================= SECTION 2: CREDIT CARD BILL PAYMENTS ================= */}
       <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-gray-100">
           <div>
@@ -364,7 +264,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
         </div>
       </div>
 
-      {/* ================= SECTION 4: TODAY'S TOTAL PAYOUT ================= */}
+      {/* ================= SECTION 3: TODAY'S TOTAL PAYOUT ================= */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 lg:p-7 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
         <div className="flex items-center gap-3.5 sm:gap-4">
           <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20">

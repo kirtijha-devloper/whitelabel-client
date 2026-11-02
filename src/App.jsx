@@ -12,8 +12,7 @@ const SuperFranchiseLayout = lazy(() => import('./layouts/SuperFranchiseLayout')
 const FranchiseLayout = lazy(() => import('./layouts/FranchiseLayout'));
 const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
 const Logout = lazy(() => import('./Pages/Logout'));
-import ananyaPayFavicon from './assets/favicon-96x96.png';
-import abheePayFavicon from './assets/FORMAT-PNG.png';
+import abheePayFavicon from './assets/FORMAT-3D-4.jpg';
 import { getLogo } from './api/logoApi';
 
 // Simple Loading Component
@@ -24,15 +23,13 @@ const Loading = () => (
 );
 
 export default function App() {
-  const isAnanyaPay =
-    typeof window !== 'undefined' &&
-    (window.location.hostname.toLowerCase().includes("ananyapay"));
+  const host_name = window.location;
 
   useEffect(() => {
-
+    
     const fetchLogo = async () => {
       try {
-        const response = await getLogo();
+        const response = await getLogo({ hostname: host_name });
         console.log('Fetched logo response:', response);
         const faviconUrl = response.logo ? response.logo : abheePayFavicon;
         if (response.company_name) {
@@ -57,13 +54,22 @@ export default function App() {
         }
       } catch (error) {
         console.error('Error fetching logo:', error);
+        const newIcon = document.createElement("link");
+        newIcon.id = "icon";
+        newIcon.rel = "icon";
+        newIcon.type = "image/png";
+
+        newIcon.href = `${abheePayFavicon}?v=${Date.now()}`;
+
+        document.head.appendChild(newIcon);
+
         document.title = "ABHEEPAY";
       }
     }
 
 
     fetchLogo();
-  }, [isAnanyaPay]);
+  }, [host_name]);
 
   return (
     <Router>

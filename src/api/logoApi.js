@@ -9,9 +9,9 @@ const api = axios.create({
   },
 });
 
-export const getLogo = async () => {
+export const getLogo = async ({hostname}) => {
   try {
-    const response = await api.get("/logo");
+    const response = await api.get(`/logo?hostname=${hostname}`);
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || "Failed to fetch logo");
