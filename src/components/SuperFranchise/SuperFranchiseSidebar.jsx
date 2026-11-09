@@ -61,6 +61,18 @@ const SuperFranchiseSidebar = ({ currentUser }) => {
       serviceKey: "mx_payout",
     },
     {
+      name: "PG 1",
+      path: "/super-franchise/pg-1",
+      icon: <PiLayout className="w-5 h-5" />,
+      serviceKey: "pg_1",
+    },
+    {
+      name: "PG 2",
+      path: "/super-franchise/pg-2",
+      icon: <PiLayout className="w-5 h-5" />,
+      serviceKey: "pg_2",
+    },
+    {
       name: "CC Bill 1",
       path: "/super-franchise/cc-bill-pay",
       icon: <FaMoneyBillWave />,

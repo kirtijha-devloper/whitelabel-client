@@ -74,6 +74,18 @@ const MerchantSideBar = ({ currentUser }) => {
       ],
       disabled: !hasAnyPayout,
     },
+    {
+      name: "PG 1",
+      path: "/merchant/pg-1",
+      icon: <Layers className="w-5 h-5" />,
+      serviceKey: "pg_1",
+    },
+    {
+      name: "PG 2",
+      path: "/merchant/pg-2",
+      icon: <Layers className="w-5 h-5" />,
+      serviceKey: "pg_2",
+    },
     { name: "Ledger", path: "/merchant/ledger", icon: <Wallet className="w-5 h-5" /> },
     { name: "Charges", path: "/merchant/charges", icon: <CreditCard className="w-5 h-5" /> },
     { name: "Stock POS", path: "/merchant/stock-pos", icon: <Box className="w-5 h-5" /> },

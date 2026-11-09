@@ -43,6 +43,7 @@ import ApplyKyc from "../Pages/Kyc/ApplyKyc";
 import PayoutReport from "../Pages/PayoutReport";
 import CCBillPaymentReports from "../Pages/CCBillPaymentReports";
 import VimoPayout from "../Pages/VimoPayout";
+import PGServicePlaceholder from "../Pages/PGServicePlaceholder";
 import SevenPayPayout from "../Pages/SevenPayPayout";
 import Ndia5Payout from "../Pages/Ndia5Payout";
 import BranchXPayout from "../Pages/BranchXPayout";
@@ -67,6 +68,8 @@ const getMerchantPageTitle = (pathname) => {
     ["/merchant/ndia5-payout", "PAYOUT-N"],
     ["/merchant/mx-payout/success", "Payout Success"],
     ["/merchant/mx-payout", "Payout-M-X"],
+    ["/merchant/pg-1", "PG 1 Service"],
+    ["/merchant/pg-2", "PG 2 Service"],
     ["/merchant/payout/remitter-details", "Remitter Details"],
     ["/merchant/payout/transaction-history", "Transaction History"],
     ["/merchant/payout-hub", "Payout Services"],
@@ -166,6 +169,8 @@ const MerchantLayout = () => {
     location.pathname.startsWith("/merchant/ndia5-payout") ||
     location.pathname.startsWith("/merchant/branchx-payout") ||
     location.pathname.startsWith("/merchant/mx-payout") ||
+    location.pathname.startsWith("/merchant/pg-1") ||
+    location.pathname.startsWith("/merchant/pg-2") ||
     location.pathname.startsWith("/merchant/ledger") ||
     location.pathname.startsWith("/merchant/charges") ||
     location.pathname.startsWith("/merchant/stock-pos") ||
@@ -259,6 +264,20 @@ const MerchantLayout = () => {
           <Route
             path="branchx-payout/success"
             element={guardServiceRoute("branchx_payout", <PayoutSuccess />)}
+          />
+          <Route
+            path="pg-1"
+            element={guardServiceRoute(
+              "pg_1",
+              <PGServicePlaceholder serviceName="PG 1" currentUser={currentUser} />
+            )}
+          />
+          <Route
+            path="pg-2"
+            element={guardServiceRoute(
+              "pg_2",
+              <PGServicePlaceholder serviceName="PG 2" currentUser={currentUser} />
+            )}
           />
           <Route
             path="payout/remitter-details"

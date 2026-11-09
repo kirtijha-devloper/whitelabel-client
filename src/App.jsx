@@ -12,6 +12,7 @@ const SuperFranchiseLayout = lazy(() => import('./layouts/SuperFranchiseLayout')
 const FranchiseLayout = lazy(() => import('./layouts/FranchiseLayout'));
 const MerchantLayout = lazy(() => import('./layouts/MerchantLayout'));
 const Logout = lazy(() => import('./Pages/Logout'));
+const PGPaymentReturn = lazy(() => import('./Pages/PGPaymentReturn'));
 import abheePayFavicon from './assets/FORMAT-3D-4.jpg';
 import { getLogo } from './api/logoApi';
 
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/logout" element={<Logout />} />
+          <Route path="/pg/payment-return" element={<PGPaymentReturn />} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={<AdminLayout />} />

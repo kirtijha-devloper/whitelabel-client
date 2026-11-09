@@ -95,6 +95,14 @@ export const CHILD_SERVICE_DISPLAY_NAMES = {
   "cc-bill": "CC Bill 1",
   "ba-cc-bill": "CC Bill 2",
   "cc-bill-3": "CC Bill 3",
+
+  // PG Services
+  pg_1: "PG 1",
+  pg_2: "PG 2",
+  "pg-1": "PG 1",
+  "pg-2": "PG 2",
+  pg_3: "PG 2",
+  "pg-3": "PG 2",
 };
 
 /**
@@ -108,6 +116,12 @@ export const SUPER_ADMIN_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill",
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
+  pg_1: "PG 1",
+  pg_2: "PG 2",
+  "pg-1": "PG 1",
+  "pg-2": "PG 2",
+  pg_3: "PG 2",
+  "pg-3": "PG 2",
 };
 
 /**
@@ -121,6 +135,12 @@ export const CHILD_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill 1",
   ba_cc_bill_pay: "CC Bill 2",
   cc_bill_3: "CC Bill 3",
+  pg_1: "PG 1",
+  pg_2: "PG 2",
+  "pg-1": "PG 1",
+  "pg-2": "PG 2",
+  pg_3: "PG 2",
+  "pg-3": "PG 2",
 };
 
 /**

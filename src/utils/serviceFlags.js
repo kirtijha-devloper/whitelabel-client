@@ -55,6 +55,20 @@ export const INITIAL_SERVICE_CONFIG = [
     description: "Enable or disable global POS T0 Instant Settlement. When ON, Money-In events dynamically evaluate daily limit rules.",
     target_roles: ["admin"],
   },
+  {
+    key: "pg_1",
+    label: "PG 1",
+    category: "Payment Gateway",
+    description: "Enable or disable the PG 1 payment gateway flow.",
+    target_roles: ["admin", "franchise", "merchant", "super_franchise"],
+  },
+  {
+    key: "pg_2",
+    label: "PG 2",
+    category: "Payment Gateway",
+    description: "Enable or disable the PG 2 payment gateway flow.",
+    target_roles: ["admin", "franchise", "merchant", "super_franchise"],
+  },
 ];
 
 export const SERVICE_FLAG_CONFIG = INITIAL_SERVICE_CONFIG;

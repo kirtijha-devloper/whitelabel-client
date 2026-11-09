@@ -61,6 +61,18 @@ const FranchiseSidebar = ({ currentUser }) => {
       serviceKey: "mx_payout",
     },
     {
+      name: "PG 1",
+      path: "/franchise/pg-1",
+      icon: <PiLayout className="w-5 h-5" />,
+      serviceKey: "pg_1",
+    },
+    {
+      name: "PG 2",
+      path: "/franchise/pg-2",
+      icon: <PiLayout className="w-5 h-5" />,
+      serviceKey: "pg_2",
+    },
+    {
       name: "CC Bill 1",
       path: "/franchise/cc-bill-pay",
       icon: <FaMoneyBillWave />,

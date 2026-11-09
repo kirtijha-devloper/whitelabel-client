@@ -40,8 +40,10 @@ const CANONICAL_SERVICE_META = {
   ba_cc_bill_pay: { label: "BA CC Bill Pay", category: "CC Bill", description: "BillAvenue BBPS Credit Card Bill Payment" },
   cc_bill_3: { label: "CC Bill 3", category: "CC Bill", description: "CC Bill 3 Bank-Callback Payment Route" },
 
-  // Payin Services
+  // Payin & PG Services
   pos_t0_settlement: { label: "POS T0 Instant Settlement", category: "Payin", description: "Instant same-day T0 POS Settlement & limits" },
+  pg_1: { label: "PG 1", category: "Payin", description: "PG 1 Payment Gateway Service Route" },
+  pg_2: { label: "PG 2", category: "Payin", description: "PG 2 Payment Gateway Service Route" },
 };
 
 // Safe Category Normalization Helper to map legacy / custom categories into the 3 Core Categories
@@ -61,6 +63,7 @@ export const normalizeCategory = (category, serviceKey = "") => {
     cleanCat.includes("pos") ||
     cleanCat.includes("qr") ||
     cleanCat.includes("gateway") ||
+    cleanCat.includes("pg") ||
     cleanCat.includes("settlement") ||
     cleanCat.includes("limit") ||
     cleanCat.includes("hardware") ||

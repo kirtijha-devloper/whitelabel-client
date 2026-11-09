@@ -19,6 +19,7 @@ import { getServiceDisplayName } from "../../utils/serviceDisplayNames";
 
 const CATEGORY_ORDER = [
   "Payout & Banking",
+  "Payment Gateway",
   "Bill Payments & BBPS",
   "POS & Hardware",
   "Security & Limits",

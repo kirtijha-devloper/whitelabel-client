@@ -60,6 +60,7 @@ const PayoutFailure = lazy(() => import('../Pages/PayoutFailure'));
 const SetLimit = lazy(() => import('../Pages/SetLimit'));
 const PosSetting = lazy(() => import('../Pages/PosSetting'));
 const ComplaintBox = lazy(() => import('../Pages/Merchant/ComplaintBox'));
+const PGServicePlaceholder = lazy(() => import('../Pages/PGServicePlaceholder'));
 
 export default function FranchiseLayout() {
   const navigate = useNavigate();
@@ -191,6 +192,14 @@ export default function FranchiseLayout() {
               <Route
                 path='branchx-payout/success'
                 element={guardServiceRoute('branchx_payout', <PayoutSuccess />)}
+              />
+              <Route
+                path='pg-1'
+                element={guardServiceRoute('pg_1', <PGServicePlaceholder serviceName="PG 1" currentUser={currentUser} />)}
+              />
+              <Route
+                path='pg-2'
+                element={guardServiceRoute('pg_2', <PGServicePlaceholder serviceName="PG 2" currentUser={currentUser} />)}
               />
               <Route
                 path="cc-bill-pay"

@@ -45,6 +45,7 @@ const PayoutSuccess = lazy(() => import('../Pages/PayoutSuccess'));
 const CCBillPay = lazy(() => import("../Pages/CCBillPay"));
 const BillAvenueCCBillPay = lazy(() => import('../Pages/BillAvenueCCBillPay'));
 const ApplyKyc = lazy(() => import('../Pages/Kyc/ApplyKyc'));
+const PGServicePlaceholder = lazy(() => import('../Pages/PGServicePlaceholder'));
 
 export default function SuperFranchiseLayout() {
   const navigate = useNavigate();
@@ -173,6 +174,15 @@ export default function SuperFranchiseLayout() {
               <Route
                 path='mx-payout/success'
                 element={guardServiceRoute('mx_payout', <PayoutSuccess />)}
+              />
+
+              <Route
+                path='pg-1'
+                element={guardServiceRoute('pg_1', <PGServicePlaceholder serviceName="PG 1" currentUser={currentUser} />)}
+              />
+              <Route
+                path='pg-2'
+                element={guardServiceRoute('pg_2', <PGServicePlaceholder serviceName="PG 2" currentUser={currentUser} />)}
               />
 
               <Route

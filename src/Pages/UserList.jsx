@@ -348,6 +348,8 @@ const DEFAULT_SERVICE_INLINE_LABELS = {
   cc_bill_pay: "CC Bill",
   ba_cc_bill_pay: "BA CC Bill",
   cc_bill_3: "CC Bill 3",
+  pg_1: "PG 1",
+  pg_2: "PG 2",
 };
 
 const EXCLUDED_INLINE_SERVICE_KEYS = new Set([
@@ -362,6 +364,8 @@ const MASTER_SERVICE_CONTROLS = [
   { key: "cc_bill_pay", label: "CC Bill" },
   { key: "ba_cc_bill_pay", label: "BA CC Bill" },
   { key: "cc_bill_3", label: "CC Bill 3" },
+  { key: "pg_1", label: "PG 1" },
+  { key: "pg_2", label: "PG 2" },
   { key: "pos_t0_settlement", label: "POS T0/T1 Settlement & Limit" },
 ];
 
