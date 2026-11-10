@@ -419,8 +419,8 @@ const makeRuleKey = (rule) => {
   return [
     normalizeKeyToken(rule?.payment_mode || rule?.method),
     normalizeKeyToken(rule?.card_brand || rule?.network),
-    normalizeKeyToken(rule?.card_type),
-    normalizeKeyToken(rule?.card_classification),
+    normalizeKeyToken(rule?.raw_card_type || rule?.card_type),
+    normalizeKeyToken(rule?.card_classification || rule?.sub_type),
     normalizeKeyToken(rule?.settlement_type),
     normalizeKeyToken(rule?.company_name),
     String(minAmount ?? 0),
@@ -518,186 +518,249 @@ const resolveUpdatedRuleRecord = ({ responseData, currentRule, payload, ruleId, 
   return fallbackRecord;
 };
 
-const mapRuleToSuperFranchiseFormat = (rule, options = {}) => ({
-  id: rule.id,
-  rule_id: rule.id,
-  superFranchiseId: options.superFranchiseId ?? getRuleSuperFranchiseId(rule) ?? null,
-  super_franchise_id: getRuleSuperFranchiseId(rule),
-  method: fromApiPaymentMode(rule.payment_mode),
-  network: fromApiCardBrand(rule.card_brand),
-  card_type: fromApiCardType(rule.card_type),
-  sub_type: rule.sub_type || 'Consumer',
-  card_classification: fromApiCardClassification(rule.card_classification),
-  gst_required: Boolean(rule.gst_required),
-  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: options.baseRule
-    ? toFiniteNumber(options.baseRule.charge_percent, 0)
-    : options.adminRule
-      ? toFiniteNumber(options.adminRule.charge_percent, 0)
-      : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
-  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
-  admin_rate: options.adminRule
-    ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : options.baseRule
+const mapRuleToSuperFranchiseFormat = (rule, options = {}) => {
+  const rawMode = rule.payment_mode || rule.method || 'CARD';
+  const rawBrand = rule.card_brand || rule.network || null;
+  const rawType = rule.raw_card_type || rule.card_type || null;
+  const rawSubType = rule.sub_type || rule.card_classification || 'Consumer';
+  const rawClassification = rule.card_classification || rule.sub_type || 'any';
+  const rawPercent = rule.charge_percent ?? rule.admin_rate ?? rule.merchant_rate ?? rule.base_rate ?? 0;
+  const rawFlat = rule.charge_flat ?? rule.admin_flat_rate ?? rule.base_flat_rate ?? 0;
+
+  return {
+    id: rule.id,
+    rule_id: rule.id,
+    superFranchiseId: options.superFranchiseId ?? getRuleSuperFranchiseId(rule) ?? null,
+    super_franchise_id: getRuleSuperFranchiseId(rule),
+    payment_mode: toApiPaymentMode(rawMode) || rawMode,
+    method: fromApiPaymentMode(rawMode),
+    card_brand: toApiCardBrand(rawBrand) || rawBrand || null,
+    network: fromApiCardBrand(rawBrand),
+    card_type: fromApiCardType(rawType),
+    raw_card_type: toApiCardType(rawType) || rawType || null,
+    sub_type: rawSubType,
+    card_classification: fromApiCardClassification(rawClassification),
+    charge_percent: toFiniteNumber(rawPercent, 0),
+    gst_required: Boolean(rule.gst_required),
+    gst_percent: rule.gst_percent ?? (rule.gst_rate !== undefined ? rule.gst_rate : null),
+    gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent ?? rule.gst_rate, 0) : null,
+    base_rate: options.baseRule
       ? toFiniteNumber(options.baseRule.charge_percent, 0)
-      : isAdminRule(rule)
-        ? toFiniteNumber(rule.charge_percent, 0)
-        : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
-  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
-  platform_default_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_percent, 0)
-    : toFiniteNumber(options.adminRule?.charge_percent ?? options.baseRule?.charge_percent ?? 0),
-  platform_default_flat_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_flat, 0)
-    : toFiniteNumber(options.adminRule?.charge_flat ?? options.baseRule?.charge_flat ?? 0),
-  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
-  settlement_type: rule.settlement_type || null,
-  company_name: rule.company_name || null,
-  min_amount: toFiniteNumber(rule.min_amount, 0),
-  max_amount: toNullableNumber(rule.max_amount),
-  isInherited: Boolean(options.isInherited),
-  default_rule_id: options.baseRule?.id ?? null,
-  base_rule: options.baseRule || null,
-  original_rule: rule,
-  rule_key: makeRuleKey(rule),
-  scope: rule.scope || getRawRuleScope(rule) || null,
-  source_scope: getRuleScope(rule),
-  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
-});
-
-const mapRuleToFranchiseFormat = (rule, options = {}) => ({
-  id: rule.id,
-  rule_id: rule.id,
-  franchiseId: options.franchiseId ?? getRuleFranchiseId(rule) ?? null,
-  franchaise_id: getRuleFranchiseId(rule),
-  method: fromApiPaymentMode(rule.payment_mode),
-  network: fromApiCardBrand(rule.card_brand),
-  card_type: fromApiCardType(rule.card_type),
-  sub_type: rule.sub_type || 'Consumer',
-  card_classification: fromApiCardClassification(rule.card_classification),
-  gst_required: Boolean(rule.gst_required),
-  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: options.baseRule
-    ? toFiniteNumber(options.baseRule.charge_percent, 0)
-    : options.adminRule
-      ? toFiniteNumber(options.adminRule.charge_percent, 0)
-      : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
-  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
-  admin_rate: options.adminRule
-    ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : options.baseRule
-      ? toFiniteNumber(options.baseRule.charge_percent, 0)
-      : (rule.admin_rate !== undefined && rule.admin_rate !== null)
-        ? toFiniteNumber(rule.admin_rate, 0)
-        : isAdminRule(rule)
-          ? toFiniteNumber(rule.charge_percent, 0)
-          : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
-  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
-  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
-  settlement_type: rule.settlement_type || null,
-  company_name: rule.company_name || null,
-  min_amount: toFiniteNumber(rule.min_amount, 0),
-  max_amount: toNullableNumber(rule.max_amount),
-  isInherited: Boolean(options.isInherited),
-  default_rule_id: options.baseRule?.id ?? null,
-  base_rule: options.baseRule || null,
-  original_rule: rule,
-  rule_key: makeRuleKey(rule),
-  source_scope: getRuleScope(rule),
-  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
-});
-
-export const mapRuleToAdminFormat = (rule, options = {}) => ({
-  id: rule.id,
-  rule_id: rule.id,
-  adminId: options.adminId ?? rule.user_id ?? null,
-  user_id: options.adminId ?? rule.user_id ?? null,
-  method: fromApiPaymentMode(rule.payment_mode),
-  network: fromApiCardBrand(rule.card_brand),
-  card_type: fromApiCardType(rule.card_type),
-  sub_type: rule.sub_type || 'Consumer',
-  card_classification: fromApiCardClassification(rule.card_classification),
-  gst_required: Boolean(rule.gst_required),
-  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  base_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_percent, toFiniteNumber(rule.charge_percent, 0))
-    : toFiniteNumber(rule.charge_percent, 0),
-  merchant_rate: toFiniteNumber(rule.charge_percent, 0),
-  admin_rate: toFiniteNumber(rule.charge_percent, 0),
-  platform_default_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_percent, 0)
-    : toFiniteNumber(rule.charge_percent, 0),
-  base_flat_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_flat, toFiniteNumber(rule.charge_flat, 0))
-    : toFiniteNumber(rule.charge_flat, 0),
-  platform_default_flat_rate: options.defaultRule
-    ? toFiniteNumber(options.defaultRule.charge_flat, 0)
-    : toFiniteNumber(rule.charge_flat, 0),
-  admin_flat_rate: toFiniteNumber(rule.charge_flat, 0),
-  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
-  settlement_type: rule.settlement_type || null,
-  company_name: rule.company_name || null,
-  min_amount: toFiniteNumber(rule.min_amount, 0),
-  max_amount: toNullableNumber(rule.max_amount),
-  isInherited: Boolean(options.isInherited),
-  default_rule_id: options.baseRule?.id ?? null,
-  base_rule: options.baseRule || null,
-  original_rule: rule,
-  rule_key: makeRuleKey(rule),
-  source_scope: getRuleScope(rule),
-  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
-});
-
-const mapRuleToMerchantFormat = (rule, options = {}) => ({
-  id: rule.id,
-  rule_id: rule.id,
-  merchantId: options.merchantId ?? null,
-  franchiseId: options.franchiseId ?? getRuleFranchiseId(rule) ?? null,
-  franchaise_id: getRuleFranchiseId(rule),
-  method: fromApiPaymentMode(rule.payment_mode),
-  network: fromApiCardBrand(rule.card_brand),
-  card_type: fromApiCardType(rule.card_type),
-  sub_type: rule.sub_type || 'Consumer',
-  card_classification: fromApiCardClassification(rule.card_classification),
-  gst_required: Boolean(rule.gst_required),
-  gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-  merchant_rate: toFiniteNumber(rule.charge_percent, 0),
-  base_rate: options.baseRule
-    ? toFiniteNumber(options.baseRule.charge_percent, 0)
-    : options.franchiseRule
-      ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
       : options.adminRule
         ? toFiniteNumber(options.adminRule.charge_percent, 0)
-        : toFiniteNumber(rule.base_rate ?? rule.charge_percent, 0),
-  base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rule.charge_flat, 0),
-  admin_rate: options.adminRule
-    ? toFiniteNumber(options.adminRule.charge_percent, 0)
-    : options.baseRule
-      ? toFiniteNumber(options.baseRule.charge_percent, 0)
-      : (rule.admin_rate !== undefined && rule.admin_rate !== null)
-        ? toFiniteNumber(rule.admin_rate, 0)
+        : toFiniteNumber(rule.base_rate ?? rawPercent, 0),
+    base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rawFlat, 0),
+    admin_rate: options.adminRule
+      ? toFiniteNumber(options.adminRule.charge_percent, 0)
+      : options.baseRule
+        ? toFiniteNumber(options.baseRule.charge_percent, 0)
         : isAdminRule(rule)
-          ? toFiniteNumber(rule.charge_percent, 0)
-          : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rule.charge_percent, 0),
-  admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rule.charge_flat, 0),
-  franchise_rate: options.franchiseRule
-    ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
-    : isFranchiseRule(rule)
-      ? toFiniteNumber(rule.charge_percent, 0)
-      : null,
-  charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
-  settlement_type: rule.settlement_type || null,
-  company_name: rule.company_name || null,
-  min_amount: toFiniteNumber(rule.min_amount, 0),
-  max_amount: toNullableNumber(rule.max_amount),
-  isInherited: Boolean(options.isInherited),
-  default_rule_id: options.baseRule?.id ?? null,
-  base_rule: options.baseRule || null,
-  original_rule: rule,
-  rule_key: makeRuleKey(rule),
-  source_scope: getRuleScope(rule),
-  base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
-});
+          ? toFiniteNumber(rawPercent, 0)
+          : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rawPercent, 0),
+    admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rawFlat, 0),
+    platform_default_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_percent, 0)
+      : toFiniteNumber(options.adminRule?.charge_percent ?? options.baseRule?.charge_percent ?? 0),
+    platform_default_flat_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_flat, 0)
+      : toFiniteNumber(options.adminRule?.charge_flat ?? options.baseRule?.charge_flat ?? 0),
+    charge_flat: toFiniteNumber(rawFlat, 0) ?? 0,
+    settlement_type: rule.settlement_type || null,
+    company_name: rule.company_name || null,
+    min_amount: toFiniteNumber(rule.min_amount, 0),
+    max_amount: toNullableNumber(rule.max_amount),
+    isInherited: Boolean(options.isInherited),
+    default_rule_id: options.baseRule?.id ?? null,
+    base_rule: options.baseRule || null,
+    original_rule: rule.original_rule || rule,
+    rule_key: makeRuleKey(rule),
+    scope: rule.scope || getRawRuleScope(rule) || null,
+    source_scope: getRuleScope(rule),
+    base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+  };
+};
+
+const mapRuleToFranchiseFormat = (rule, options = {}) => {
+  const rawMode = rule.payment_mode || rule.method || 'CARD';
+  const rawBrand = rule.card_brand || rule.network || null;
+  const rawType = rule.raw_card_type || rule.card_type || null;
+  const rawSubType = rule.sub_type || rule.card_classification || 'Consumer';
+  const rawClassification = rule.card_classification || rule.sub_type || 'any';
+  const rawPercent = rule.charge_percent ?? rule.admin_rate ?? rule.merchant_rate ?? rule.base_rate ?? 0;
+  const rawFlat = rule.charge_flat ?? rule.admin_flat_rate ?? rule.base_flat_rate ?? 0;
+
+  return {
+    id: rule.id,
+    rule_id: rule.id,
+    franchiseId: options.franchiseId ?? getRuleFranchiseId(rule) ?? null,
+    franchaise_id: getRuleFranchiseId(rule),
+    payment_mode: toApiPaymentMode(rawMode) || rawMode,
+    method: fromApiPaymentMode(rawMode),
+    card_brand: toApiCardBrand(rawBrand) || rawBrand || null,
+    network: fromApiCardBrand(rawBrand),
+    card_type: fromApiCardType(rawType),
+    raw_card_type: toApiCardType(rawType) || rawType || null,
+    sub_type: rawSubType,
+    card_classification: fromApiCardClassification(rawClassification),
+    charge_percent: toFiniteNumber(rawPercent, 0),
+    gst_required: Boolean(rule.gst_required),
+    gst_percent: rule.gst_percent ?? (rule.gst_rate !== undefined ? rule.gst_rate : null),
+    gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent ?? rule.gst_rate, 0) : null,
+    base_rate: options.baseRule
+      ? toFiniteNumber(options.baseRule.charge_percent, 0)
+      : options.adminRule
+        ? toFiniteNumber(options.adminRule.charge_percent, 0)
+        : toFiniteNumber(rule.base_rate ?? rawPercent, 0),
+    base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rawFlat, 0),
+    admin_rate: options.adminRule
+      ? toFiniteNumber(options.adminRule.charge_percent, 0)
+      : options.baseRule
+        ? toFiniteNumber(options.baseRule.charge_percent, 0)
+        : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+          ? toFiniteNumber(rule.admin_rate, 0)
+          : isAdminRule(rule)
+            ? toFiniteNumber(rawPercent, 0)
+            : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rawPercent, 0),
+    admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rawFlat, 0),
+    charge_flat: toFiniteNumber(rawFlat, 0) ?? 0,
+    settlement_type: rule.settlement_type || null,
+    company_name: rule.company_name || null,
+    min_amount: toFiniteNumber(rule.min_amount, 0),
+    max_amount: toNullableNumber(rule.max_amount),
+    isInherited: Boolean(options.isInherited),
+    default_rule_id: options.baseRule?.id ?? null,
+    base_rule: options.baseRule || null,
+    original_rule: rule.original_rule || rule,
+    rule_key: makeRuleKey(rule),
+    scope: rule.scope || getRawRuleScope(rule) || null,
+    source_scope: getRuleScope(rule),
+    base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+  };
+};
+
+export const mapRuleToAdminFormat = (rule, options = {}) => {
+  const rawMode = rule.payment_mode || rule.method || 'CARD';
+  const rawBrand = rule.card_brand || rule.network || null;
+  const rawType = rule.raw_card_type || rule.card_type || null;
+  const rawSubType = rule.sub_type || rule.card_classification || 'Consumer';
+  const rawClassification = rule.card_classification || rule.sub_type || 'any';
+  const rawPercent = rule.charge_percent ?? rule.admin_rate ?? rule.merchant_rate ?? rule.base_rate ?? 0;
+  const rawFlat = rule.charge_flat ?? rule.admin_flat_rate ?? rule.base_flat_rate ?? 0;
+
+  return {
+    id: rule.id,
+    rule_id: rule.id,
+    adminId: options.adminId ?? rule.user_id ?? null,
+    user_id: options.adminId ?? rule.user_id ?? null,
+    payment_mode: toApiPaymentMode(rawMode) || rawMode,
+    method: fromApiPaymentMode(rawMode),
+    card_brand: toApiCardBrand(rawBrand) || rawBrand || null,
+    network: fromApiCardBrand(rawBrand),
+    card_type: fromApiCardType(rawType),
+    raw_card_type: toApiCardType(rawType) || rawType || null,
+    sub_type: rawSubType,
+    card_classification: fromApiCardClassification(rawClassification),
+    charge_percent: toFiniteNumber(rawPercent, 0),
+    gst_required: Boolean(rule.gst_required),
+    gst_percent: rule.gst_percent ?? (rule.gst_rate !== undefined ? rule.gst_rate : null),
+    gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent ?? rule.gst_rate, 0) : null,
+    base_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_percent ?? options.defaultRule.admin_rate ?? options.defaultRule.base_rate, toFiniteNumber(rawPercent, 0))
+      : toFiniteNumber(rawPercent, 0),
+    merchant_rate: toFiniteNumber(rawPercent, 0),
+    admin_rate: toFiniteNumber(rawPercent, 0),
+    platform_default_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_percent ?? options.defaultRule.admin_rate ?? options.defaultRule.base_rate, 0)
+      : toFiniteNumber(rawPercent, 0),
+    base_flat_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_flat ?? options.defaultRule.admin_flat_rate ?? options.defaultRule.base_flat_rate, toFiniteNumber(rawFlat, 0))
+      : toFiniteNumber(rawFlat, 0),
+    platform_default_flat_rate: options.defaultRule
+      ? toFiniteNumber(options.defaultRule.charge_flat ?? options.defaultRule.admin_flat_rate ?? options.defaultRule.base_flat_rate, 0)
+      : toFiniteNumber(rawFlat, 0),
+    admin_flat_rate: toFiniteNumber(rawFlat, 0),
+    charge_flat: toFiniteNumber(rawFlat, 0) ?? 0,
+    settlement_type: rule.settlement_type || null,
+    company_name: rule.company_name || null,
+    min_amount: toFiniteNumber(rule.min_amount, 0),
+    max_amount: toNullableNumber(rule.max_amount),
+    isInherited: Boolean(options.isInherited),
+    default_rule_id: options.baseRule?.id ?? null,
+    base_rule: options.baseRule || null,
+    original_rule: rule.original_rule || rule,
+    rule_key: makeRuleKey(rule),
+    scope: rule.scope || getRawRuleScope(rule) || null,
+    source_scope: getRuleScope(rule),
+    base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+  };
+};
+
+const mapRuleToMerchantFormat = (rule, options = {}) => {
+  const rawMode = rule.payment_mode || rule.method || 'CARD';
+  const rawBrand = rule.card_brand || rule.network || null;
+  const rawType = rule.raw_card_type || rule.card_type || null;
+  const rawSubType = rule.sub_type || rule.card_classification || 'Consumer';
+  const rawClassification = rule.card_classification || rule.sub_type || 'any';
+  const rawPercent = rule.charge_percent ?? rule.merchant_rate ?? rule.base_rate ?? 0;
+  const rawFlat = rule.charge_flat ?? rule.base_flat_rate ?? 0;
+
+  return {
+    id: rule.id,
+    rule_id: rule.id,
+    merchantId: options.merchantId ?? null,
+    franchiseId: options.franchiseId ?? getRuleFranchiseId(rule) ?? null,
+    franchaise_id: getRuleFranchiseId(rule),
+    payment_mode: toApiPaymentMode(rawMode) || rawMode,
+    method: fromApiPaymentMode(rawMode),
+    card_brand: toApiCardBrand(rawBrand) || rawBrand || null,
+    network: fromApiCardBrand(rawBrand),
+    card_type: fromApiCardType(rawType),
+    raw_card_type: toApiCardType(rawType) || rawType || null,
+    sub_type: rawSubType,
+    card_classification: fromApiCardClassification(rawClassification),
+    charge_percent: toFiniteNumber(rawPercent, 0),
+    gst_required: Boolean(rule.gst_required),
+    gst_percent: rule.gst_percent ?? (rule.gst_rate !== undefined ? rule.gst_rate : null),
+    gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent ?? rule.gst_rate, 0) : null,
+    merchant_rate: toFiniteNumber(rawPercent, 0),
+    base_rate: options.baseRule
+      ? toFiniteNumber(options.baseRule.charge_percent, 0)
+      : options.franchiseRule
+        ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
+        : options.adminRule
+          ? toFiniteNumber(options.adminRule.charge_percent, 0)
+          : toFiniteNumber(rule.base_rate ?? rawPercent, 0),
+    base_flat_rate: options.baseRule ? toFiniteNumber(options.baseRule.charge_flat, 0) : toFiniteNumber(rule.base_flat_rate ?? rawFlat, 0),
+    admin_rate: options.adminRule
+      ? toFiniteNumber(options.adminRule.charge_percent, 0)
+      : options.baseRule
+        ? toFiniteNumber(options.baseRule.charge_percent, 0)
+        : (rule.admin_rate !== undefined && rule.admin_rate !== null)
+          ? toFiniteNumber(rule.admin_rate, 0)
+          : isAdminRule(rule)
+            ? toFiniteNumber(rawPercent, 0)
+            : toFiniteNumber(rule.admin_rate ?? rule.base_rate ?? rawPercent, 0),
+    admin_flat_rate: options.adminRule ? toFiniteNumber(options.adminRule.charge_flat, 0) : toFiniteNumber(options.baseRule?.charge_flat ?? rawFlat, 0),
+    franchise_rate: options.franchiseRule
+      ? toFiniteNumber(options.franchiseRule.charge_percent, 0)
+      : isFranchiseRule(rule)
+        ? toFiniteNumber(rawPercent, 0)
+        : null,
+    charge_flat: toFiniteNumber(rawFlat, 0) ?? 0,
+    settlement_type: rule.settlement_type || null,
+    company_name: rule.company_name || null,
+    min_amount: toFiniteNumber(rule.min_amount, 0),
+    max_amount: toNullableNumber(rule.max_amount),
+    isInherited: Boolean(options.isInherited),
+    default_rule_id: options.baseRule?.id ?? null,
+    base_rule: options.baseRule || null,
+    original_rule: rule.original_rule || rule,
+    rule_key: makeRuleKey(rule),
+    scope: rule.scope || getRawRuleScope(rule) || null,
+    source_scope: getRuleScope(rule),
+    base_source_scope: options.baseRule ? getRuleScope(options.baseRule) : null
+  };
+};
 
 const enrichManagedFranchiseDefaultRate = (mappedRate, { adminRule = null, franchiseRule = null } = {}) => {
   const adminRate = adminRule
@@ -999,22 +1062,32 @@ const buildAuthenticatedMerchantRules = (rules = []) => {
   );
 
   return preferredRules
-    .map((rule) => ({
-      id: rule.id,
-      rule_id: rule.id,
-      method: fromApiPaymentMode(rule.payment_mode),
-      network: fromApiCardBrand(rule.card_brand),
-      card_type: fromApiCardType(rule.card_type),
-      card_classification: fromApiCardClassification(rule.card_classification),
-      gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
-      rate_percentage: toFiniteNumber(rule.charge_percent, 0),
-      min_amount: toFiniteNumber(rule.min_amount, 0),
-      max_amount: toNullableNumber(rule.max_amount),
-      charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
-      settlement_type: rule.settlement_type || null,
-      scope: getRawRuleScope(rule) || null,
-      rule_key: makeRuleKey(rule)
-    }))
+    .map((rule) => {
+      const rawMode = rule.payment_mode || rule.method || 'CARD';
+      const rawBrand = rule.card_brand || rule.network || null;
+      const rawType = rule.raw_card_type || rule.card_type || null;
+      return {
+        id: rule.id,
+        rule_id: rule.id,
+        payment_mode: toApiPaymentMode(rawMode) || rawMode,
+        method: fromApiPaymentMode(rawMode),
+        card_brand: toApiCardBrand(rawBrand) || rawBrand || null,
+        network: fromApiCardBrand(rawBrand),
+        card_type: fromApiCardType(rawType),
+        raw_card_type: toApiCardType(rawType) || rawType || null,
+        card_classification: fromApiCardClassification(rule.card_classification || rule.sub_type),
+        sub_type: rule.sub_type || rule.card_classification || 'Consumer',
+        gst_rate: rule.gst_required ? toFiniteNumber(rule.gst_percent, 0) : null,
+        rate_percentage: toFiniteNumber(rule.charge_percent, 0),
+        min_amount: toFiniteNumber(rule.min_amount, 0),
+        max_amount: toNullableNumber(rule.max_amount),
+        charge_flat: toFiniteNumber(rule.charge_flat, 0) ?? 0,
+        settlement_type: rule.settlement_type || null,
+        company_name: rule.company_name || null,
+        scope: rule.scope || getRawRuleScope(rule) || null,
+        rule_key: makeRuleKey(rule)
+      };
+    })
     .sort(sortMappedRates);
 };
 

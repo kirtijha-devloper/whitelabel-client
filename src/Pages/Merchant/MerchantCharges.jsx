@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Table from '../../components/Table';
 import Loader from '../../components/Loader';
@@ -315,6 +316,20 @@ const MerchantCharges = ({ currentUser }) => {
 
   return (
     <div className="pb-1 w-full">
+      {isMerchantUser && (
+        <div className="mb-6">
+          <Link
+            to="/merchant/charges"
+            className="text-sm text-[#008c87] hover:underline font-medium inline-flex items-center gap-1 mb-2"
+          >
+            &larr; Back to Charges
+          </Link>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">POS Transaction Charges</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Applicable card swipe and UPI transaction charges for POS terminals.
+          </p>
+        </div>
+      )}
       {isFranchiseUser && (
         <div className="mb-4 flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">

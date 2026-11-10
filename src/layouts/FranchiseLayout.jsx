@@ -45,6 +45,8 @@ const MerchantCharges = lazy(() => import('../Pages/Merchant/MerchantCharges'));
 const TodayPayouts = lazy(() => import('../Pages/TodayPayouts'));
 const FranchiseMerchantRateSetting = lazy(() => import('../Pages/FranchiseMerchantRateSetting'));
 const FranchiseRateSettings = lazy(() => import('../Pages/FranchiseRateSettings'));
+const RateSettingLanding2Card = lazy(() => import('../Pages/Common/RateSettingLanding2Card'));
+const PGAdminRateSetting = lazy(() => import('../Pages/PG/PGAdminRateSetting'));
 const FranchiseLedger = lazy(() => import('../Pages/FranchiseLedger'));
 const Ledger = lazy(() => import('../Pages/Ledger')); // reuse admin ledger statements page
 const CCBillPay = lazy(() => import('../Pages/CCBillPay'));
@@ -248,8 +250,12 @@ export default function FranchiseLayout() {
               <Route path="complaint-box" element={<ComplaintBox currentUser={currentUser} />} />
               <Route path="complaint" element={<ComplaintBox currentUser={currentUser} />} />
               <Route path="commissions" element={<Navigate to="/franchise/dashboard" replace />} />
-              <Route path="merchant-rates" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
-              <Route path="rate-settings" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="merchant-rates" element={<RateSettingLanding2Card role="franchise" />} />
+              <Route path="merchant-rates/pos" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="merchant-rates/pg" element={<PGAdminRateSetting mode="pg" role="franchise" currentUser={currentUser} />} />
+              <Route path="rate-settings" element={<RateSettingLanding2Card role="franchise" />} />
+              <Route path="rate-settings/pos" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="rate-settings/pg" element={<PGAdminRateSetting mode="pg" role="franchise" currentUser={currentUser} />} />
               {/* show same ledger statements page as admin; backend will restrict results to franchise user */}
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               {/* keep legacy/alternate entries view if needed */}

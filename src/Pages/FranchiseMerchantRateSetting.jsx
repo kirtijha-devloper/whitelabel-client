@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   getMerchants,
   getFranchises,
@@ -1410,6 +1411,12 @@ const FranchiseMerchantRateSetting = ({ currentUser }) => {
       {/* Header */}
       <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
+          <Link
+            to={isSuperFranchise ? "/super-franchise/rate-setting" : "/franchise/rate-settings"}
+            className="text-sm text-[#008c87] hover:underline font-medium inline-flex items-center gap-1 mb-1"
+          >
+            &larr; Rate Settings Home
+          </Link>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">
             POS Transaction Charges
           </h1>

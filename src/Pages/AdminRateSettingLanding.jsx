@@ -18,6 +18,13 @@ const AdminRateSettingLanding = () => {
       path: `${basePath}/txn`,
     },
     {
+      title: 'PG Transaction Charges',
+      desc: isSuperAdminRoute
+        ? 'Default and Admin-level transaction rate matrix in one place.'
+        : 'Configure PG transaction rates for Super Franchise (Default & Overrides).',
+      path: `${basePath}/pg`,
+    },
+    {
       title: 'POS Rental Charges',
       desc: isSuperAdminRoute
         ? 'Manage POS rental charges applicable to Admin accounts.'

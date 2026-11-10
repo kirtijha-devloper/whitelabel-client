@@ -30,6 +30,8 @@ import { fetchUserDetails } from "../api/authApi";
 import Logout from "../Pages/Logout";
 import Settings from "../Pages/Settings";
 import MerchantCharges from "../Pages/Merchant/MerchantCharges";
+import MerchantPGCharges from "../Pages/Merchant/MerchantPGCharges";
+import RateSettingLanding2Card from "../Pages/Common/RateSettingLanding2Card";
 import MerchantLedger from "../Pages/Merchant/MerchantLedger";
 import TransactionHistory from "../Pages/Merchant/TransactionHistory";
 import ComplaintBox from "../Pages/Merchant/ComplaintBox";
@@ -289,7 +291,15 @@ const MerchantLayout = () => {
           />
           <Route
             path="charges"
+            element={<RateSettingLanding2Card role="merchant" />}
+          />
+          <Route
+            path="charges/pos"
             element={<MerchantCharges currentUser={currentUser} />}
+          />
+          <Route
+            path="charges/pg"
+            element={<MerchantPGCharges currentUser={currentUser} />}
           />
           <Route
             path="stock-pos"

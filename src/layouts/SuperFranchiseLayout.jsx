@@ -33,6 +33,8 @@ const PosSetting = lazy(() => import('../Pages/PosSetting'));
 const SuperFranchiseRateSettings = lazy(() => import('../Pages/SuperFranchiseRateSettings'));
 const FranchiseMerchantRateSetting = lazy(() => import('../Pages/FranchiseMerchantRateSetting'));
 const FranchiseRateSettings = lazy(() => import('../Pages/FranchiseRateSettings'));
+const RateSettingLanding2Card = lazy(() => import('../Pages/Common/RateSettingLanding2Card'));
+const PGAdminRateSetting = lazy(() => import('../Pages/PG/PGAdminRateSetting'));
 const Ledger = lazy(() => import('../Pages/Ledger'));
 const FranchiseLedger = lazy(() => import('../Pages/FranchiseLedger'));
 const Logout = lazy(() => import('../Pages/Logout'));
@@ -225,9 +227,13 @@ export default function SuperFranchiseLayout() {
               <Route path="reports/ba-cc-bill" element={<BillAvenueCCBillPayReports />} />
               <Route path="setting" element={<Settings currentUser={currentUser} />} />
               <Route path="pos-setting" element={<PosSetting currentUser={currentUser} />} />
-              <Route path="rate-settings" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="rate-settings" element={<RateSettingLanding2Card role="super_franchise" />} />
+              <Route path="rate-settings/pos" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="rate-settings/pg" element={<PGAdminRateSetting mode="pg" role="super_franchise" currentUser={currentUser} />} />
               <Route path='complaint-box' element={<ComplaintBox currentUser={currentUser} />} />
-              <Route path="franchise-charges" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="franchise-charges" element={<RateSettingLanding2Card role="super_franchise" />} />
+              <Route path="franchise-charges/pos" element={<FranchiseMerchantRateSetting currentUser={currentUser} />} />
+              <Route path="franchise-charges/pg" element={<PGAdminRateSetting mode="pg" role="super_franchise" currentUser={currentUser} />} />
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               <Route path="ledger-entries" element={<FranchiseLedger currentUser={currentUser} />} />
               <Route path="logout" element={<Logout />} />

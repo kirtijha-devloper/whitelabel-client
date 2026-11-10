@@ -66,6 +66,7 @@ const AdminRateSettingLanding = lazy(
   () => import("../Pages/AdminRateSettingLanding"),
 );
 const AdminRateSetting = lazy(() => import("../Pages/AdminRateSetting"));
+const PGAdminRateSetting = lazy(() => import("../Pages/PG/PGAdminRateSetting"));
 const RateSettings = lazy(() => import("../Pages/RateSettings"));
 const PayoutReport = lazy(() => import("../Pages/PayoutReport"));
 const AdminPayoutAuditLogs = lazy(
@@ -805,6 +806,17 @@ export default function AdminLayout() {
                   canViewRateSettings,
                   <AdminRateSetting
                     mode="pos_txn"
+                    initialTab="default"
+                    isSuperAdmin={isSuperAdminViewer}
+                  />,
+                )}
+              />
+              <Route
+                path="rate-setting/pg"
+                element={guardRoute(
+                  canViewRateSettings,
+                  <PGAdminRateSetting
+                    mode="pg"
                     initialTab="default"
                     isSuperAdmin={isSuperAdminViewer}
                   />,
