@@ -2,6 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand-primary: #00D3CD;
+  --brand-dark: #111827;
+  --brand-light: #FFFFFF;
+}
+
+/* COLOR 1: Primary (Sirf static elements par, bina hover ko trigger kiye) */
+.bg-primary,
+.bg-\[\#00D3CD\],
+.bg-\[\#00a8a3\],
+.bg-\[\#00A8A3\] {
+  background-color: var(--brand-primary) !important;
+}
+
+/* Primary 10% / 15% light tint (Icon boxes, Badges) */
+.bg-\[\#00D3CD\]\/10,
+.bg-\[\#00D3CD\]\/15 {
+  background-color: color-mix(in srgb, var(--brand-primary) 12%, transparent) !important;
+}
+
+.text-primary,
+.text-\[\#00D3CD\],
+.text-\[\#00a8a3\],
+.text-\[\#00A8A3\],
+.text-\[\#008b87\] {
+  color: var(--brand-primary) !important;
+}
+
+/* Hover text sirf card par hover karne par */
+.group:hover .group-hover\:text-\[\#00a8a3\],
+.group:hover .group-hover\:text-\[\#00D3CD\] {
+  color: var(--brand-primary) !important;
+}
+
+.border-primary,
+.border-\[\#00D3CD\],
+.border-\[\#00D3CD\]\/20,
+.border-\[\#00D3CD\]\/30 {
+  border-color: var(--brand-primary) !important;
+}
+
+.hover\:border-\[\#00D3CD\]\/40:hover,
+.hover\:border-\[\#00D3CD\]\/50:hover {
+  border-color: var(--brand-primary) !important;
+}
+
+.from-\[\#00D3CD\] {
+  background-image: none !important;
+  background-color: var(--brand-primary) !important;
+}
+
+/* COLOR 2: Dark (Sidebar background aur SIRF hover par background) */
+div.bg-gray-900.min-h-screen,
+button.bg-gray-900 {
+  background-color: var(--brand-dark) !important;
+}
+
+div.bg-gray-900 .hover\:bg-gray-800:hover,
+div.bg-gray-900 .bg-gray-800 {
+  background-color: color-mix(in srgb, var(--brand-dark) 80%, var(--brand-light)) !important;
+}
+
+/* COLOR 3: Light (Text inside active/primary elements) */
+div.bg-gray-900 .bg-\[\#00D3CD\],
+.bg-primary,
+.from-\[\#00D3CD\] {
+  color: var(--brand-light) !important;
+}
+
 .ledger-horizontal-scrollbar {
   scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;

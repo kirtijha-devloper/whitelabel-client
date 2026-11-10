@@ -3,6 +3,8 @@ import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useQueryClient } from '@tanstack/react-query';
+import { resolveThemeBundle, applyThemeBundle } from './utils/theme';
 
 // Lazy Load Pages & Layouts
 const Login = lazy(() => import('./Pages/Auth/Login'));
@@ -24,12 +26,20 @@ const Loading = () => (
 
 export default function App() {
   const host_name = window.location;
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    
     const fetchLogo = async () => {
+      const currentUser = queryClient.getQueryData(["currentUser"]);
       try {
         const response = await getLogo({ hostname: host_name });
+        const themeBundle = resolveThemeBundle({
+          apiTheme: response?.theme_colors || response?.theme || response?.colors || currentUser?.company?.theme_colors || currentUser?.company?.theme,
+          currentUser,
+          hostname: window.location.hostname,
+        });
+        applyThemeBundle(themeBundle);
+
         console.log('Fetched logo response:', response);
         const faviconUrl = response.logo ? response.logo : abheePayFavicon;
         if (response.company_name) {
@@ -38,13 +48,11 @@ export default function App() {
           document.title = "ABHEEPAY";
         }
 
-        // Recreate/replace the link element to force modern browsers to redraw the title bar tab icon
         const existingIcon = document.getElementById("icon") || document.querySelector("link[rel*='icon']");
         const newIcon = document.createElement("link");
         newIcon.id = "icon";
         newIcon.rel = "icon";
         newIcon.type = "image/png";
-
         newIcon.href = `${faviconUrl}?v=${Date.now()}`;
 
         if (existingIcon && existingIcon.parentNode) {
@@ -54,22 +62,48 @@ export default function App() {
         }
       } catch (error) {
         console.error('Error fetching logo:', error);
+        const fallbackUser = queryClient.getQueryData(["currentUser"]);
+        applyThemeBundle(
+          resolveThemeBundle({
+            apiTheme: fallbackUser?.company?.theme_colors || fallbackUser?.company?.theme,
+            currentUser: fallbackUser,
+            hostname: window.location.hostname,
+          })
+        );
+
         const newIcon = document.createElement("link");
         newIcon.id = "icon";
         newIcon.rel = "icon";
         newIcon.type = "image/png";
-
         newIcon.href = `${abheePayFavicon}?v=${Date.now()}`;
-
         document.head.appendChild(newIcon);
-
         document.title = "ABHEEPAY";
       }
-    }
-
+    };
 
     fetchLogo();
-  }, [host_name]);
+  }, [host_name, queryClient]);
+
+  // ✅ Ab yeh doosra useEffect bilkul ALAG bahar hai:
+  useEffect(() => {
+    const applyFromUserCache = () => {
+      const currentUser = queryClient.getQueryData(["currentUser"]);
+      const bundle = resolveThemeBundle({
+        apiTheme: currentUser?.company?.theme_colors || currentUser?.company?.theme,
+        currentUser,
+        hostname: window.location.hostname,
+      });
+      applyThemeBundle(bundle);
+    };
+
+    applyFromUserCache();
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query?.queryKey?.[0] === "currentUser") {
+        applyFromUserCache();
+      }
+    });
+    return () => unsubscribe();
+  }, [queryClient]);
 
   return (
     <Router>

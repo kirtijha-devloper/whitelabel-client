@@ -236,6 +236,11 @@ function CreateAdmin() {
           settlement_type:
             adminData.settlement_type || 'today_settlement',
           company_logo: comp.company_logo || adminData.shop_with_photo_url || null,
+          theme_colors: {
+            primary: comp?.theme_colors?.primary || '#00D3CD',
+            dark: comp?.theme_colors?.dark || '#111827',
+            light: comp?.theme_colors?.light || '#FFFFFF',
+          },
         };
 
         initialDataRef.current = loadedForm;
@@ -348,6 +353,26 @@ function CreateAdmin() {
       type: 'UPDATE_FORM',
       payload: {
         [name]: nextValue,
+      },
+    });
+  };
+
+  // ==========================================
+  // HANDLE THEME COLOR CHANGE
+  // ==========================================
+
+  const handleThemeColorChange = (colorKey, value) => {
+    dispatch({
+      type: 'UPDATE_FORM',
+      payload: {
+        theme_colors: {
+          ...(state.formData.theme_colors || {
+            primary: '#00D3CD',
+            dark: '#111827',
+            light: '#FFFFFF',
+          }),
+          [colorKey]: value,
+        },
       },
     });
   };
@@ -642,6 +667,12 @@ function CreateAdmin() {
         if (checkDiff('settlement_type', form.settlement_type, initial.settlement_type)) {
           changedData.settlement_type = form.settlement_type;
         }
+        if (
+          JSON.stringify(form.theme_colors || {}) !==
+          JSON.stringify(initial.theme_colors || {})
+        ) {
+          changedData.theme_colors = form.theme_colors;
+        }
 
         // For images and logo: ONLY updated file fields are included!
         const updatedFiles = {};
@@ -668,7 +699,10 @@ function CreateAdmin() {
         if (hasFiles) {
           const formData = new FormData();
           Object.entries(changedData).forEach(([key, value]) => {
-            formData.append(key, value);
+            formData.append(
+              key,
+              typeof value === 'object' && value !== null ? JSON.stringify(value) : value
+            );
           });
 
           // ONLY append updated files (never untouched ones)
@@ -1605,6 +1639,64 @@ function CreateAdmin() {
                     placeholder="Enter company title"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                   />
+                </div>
+                                {/* THEME COLOR BUNDLE (3 COLORS) */}
+                <div className="md:col-span-2 pt-4 border-t border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Website Theme Colors (3 Colors)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { key: 'primary', label: 'Primary Color (Buttons / Active)', fallback: '#00D3CD' },
+                      { key: 'dark', label: 'Sidebar / Dark Color', fallback: '#111827' },
+                      { key: 'light', label: 'Light / Active Text Color', fallback: '#FFFFFF' },
+                    ].map(({ key, label, fallback }) => {
+                      const val = state.formData.theme_colors?.[key] ?? fallback;
+                      const pickerVal = /^#[0-9A-Fa-f]{6}$/.test(val) ? val : fallback;
+                      return (
+                        <div key={key} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white">
+                          <input
+                            type="color"
+                            value={pickerVal}
+                            onChange={(e) => handleThemeColorChange(key, e.target.value)}
+                            className="w-10 h-10 rounded cursor-pointer border-0 bg-transparent p-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-gray-700">{label}</p>
+                            <input
+                              type="text"
+                              value={val}
+                              onChange={(e) => handleThemeColorChange(key, e.target.value)}
+                              maxLength={7}
+                              className="mt-1 w-full px-2 py-1 text-xs font-mono uppercase border border-gray-300 rounded bg-gray-50"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mini Live Preview */}
+                  <div
+                    className="mt-3 p-3 rounded-lg border border-gray-200 flex items-center justify-between"
+                    style={{ backgroundColor: state.formData.theme_colors?.dark || '#111827' }}
+                  >
+                    <span
+                      className="text-xs font-semibold px-3 py-1.5 rounded-md"
+                      style={{
+                        backgroundColor: state.formData.theme_colors?.primary || '#00D3CD',
+                        color: state.formData.theme_colors?.light || '#FFFFFF',
+                      }}
+                    >
+                      Active Menu / Button Preview
+                    </span>
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: state.formData.theme_colors?.primary || '#00D3CD' }}
+                    >
+                      Link Text →
+                    </span>
+                  </div>
                 </div>
 
               </div>
