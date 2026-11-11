@@ -1,0 +1,13 @@
+{
+  "defaultBundle": "abheepay_cyan",
+  "bundles": {
+    "abheepay_cyan": {
+      "name": "AbheePay Classic",
+      "primary": "#00D3CD",
+      "dark": "#111827",
+      "light": "#FFFFFF"
+    }
+  },
+  "companyThemes": {},
+  "domainThemes": {}
+}

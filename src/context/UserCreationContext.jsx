@@ -28,6 +28,12 @@ const initialState = {
     domain_name: '',
     company_logo: null,
 
+    theme_colors: {
+      primary: '#00D3CD',
+      dark: '#111827',
+      light: '#FFFFFF',
+    },
+
     aadhar_photo: null,
     aadhar_back_photo: null,
     pan_photo: null,
