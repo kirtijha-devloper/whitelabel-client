@@ -203,11 +203,10 @@ export const signup = async (userData) => {
 
 export const login = async (credentials) => {
   try {
-    const response = await api.post(`/user/login`, credentials
-    )
+    const response = await api.post(`/user/login`, credentials);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || 'Login failed');
+    throw new Error(error.response?.data?.message || error.message || 'Login failed');
   }
 };
 

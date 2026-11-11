@@ -450,6 +450,17 @@ const AdminRateSetting = ({
 
         let results = extractSearchUsersArray(response);
 
+        if (isAdminUser && activeTab === 'specific') {
+          results = results.filter((f) => {
+            const sfId = f?.super_franchise_id;
+            return sfId === null || sfId === undefined || sfId === '' || sfId === 0 || sfId === 'null';
+          });
+        } else if (isSuperFranchiseUser && activeTab === 'specific') {
+          results = results.filter((f) => {
+            return String(f?.super_franchise_id) === String(effectiveUser?.id);
+          });
+        }
+
         if (activeTab === 'unassigned') {
           const unassignedIds = new Set(
             unassignedMerchants
@@ -518,34 +529,43 @@ const AdminRateSetting = ({
           setRates(effective);
           setDefaultRatesAttributes(buildColumnStructure(effective));
         } else if (isSuperFranchiseUser) {
-          const [superAdminRules, adminRules, sfSpecificRules, sfDefaultRules] = await Promise.all([
+          const [superAdminRules, adminSpecificRules, adminRules, sfSpecificRules, sfDefaultRules] = await Promise.all([
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
             fetchPgChargeRules({ super_franchise_id: effectiveUser?.id }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_franchise_default' }).catch(() => []),
           ]);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+          const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
           const specificList = Array.isArray(sfSpecificRules) ? sfSpecificRules : (sfSpecificRules?.data || []);
           const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
-          const baseDefaults = buildPgEffectiveRules(saList, admList);
-          const sfBase = buildPgEffectiveRules(baseDefaults, specificList);
+          const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+          const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+          const sfBase = buildPgEffectiveRules(adminEffective, specificList);
           const effective = buildPgEffectiveRules(sfBase, sfList);
           setRates(effective);
           setDefaultRatesAttributes(buildColumnStructure(effective));
         } else if (isFranchiseUser) {
-          const [superAdminRules, adminRules, fSpecificRules, fDefaultRules] = await Promise.all([
+          const [superAdminRules, adminSpecificRules, adminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+            effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
             fetchPgChargeRules({ franchaise_id: effectiveUser?.id }).catch(() => []),
             fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
           ]);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+          const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+          const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
           const specificList = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
           const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
-          const baseDefaults = buildPgEffectiveRules(saList, admList);
-          const fBase = buildPgEffectiveRules(baseDefaults, specificList);
+          const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+          const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+          const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
+          const fBase = buildPgEffectiveRules(sfEffective, specificList);
           const effective = buildPgEffectiveRules(fBase, fList);
           setRates(effective);
           setDefaultRatesAttributes(buildColumnStructure(effective));
@@ -578,14 +598,23 @@ const AdminRateSetting = ({
             getUnassignedMerchants().catch(() => []),
           ]);
           setSuperFranchises(superFranchisesData || []);
-          setFranchises(franchisesData || []);
+          // Only show direct franchises whose parent is Admin (exclude franchises under a Super Franchise)
+          const directFranchises = (franchisesData || []).filter((f) => {
+            const sfId = f?.super_franchise_id;
+            return sfId === null || sfId === undefined || sfId === '' || sfId === 0 || sfId === 'null';
+          });
+          setFranchises(directFranchises);
           setUnassignedMerchants(unassignedMerchantsData || []);
         } else if (isSuperFranchiseUser) {
           const [franchisesData, merchantsData] = await Promise.all([
             getFranchises().catch(() => []),
             MerchantAllUsers().catch(() => []),
           ]);
-          setFranchises(franchisesData || []);
+          // Only show franchises belonging to this Super Franchise
+          const sfFranchises = (franchisesData || []).filter((f) => {
+            return String(f?.super_franchise_id) === String(effectiveUser?.id);
+          });
+          setFranchises(sfFranchises);
           setUnassignedMerchants(Array.isArray(merchantsData) ? merchantsData : (merchantsData?.data || merchantsData?.users || []));
         } else if (isFranchiseUser) {
           const merchantsData = await MerchantAllUsers().catch(() => []);
@@ -657,8 +686,19 @@ const AdminRateSetting = ({
         getUnassignedMerchants(),
       ]);
 
+      const filteredFranchises = (franchisesData || []).filter((f) => {
+        if (isAdminUser) {
+          const sfId = f?.super_franchise_id;
+          return sfId === null || sfId === undefined || sfId === '' || sfId === 0 || sfId === 'null';
+        }
+        if (isSuperFranchiseUser) {
+          return String(f?.super_franchise_id) === String(effectiveUser?.id);
+        }
+        return true;
+      });
+
       setSuperFranchises(superFranchisesData);
-      setFranchises(franchisesData);
+      setFranchises(filteredFranchises);
       setUnassignedMerchants(unassignedMerchantsData);
 
       const [sfMatrix, matrix, unassignedMerchantMatrix] = await Promise.all([
@@ -693,9 +733,10 @@ const AdminRateSetting = ({
     setLoadingRates(true);
     try {
       if (isPGTxnMode) {
-        const [sfRulesUser, sfRulesSF, adminRules, superAdminRules] = await Promise.all([
+        const [sfRulesUser, sfRulesSF, adminSpecificRules, adminRules, superAdminRules] = await Promise.all([
           fetchPgChargeRules({ user_id: sfId }).catch(() => []),
           fetchPgChargeRules({ super_franchise_id: sfId }).catch(() => []),
+          fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
           fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
           fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
         ]);
@@ -703,10 +744,12 @@ const AdminRateSetting = ({
           ...(Array.isArray(sfRulesUser) ? sfRulesUser : (sfRulesUser?.data || [])),
           ...(Array.isArray(sfRulesSF) ? sfRulesSF : (sfRulesSF?.data || []))
         ];
+        const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
         const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
         const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
-        const baseDefaults = buildPgEffectiveRules(saList, admList);
-        const effective = buildPgEffectiveRules(baseDefaults, sfList);
+        const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+        const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+        const effective = buildPgEffectiveRules(adminEffective, sfList);
         setRates(effective);
         return;
       }
@@ -818,33 +861,42 @@ const AdminRateSetting = ({
             const effective = buildPgEffectiveRules(baseDefaults, admList);
             setRates(effective);
           } else if (isSuperFranchiseUser) {
-            const [superAdminRules, adminRules, sfSpecificRules, sfDefaultRules] = await Promise.all([
+            const [superAdminRules, adminSpecificRules, adminRules, sfSpecificRules, sfDefaultRules] = await Promise.all([
               fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+              fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
               fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
               fetchPgChargeRules({ super_franchise_id: effectiveUser?.id }).catch(() => []),
               fetchPgChargeRules({ scope: 'super_franchise_default' }).catch(() => []),
             ]);
             const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+            const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
             const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
             const specificList = Array.isArray(sfSpecificRules) ? sfSpecificRules : (sfSpecificRules?.data || []);
             const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
-            const baseDefaults = buildPgEffectiveRules(saList, admList);
-            const sfBase = buildPgEffectiveRules(baseDefaults, specificList);
+            const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+            const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+            const sfBase = buildPgEffectiveRules(adminEffective, specificList);
             const effective = buildPgEffectiveRules(sfBase, sfList);
             setRates(effective);
           } else if (isFranchiseUser) {
-            const [superAdminRules, adminRules, fSpecificRules, fDefaultRules] = await Promise.all([
+            const [superAdminRules, adminSpecificRules, adminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
               fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+              fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
               fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+              effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
               fetchPgChargeRules({ franchaise_id: effectiveUser?.id }).catch(() => []),
               fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
             ]);
             const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+            const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
             const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+            const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
             const specificList = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
             const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
-            const baseDefaults = buildPgEffectiveRules(saList, admList);
-            const fBase = buildPgEffectiveRules(baseDefaults, specificList);
+            const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+            const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+            const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
+            const fBase = buildPgEffectiveRules(sfEffective, specificList);
             const effective = buildPgEffectiveRules(fBase, fList);
             setRates(effective);
           } else {
@@ -863,25 +915,32 @@ const AdminRateSetting = ({
           const effective = buildPgEffectiveRules(saList, uList);
           setRates(effective);
         } else if (isFranchiseUser) {
-          const [mOverrides, fDefaultRules, adminRules, superAdminRules] = await Promise.all([
+          const [mOverrides, fDefaultRules, sfDefaultRules, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
             fetchPgChargeRules({ user_id: id }).catch(() => []),
             fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
+            effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
           ]);
           const mList = Array.isArray(mOverrides) ? mOverrides : (mOverrides?.data || []);
           const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+          const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+          const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
-          const baseDefaults = buildPgEffectiveRules(saList, admList);
-          const fEffective = buildPgEffectiveRules(baseDefaults, fList);
+          const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+          const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+          const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
+          const fEffective = buildPgEffectiveRules(sfEffective, fList);
           const effective = buildPgEffectiveRules(fEffective, mList);
           setRates(effective);
         } else {
-          const [fRulesUser, fRulesFranchise, adminRules, superAdminRules] = await Promise.all([
+          const [fRulesUser, fRulesFranchise, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
             fetchPgChargeRules({ user_id: id }).catch(() => []),
             fetchPgChargeRules({ franchaise_id: id }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
           ]);
           const fList = [
@@ -889,9 +948,11 @@ const AdminRateSetting = ({
             ...(Array.isArray(fRulesFranchise) ? fRulesFranchise : (fRulesFranchise?.data || []))
           ];
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+          const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
-          const baseDefaults = buildPgEffectiveRules(saList, admList);
-          const effective = buildPgEffectiveRules(baseDefaults, fList);
+          const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+          const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+          const effective = buildPgEffectiveRules(adminEffective, fList);
           setRates(effective);
         }
         return;
@@ -1358,9 +1419,9 @@ const AdminRateSetting = ({
           target_user_id: activeTab === 'unassigned'
             ? selectedMerchantId
             : (activeTab === 'specific'
-                ? selectedFranchiseId
-                : (activeTab === 'super_franchise' ? selectedSuperFranchiseId : null)),
-          target_franchise_id: (activeTab === 'specific' && !isFranchiseUser) ? selectedFranchiseId : null,
+                ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? selectedMerchantId : null))
+                : null),
+          target_franchise_id: (activeTab === 'specific' && !isSuperAdmin && !isFranchiseUser) ? selectedFranchiseId : null,
           target_super_franchise_id: activeTab === 'super_franchise' ? selectedSuperFranchiseId : null
         });
         toast.success("New PG charge rule created successfully.");
@@ -1798,9 +1859,9 @@ const AdminRateSetting = ({
             target_user_id: activeTab === 'unassigned'
               ? selectedMerchantId
               : (activeTab === 'specific'
-                  ? selectedFranchiseId
-                  : (activeTab === 'super_franchise' ? selectedSuperFranchiseId : null)),
-            target_franchise_id: (activeTab === 'specific' && !isFranchiseUser) ? selectedFranchiseId : null,
+                  ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? selectedMerchantId : null))
+                  : null),
+            target_franchise_id: (activeTab === 'specific' && !isSuperAdmin && !isFranchiseUser) ? selectedFranchiseId : null,
             target_super_franchise_id: activeTab === 'super_franchise' ? selectedSuperFranchiseId : null
           });
           toast.success("PG charge rule override created successfully.");
