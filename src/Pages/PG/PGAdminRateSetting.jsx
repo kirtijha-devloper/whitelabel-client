@@ -245,11 +245,71 @@ const AdminRateSetting = ({
   };
   const formatGstValue = (rate) => hasEditableGst(rate) ? formatPercent(rate.gst_rate) : '-';
   const normalizeSettlementValue = (value) => String(value ?? '').trim().toLowerCase();
+
+  const getPreviousFlatRate = (rate) => {
+    if (!rate) return 0;
+    if (isSuperAdmin && activeTab === 'default') return 0;
+    const candidates = [
+      rate.platform_default_flat_rate,
+      rate.base_flat_rate,
+      rate.admin_flat_rate,
+      rate.super_franchise_flat_rate,
+      rate.franchise_flat_rate,
+      rate.isInherited ? rate.charge_flat : null
+    ];
+    const nums = candidates
+      .map(v => (v !== null && v !== undefined && v !== '' ? parseFloat(v) : NaN))
+      .filter(n => !isNaN(n) && n > 0);
+    return nums.length > 0 ? Math.max(...nums) : 0;
+  };
+
+  const getPreviousRate = (rate) => {
+    if (!rate) return 0;
+    if (isSuperAdmin && activeTab === 'default') return 0;
+    const candidates = [
+      rate.platform_default_rate,
+      rate.base_rate,
+      rate.admin_rate,
+      rate.super_franchise_rate,
+      rate.franchise_rate,
+      rate.isInherited ? rate.charge_percent : null
+    ];
+    const nums = candidates
+      .map(v => (v !== null && v !== undefined && v !== '' ? parseFloat(v) : NaN))
+      .filter(n => !isNaN(n) && n > 0);
+    return nums.length > 0 ? Math.max(...nums) : 0;
+  };
+
+  const isRateLimitFlat = (rate) => {
+    if (!rate) return false;
+    const flatFloor = getPreviousFlatRate(rate);
+    const pctFloor = getPreviousRate(rate);
+    if (flatFloor > 0 && pctFloor <= 0) return true;
+    const rawFlat = parseFloat(rate.charge_flat || '0');
+    const rawPct = parseFloat(rate.charge_percent || rate.base_rate || rate.merchant_rate || '0');
+    if (flatFloor > 0 && rawPct <= 0) return true;
+    if (rawFlat > 0 && rawPct <= 0) return true;
+    return false;
+  };
+
+  const isRateLimitPercent = (rate) => {
+    if (!rate) return false;
+    const pctFloor = getPreviousRate(rate);
+    const flatFloor = getPreviousFlatRate(rate);
+    if (pctFloor > 0 && flatFloor <= 0) return true;
+    const rawFlat = parseFloat(rate.charge_flat || '0');
+    const rawPct = parseFloat(rate.charge_percent || rate.base_rate || rate.merchant_rate || '0');
+    if (pctFloor > 0 && rawFlat <= 0) return true;
+    if (rawPct > 0 && rawFlat <= 0) return true;
+    return false;
+  };
   const getRateKey = (rate) =>
     rate?.rule_key ||
     `${rate?.method || rate?.payment_mode}-${rate?.network || rate?.card_brand}-${rate?.card_type}-${rate?.sub_type || rate?.card_classification || 'any'}-${rate?.settlement_type || ''}-${rate?.min_amount || 0}-${rate?.max_amount || 'OPEN'}`;
 
   const makePgRuleKey = (rule) => {
+    const rawGateway = rule?.gateway || 'all';
+    const gateway = String(rawGateway).trim().toLowerCase();
     const rawMethod = rule?.payment_mode || rule?.method || '';
     const method = String(rawMethod).trim().toUpperCase();
     const rawNetwork = rule?.card_brand || rule?.network || 'ALL';
@@ -258,12 +318,11 @@ const AdminRateSetting = ({
     const cardType = String(rawCardType).trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
     const subType = String(rule?.sub_type || rule?.card_classification || 'any').trim().toLowerCase();
     const settlement = String(rule?.settlement_type || '').trim().toLowerCase();
-    const company = String(rule?.company_name || '').trim().toLowerCase();
     const minAmount = String(Number(rule?.min_amount || 0));
     const rawMax = rule?.max_amount ?? rule?.to_amount;
     const maxAmount = rawMax !== null && rawMax !== undefined && rawMax !== '' && !isNaN(Number(rawMax)) ? String(Number(rawMax)) : 'OPEN';
 
-    return [method, network, cardType, subType, settlement, company, minAmount, maxAmount].join('|');
+    return [gateway, method, network, cardType, subType, settlement, minAmount, maxAmount].join('|');
   };
 
   const buildPgEffectiveRules = (defaultRules = [], overrideRules = []) => {
@@ -533,8 +592,8 @@ const AdminRateSetting = ({
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
-            fetchPgChargeRules({ super_franchise_id: effectiveUser?.id }).catch(() => []),
-            fetchPgChargeRules({ scope: 'super_franchise_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: effectiveUser?.id }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.id }).catch(() => []),
           ]);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
           const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
@@ -548,34 +607,101 @@ const AdminRateSetting = ({
           setRates(effective);
           setDefaultRatesAttributes(buildColumnStructure(effective));
         } else if (isFranchiseUser) {
-          const [superAdminRules, adminSpecificRules, adminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
+          let sfId = effectiveUser?.super_franchise_id || effectiveUser?.superFranchiseId;
+          if (!sfId && effectiveUser?.id) {
+            try {
+              const userRes = await FranchiseAllUsers({ id: effectiveUser.id });
+              const u = (userRes?.data || userRes?.users || (Array.isArray(userRes) ? userRes : []))[0];
+              if (u?.super_franchise_id) sfId = u.super_franchise_id;
+            } catch (e) {}
+          }
+          const [superAdminRules, adminSpecificRules, adminRules, sfAdminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
-            effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
+            fetchPgChargeRules({ scope: 'admin_super_franchise', ...(sfId ? { super_franchise_id: sfId } : {}) }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_franchise_default', ...(sfId ? { super_franchise_id: sfId } : {}) }).catch(() => []),
             fetchPgChargeRules({ franchaise_id: effectiveUser?.id }).catch(() => []),
             fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
           ]);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
           const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+          const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
           const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
-          const specificList = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
+          const rawSpecific = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
+          const specificList = rawSpecific.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.franchaise_id) === String(effectiveUser?.id) || String(r.user_id) === String(effectiveUser?.id);
+          });
           const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
           const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
           const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
-          const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
+          const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+          const sfEffective = buildPgEffectiveRules(sfBase, sfList);
           const fBase = buildPgEffectiveRules(sfEffective, specificList);
           const effective = buildPgEffectiveRules(fBase, fList);
           setRates(effective);
           setDefaultRatesAttributes(buildColumnStructure(effective));
         } else {
-          // Merchant: query own charge rules
-          const merchantRules = await fetchPgChargeRules({ user_id: effectiveUser?.id }).catch(() => []);
-          const mList = Array.isArray(merchantRules) ? merchantRules : (merchantRules?.data || []);
-          const mapped = mList.map(rule => mapRuleToAdminFormat(rule, { isInherited: false }));
-          setRates(mapped);
-          setDefaultRatesAttributes(buildColumnStructure(mapped));
+          // Merchant: query hierarchy to inherit upstream default/override rates
+          const sfId = effectiveUser?.super_franchise_id || effectiveUser?.superFranchiseId;
+          const fId = effectiveUser?.franchaise_id || effectiveUser?.franchise_id;
+          const [superAdminRules, adminSpecificRules, adminRules, sfAdminRules, sfDefaultRules, sfFranchiseRules, fMerchantRules, fDefaultRules, merchantRules] = await Promise.all([
+            fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
+            fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+            sfId ? fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+            sfId ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+            (sfId && fId) ? fetchPgChargeRules({ scope: 'super_franchise_franchise', super_franchise_id: sfId, franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+            fId ? fetchPgChargeRules({ scope: 'franchise_merchant', franchaise_id: fId, user_id: effectiveUser?.id }).catch(() => []) : Promise.resolve([]),
+            fId ? fetchPgChargeRules({ scope: 'franchise_default', franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+            fetchPgChargeRules({ user_id: effectiveUser?.id }).catch(() => [])
+          ]);
+          const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+          const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
+          const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+          const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
+          const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
+          const sfFranchiseList = Array.isArray(sfFranchiseRules) ? sfFranchiseRules : (sfFranchiseRules?.data || []);
+          const rawFMerchantList = Array.isArray(fMerchantRules) ? fMerchantRules : (fMerchantRules?.data || []);
+          const fMerchantList = rawFMerchantList.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return r.scope === 'franchise_merchant';
+          });
+          const rawFList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+          const fList = rawFList.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return (fId && String(r.franchaise_id) === String(fId)) || ['franchise_default', 'admin_franchise'].includes(r.scope);
+          });
+          const rawMList = Array.isArray(merchantRules) ? merchantRules : (merchantRules?.data || []);
+          const mList = rawMList.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise', 'franchise_default', 'admin_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.user_id) === String(effectiveUser?.id) || ['merchant', 'admin_merchant', 'super_franchise_merchant'].includes(r.scope);
+          });
+
+          const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+          const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+          const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+          const sfEffective = buildPgEffectiveRules(sfBase, sfList);
+          const sfFranchiseEffective = buildPgEffectiveRules(sfEffective, sfFranchiseList);
+          const fEffective = buildPgEffectiveRules(sfFranchiseEffective, fList);
+          const fMerchantEffective = buildPgEffectiveRules(fEffective, fMerchantList);
+          const effective = buildPgEffectiveRules(fMerchantEffective, mList);
+          setRates(effective);
+          setDefaultRatesAttributes(buildColumnStructure(effective));
         }
 
         if (isSuperAdmin) {
@@ -735,7 +861,7 @@ const AdminRateSetting = ({
       if (isPGTxnMode) {
         const [sfRulesUser, sfRulesSF, adminSpecificRules, adminRules, superAdminRules] = await Promise.all([
           fetchPgChargeRules({ user_id: sfId }).catch(() => []),
-          fetchPgChargeRules({ super_franchise_id: sfId }).catch(() => []),
+          fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: sfId }).catch(() => []),
           fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
           fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
           fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
@@ -865,8 +991,8 @@ const AdminRateSetting = ({
               fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
               fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
               fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
-              fetchPgChargeRules({ super_franchise_id: effectiveUser?.id }).catch(() => []),
-              fetchPgChargeRules({ scope: 'super_franchise_default' }).catch(() => []),
+              fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: effectiveUser?.id }).catch(() => []),
+              fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.id }).catch(() => []),
             ]);
             const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
             const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
@@ -879,31 +1005,98 @@ const AdminRateSetting = ({
             const effective = buildPgEffectiveRules(sfBase, sfList);
             setRates(effective);
           } else if (isFranchiseUser) {
-            const [superAdminRules, adminSpecificRules, adminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
+            let sfId = effectiveUser?.super_franchise_id || effectiveUser?.superFranchiseId;
+            if (!sfId && effectiveUser?.id) {
+              try {
+                const userRes = await FranchiseAllUsers({ id: effectiveUser.id });
+                const u = (userRes?.data || userRes?.users || (Array.isArray(userRes) ? userRes : []))[0];
+                if (u?.super_franchise_id) sfId = u.super_franchise_id;
+              } catch (e) {}
+            }
+            const [superAdminRules, adminSpecificRules, adminRules, sfAdminRules, sfDefaultRules, fSpecificRules, fDefaultRules] = await Promise.all([
               fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
               fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
               fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
-              effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
+              fetchPgChargeRules({ scope: 'admin_super_franchise', ...(sfId ? { super_franchise_id: sfId } : {}) }).catch(() => []),
+              fetchPgChargeRules({ scope: 'super_franchise_default', ...(sfId ? { super_franchise_id: sfId } : {}) }).catch(() => []),
               fetchPgChargeRules({ franchaise_id: effectiveUser?.id }).catch(() => []),
               fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
             ]);
             const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
             const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
             const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+            const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
             const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
-            const specificList = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
+            const rawSpecific = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
+          const specificList = rawSpecific.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.franchaise_id) === String(effectiveUser?.id) || String(r.user_id) === String(effectiveUser?.id);
+          });
             const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
             const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
             const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
-            const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
+            const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+            const sfEffective = buildPgEffectiveRules(sfBase, sfList);
             const fBase = buildPgEffectiveRules(sfEffective, specificList);
             const effective = buildPgEffectiveRules(fBase, fList);
             setRates(effective);
           } else {
-            const merchantRules = await fetchPgChargeRules({ user_id: effectiveUser?.id }).catch(() => []);
-            const mList = Array.isArray(merchantRules) ? merchantRules : (merchantRules?.data || []);
-            const mapped = mList.map(rule => mapRuleToAdminFormat(rule, { isInherited: false }));
-            setRates(mapped);
+            const sfId = effectiveUser?.super_franchise_id || effectiveUser?.superFranchiseId;
+            const fId = effectiveUser?.franchaise_id || effectiveUser?.franchise_id;
+            const [superAdminRules, adminSpecificRules, adminRules, sfAdminRules, sfDefaultRules, sfFranchiseRules, fMerchantRules, fDefaultRules, merchantRules] = await Promise.all([
+              fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+              fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
+              fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+              sfId ? fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+              sfId ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+              (sfId && fId) ? fetchPgChargeRules({ scope: 'super_franchise_franchise', super_franchise_id: sfId, franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+              fId ? fetchPgChargeRules({ scope: 'franchise_merchant', franchaise_id: fId, user_id: effectiveUser?.id }).catch(() => []) : Promise.resolve([]),
+              fId ? fetchPgChargeRules({ scope: 'franchise_default', franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+              fetchPgChargeRules({ user_id: effectiveUser?.id }).catch(() => [])
+            ]);
+            const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+            const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
+            const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+            const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
+            const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
+            const sfFranchiseList = Array.isArray(sfFranchiseRules) ? sfFranchiseRules : (sfFranchiseRules?.data || []);
+            const rawFMerchantList = Array.isArray(fMerchantRules) ? fMerchantRules : (fMerchantRules?.data || []);
+            const fMerchantList = rawFMerchantList.filter((r) => {
+              if (!r) return false;
+              if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+                return false;
+              }
+              return r.scope === 'franchise_merchant';
+            });
+            const rawFList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+            const fList = rawFList.filter((r) => {
+              if (!r) return false;
+              if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+                return false;
+              }
+              return (fId && String(r.franchaise_id) === String(fId)) || ['franchise_default', 'admin_franchise'].includes(r.scope);
+            });
+            const rawMList = Array.isArray(merchantRules) ? merchantRules : (merchantRules?.data || []);
+            const mList = rawMList.filter((r) => {
+              if (!r) return false;
+              if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise', 'franchise_default', 'admin_franchise'].includes(r.scope)) {
+                return false;
+              }
+              return String(r.user_id) === String(effectiveUser?.id) || ['merchant', 'admin_merchant', 'super_franchise_merchant'].includes(r.scope);
+            });
+
+            const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+            const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+            const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+            const sfEffective = buildPgEffectiveRules(sfBase, sfList);
+            const sfFranchiseEffective = buildPgEffectiveRules(sfEffective, sfFranchiseList);
+            const fEffective = buildPgEffectiveRules(sfFranchiseEffective, fList);
+            const fMerchantEffective = buildPgEffectiveRules(fEffective, fMerchantList);
+            const effective = buildPgEffectiveRules(fMerchantEffective, mList);
+            setRates(effective);
           }
         } else if (isSuperAdmin) {
           const [adminOverrides, superAdminRules] = await Promise.all([
@@ -915,44 +1108,112 @@ const AdminRateSetting = ({
           const effective = buildPgEffectiveRules(saList, uList);
           setRates(effective);
         } else if (isFranchiseUser) {
-          const [mOverrides, fDefaultRules, sfDefaultRules, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
+          let sfId = effectiveUser?.super_franchise_id || effectiveUser?.superFranchiseId;
+          if (!sfId && effectiveUser?.id) {
+            try {
+              const userRes = await FranchiseAllUsers({ id: effectiveUser.id });
+              const u = (userRes?.data || userRes?.users || (Array.isArray(userRes) ? userRes : []))[0];
+              if (u?.super_franchise_id) sfId = u.super_franchise_id;
+            } catch (e) {}
+          }
+          const fId = effectiveUser?.id;
+          const [mOverrides, fMerchantRules, fDefaultRules, sfFranchiseRules, sfAdminRules, sfDefaultRules, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
             fetchPgChargeRules({ user_id: id }).catch(() => []),
-            fetchPgChargeRules({ scope: 'franchise_default' }).catch(() => []),
-            effectiveUser?.super_franchise_id ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: effectiveUser?.super_franchise_id }).catch(() => []) : Promise.resolve([]),
+            fetchPgChargeRules({ scope: 'franchise_merchant', franchaise_id: fId, user_id: id }).catch(() => []),
+            fetchPgChargeRules({ scope: 'franchise_default', franchaise_id: fId }).catch(() => []),
+            sfId ? fetchPgChargeRules({ scope: 'super_franchise_franchise', super_franchise_id: sfId, franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+            sfId ? fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+            sfId ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
           ]);
-          const mList = Array.isArray(mOverrides) ? mOverrides : (mOverrides?.data || []);
-          const fList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+          const rawMList = Array.isArray(mOverrides) ? mOverrides : (mOverrides?.data || []);
+          const mList = rawMList.filter((r) => {
+            if (!r) return false;
+            // Reject higher-level default rules returned by backend fallback
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise', 'franchise_default', 'admin_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.user_id) === String(id) || ['merchant', 'admin_merchant', 'super_franchise_merchant'].includes(r.scope);
+          });
+          const rawFMerchantList = Array.isArray(fMerchantRules) ? fMerchantRules : (fMerchantRules?.data || []);
+          const fMerchantList = rawFMerchantList.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return r.scope === 'franchise_merchant';
+          });
+          const rawFList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+          const fList = rawFList.filter((r) => {
+            if (!r) return false;
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.franchaise_id) === String(fId) || ['franchise_default', 'admin_franchise'].includes(r.scope);
+          });
+          const sfFranchiseList = Array.isArray(sfFranchiseRules) ? sfFranchiseRules : (sfFranchiseRules?.data || []);
+          const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
           const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
           const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
           const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
           const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
-          const sfEffective = buildPgEffectiveRules(adminEffective, sfList);
-          const fEffective = buildPgEffectiveRules(sfEffective, fList);
-          const effective = buildPgEffectiveRules(fEffective, mList);
+          const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+          const sfEffective = buildPgEffectiveRules(sfBase, sfList);
+          const sfFranchiseEffective = buildPgEffectiveRules(sfEffective, sfFranchiseList);
+          const fEffective = buildPgEffectiveRules(sfFranchiseEffective, fList);
+          const fMerchantEffective = buildPgEffectiveRules(fEffective, fMerchantList);
+          const effective = buildPgEffectiveRules(fMerchantEffective, mList);
           setRates(effective);
         } else {
-          const [fRulesUser, fRulesFranchise, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
+          // Viewing a specific franchise (as Admin or Super Franchise)
+          let targetSfId = isSuperFranchiseUser ? effectiveUser?.id : null;
+          if (!targetSfId) {
+            const targetFranchise = (franchises || []).find((f) => String(f.id) === String(id)) ||
+                                    (matrixSearchResults || []).find((f) => String(f.id) === String(id)) ||
+                                    (superFranchises || []).find((f) => String(f.id) === String(id));
+            targetSfId = targetFranchise?.super_franchise_id;
+          }
+          if (!targetSfId && id && id !== 'default') {
+            try {
+              const userRes = await FranchiseAllUsers({ id });
+              const u = (userRes?.data || userRes?.users || (Array.isArray(userRes) ? userRes : []))[0];
+              if (u?.super_franchise_id) targetSfId = u.super_franchise_id;
+            } catch (e) {}
+          }
+
+          const [fRulesUser, fRulesFranchise, adminRules, adminSpecificRules, superAdminRules, sfAdminRules, sfDefaultRules] = await Promise.all([
             fetchPgChargeRules({ user_id: id }).catch(() => []),
             fetchPgChargeRules({ franchaise_id: id }).catch(() => []),
             fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
             fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
+            targetSfId ? fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: targetSfId }).catch(() => []) : Promise.resolve([]),
+            targetSfId ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: targetSfId }).catch(() => []) : Promise.resolve([]),
           ]);
-          const fList = [
-            ...(Array.isArray(fRulesUser) ? fRulesUser : (fRulesUser?.data || [])),
-            ...(Array.isArray(fRulesFranchise) ? fRulesFranchise : (fRulesFranchise?.data || []))
-          ];
+          const rawFUser = Array.isArray(fRulesUser) ? fRulesUser : (fRulesUser?.data || []);
+          const rawFFranchise = Array.isArray(fRulesFranchise) ? fRulesFranchise : (fRulesFranchise?.data || []);
+          const fList = [...rawFUser, ...rawFFranchise].filter((r) => {
+            if (!r) return false;
+            // Reject higher-level default rules returned by backend fallback
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+              return false;
+            }
+            return String(r.franchaise_id) === String(id) || String(r.user_id) === String(id) || ['franchise_default', 'admin_franchise', 'super_franchise_franchise'].includes(r.scope);
+          });
           const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
           const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
           const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
+          const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
+          const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
           const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
           const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
-          const effective = buildPgEffectiveRules(adminEffective, fList);
+          const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+          const sfEffective = buildPgEffectiveRules(sfBase, sfList);
+          const effective = buildPgEffectiveRules(sfEffective, fList);
           setRates(effective);
         }
         return;
@@ -1012,16 +1273,75 @@ const AdminRateSetting = ({
     setLoadingRates(true);
     try {
       if (isPGTxnMode) {
-        const [mOverrides, adminRules, superAdminRules] = await Promise.all([
+        let sfId = null;
+        let fId = null;
+        const targetMerchant = (unassignedMerchants || []).find((m) => String(m.id) === String(id)) ||
+                               (franchises || []).find((m) => String(m.id) === String(id)) ||
+                               (matrixSearchResults || []).find((m) => String(m.id) === String(id));
+        if (targetMerchant) {
+          sfId = targetMerchant.super_franchise_id || targetMerchant.superFranchiseId;
+          fId = targetMerchant.franchaise_id || targetMerchant.franchise_id;
+        }
+        if (!targetMerchant && id) {
+          try {
+            const userRes = await MerchantAllUsers({ id });
+            const u = (userRes?.data || userRes?.users || (Array.isArray(userRes) ? userRes : []))[0];
+            if (u) {
+              sfId = u.super_franchise_id || u.superFranchiseId;
+              fId = u.franchaise_id || u.franchise_id;
+            }
+          } catch (e) {}
+        }
+        const [mOverrides, fMerchantRules, fDefaultRules, sfFranchiseRules, sfAdminRules, sfDefaultRules, adminRules, adminSpecificRules, superAdminRules] = await Promise.all([
           fetchPgChargeRules({ user_id: id }).catch(() => []),
+          fId ? fetchPgChargeRules({ scope: 'franchise_merchant', franchaise_id: fId, user_id: id }).catch(() => []) : Promise.resolve([]),
+          fId ? fetchPgChargeRules({ scope: 'franchise_default', franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+          (sfId && fId) ? fetchPgChargeRules({ scope: 'super_franchise_franchise', super_franchise_id: sfId, franchaise_id: fId }).catch(() => []) : Promise.resolve([]),
+          sfId ? fetchPgChargeRules({ scope: 'admin_super_franchise', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
+          sfId ? fetchPgChargeRules({ scope: 'super_franchise_default', super_franchise_id: sfId }).catch(() => []) : Promise.resolve([]),
           fetchPgChargeRules({ scope: 'admin_default' }).catch(() => []),
+          fetchPgChargeRules({ scope: 'super_admin_admin' }).catch(() => []),
           fetchPgChargeRules({ scope: 'super_admin_default' }).catch(() => []),
         ]);
-        const mList = Array.isArray(mOverrides) ? mOverrides : (mOverrides?.data || []);
+        const rawMList = Array.isArray(mOverrides) ? mOverrides : (mOverrides?.data || []);
+        const mList = rawMList.filter((r) => {
+          if (!r) return false;
+          if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise', 'franchise_default', 'admin_franchise'].includes(r.scope)) {
+            return false;
+          }
+          return String(r.user_id) === String(id) || ['merchant', 'admin_merchant', 'super_franchise_merchant'].includes(r.scope);
+        });
+        const rawFMerchantList = Array.isArray(fMerchantRules) ? fMerchantRules : (fMerchantRules?.data || []);
+        const fMerchantList = rawFMerchantList.filter((r) => {
+          if (!r) return false;
+          if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+            return false;
+          }
+          return r.scope === 'franchise_merchant';
+        });
+        const rawFList = Array.isArray(fDefaultRules) ? fDefaultRules : (fDefaultRules?.data || []);
+        const fList = rawFList.filter((r) => {
+          if (!r) return false;
+          if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'super_franchise_franchise'].includes(r.scope)) {
+            return false;
+          }
+          return (fId && String(r.franchaise_id) === String(fId)) || ['franchise_default', 'admin_franchise'].includes(r.scope);
+        });
+        const sfFranchiseList = Array.isArray(sfFranchiseRules) ? sfFranchiseRules : (sfFranchiseRules?.data || []);
+        const sfAdminList = Array.isArray(sfAdminRules) ? sfAdminRules : (sfAdminRules?.data || []);
+        const sfList = Array.isArray(sfDefaultRules) ? sfDefaultRules : (sfDefaultRules?.data || []);
         const admList = Array.isArray(adminRules) ? adminRules : (adminRules?.data || []);
+        const specificAdminList = Array.isArray(adminSpecificRules) ? adminSpecificRules : (adminSpecificRules?.data || []);
         const saList = Array.isArray(superAdminRules) ? superAdminRules : (superAdminRules?.data || []);
-        const baseDefaults = buildPgEffectiveRules(saList, admList);
-        const effective = buildPgEffectiveRules(baseDefaults, mList);
+
+        const baseDefaults = buildPgEffectiveRules(saList, specificAdminList);
+        const adminEffective = buildPgEffectiveRules(baseDefaults, admList);
+        const sfBase = buildPgEffectiveRules(adminEffective, sfAdminList);
+        const sfEffective = buildPgEffectiveRules(sfBase, sfList);
+        const sfFranchiseEffective = buildPgEffectiveRules(sfEffective, sfFranchiseList);
+        const fEffective = buildPgEffectiveRules(sfFranchiseEffective, fList);
+        const fMerchantEffective = buildPgEffectiveRules(fEffective, fMerchantList);
+        const effective = buildPgEffectiveRules(fMerchantEffective, mList);
         setRates(effective);
         return;
       }
@@ -1204,7 +1524,7 @@ const AdminRateSetting = ({
         rate.base_rate ??
         rate.admin_rate ??
         rate.platform_default_rate ??
-        (rate.isInherited ? rate.charge_percent : 0) ??
+        (rate.isInherited ? rate.charge_percent : null) ??
         0
       );
       const enteredRate = parseFloat(editValue || '0');
@@ -1227,11 +1547,63 @@ const AdminRateSetting = ({
 
       let updatedRate;
       if (isPGTxnMode) {
-        const pgUpdates = {
-          charge_percent: editValue,
-          ...(hasEditableGst(rate) && { gst_percent: editGstValue })
-        };
-        updatedRate = await updatePgChargeRule(rate.rule_id || rate.id, pgUpdates);
+        if (rate.isInherited) {
+          const rawBrand = rate.raw_card_brand || rate.card_brand || rate.network;
+          const normBrand = (!rawBrand || String(rawBrand).toUpperCase() === 'ALL') ? null : String(rawBrand).trim().toUpperCase();
+          const rawType = rate.raw_card_type || rate.card_type;
+          const cleanType = rawType ? String(rawType).trim().toUpperCase().replace(/[\s_-]/g, '').replace('CARD', '') : null;
+          const normType = (!cleanType || cleanType === 'ALL' || cleanType === 'UNKNOWN') ? null : cleanType;
+
+          const payload = {
+            gateway: rate.gateway || 'ALL',
+            payment_mode: String(rate.payment_mode || rate.method || 'ALL').trim().toUpperCase(),
+            card_brand: normBrand,
+            card_type: normType,
+            card_classification: rate.card_classification || rate.sub_type || 'any',
+            sub_type: rate.sub_type || rate.card_classification || 'any',
+            settlement_type: rate.settlement_type || null,
+            min_amount: rate.min_amount != null ? rate.min_amount : 0,
+            max_amount: rate.max_amount !== null && rate.max_amount !== undefined ? rate.max_amount : null,
+            charge_percent: editValue,
+            charge_flat: rate.charge_flat || 0,
+            gst_required: Boolean(rate.gst_required),
+            gst_percent: rate.gst_rate ?? rate.gst_percent ?? 0,
+            company_name: rate.company_name || null,
+            scope: isSuperAdmin
+              ? (activeTab === 'specific' ? 'super_admin_admin' : 'super_admin_default')
+              : (activeTab === 'specific'
+                  ? (isFranchiseUser
+                      ? 'franchise_merchant'
+                      : (isSuperFranchiseUser
+                          ? 'super_franchise_franchise'
+                          : 'admin_franchise'))
+                  : (activeTab === 'unassigned'
+                      ? (isSuperFranchiseUser
+                          ? 'super_franchise_merchant'
+                          : 'admin_merchant')
+                      : (activeTab === 'super_franchise'
+                          ? 'admin_super_franchise'
+                          : (isFranchiseUser
+                              ? 'franchise_default'
+                              : (isSuperFranchiseUser
+                                  ? 'super_franchise_default'
+                                  : 'admin_default'))))),
+            target_user_id: activeTab === 'unassigned'
+              ? selectedMerchantId
+              : (activeTab === 'specific'
+                  ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? (selectedMerchantId || selectedFranchiseId) : null))
+                  : null),
+            target_franchise_id: (activeTab === 'specific' && !isSuperAdmin && !isFranchiseUser) ? selectedFranchiseId : null,
+            target_super_franchise_id: activeTab === 'super_franchise' ? selectedSuperFranchiseId : null
+          };
+          updatedRate = await createPgChargeRule(payload);
+        } else {
+          const pgUpdates = {
+            charge_percent: editValue,
+            ...(isAdminOrSuperAdmin && hasEditableGst(rate) && { gst_percent: editGstValue })
+          };
+          updatedRate = await updatePgChargeRule(rate.rule_id || rate.id, pgUpdates);
+        }
       } else if (activeTab === 'default') {
         if (isSuperAdmin) {
           updatedRate = await updatePlatformDefaultPosRule(rate.rule_id || rate.id, updates);
@@ -1272,6 +1644,10 @@ const AdminRateSetting = ({
   };
 
   const handleCreateNewRate = async () => {
+    if (!isAdminOrSuperAdmin) {
+      toast.error("Only Admin and Super Admin can create new rate specifications.");
+      return;
+    }
     if (newRateHasBoth) {
       toast.error("Please set either Flat Rate or Base Rate (%), not both.");
       return;
@@ -1419,7 +1795,7 @@ const AdminRateSetting = ({
           target_user_id: activeTab === 'unassigned'
             ? selectedMerchantId
             : (activeTab === 'specific'
-                ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? selectedMerchantId : null))
+                ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? (selectedMerchantId || selectedFranchiseId) : null))
                 : null),
           target_franchise_id: (activeTab === 'specific' && !isSuperAdmin && !isFranchiseUser) ? selectedFranchiseId : null,
           target_super_franchise_id: activeTab === 'super_franchise' ? selectedSuperFranchiseId : null
@@ -1649,8 +2025,11 @@ const AdminRateSetting = ({
     const isUPI = method === 'UPI';
     const flatVal = rate.charge_flat !== null && rate.charge_flat !== undefined ? String(rate.charge_flat) : '';
     const pctVal = getRateValue(rate) !== null && getRateValue(rate) !== undefined ? String(getRateValue(rate)) : '';
-    const hasFlat = parseFloat(flatVal || '0') > 0 && parseFloat(pctVal || '0') <= 0;
-    setPosEditChargeMode(hasFlat ? 'flat' : 'percent');
+    const isFlatLocked = isRateLimitFlat(rate);
+    const isPercentLocked = isRateLimitPercent(rate);
+    const hasFlat = isFlatLocked || (parseFloat(flatVal || '0') > 0 && parseFloat(pctVal || '0') <= 0);
+    const initialMode = isPercentLocked ? 'percent' : (hasFlat ? 'flat' : 'percent');
+    setPosEditChargeMode(initialMode);
     const rawNetwork = rate.network || rate.card_brand;
     const networkVal = isUPI ? '' : (!rawNetwork || rawNetwork === 'ALL' ? 'ALL' : String(rawNetwork).toUpperCase());
     const rawCardType = rate.card_type;
@@ -1666,8 +2045,8 @@ const AdminRateSetting = ({
       settlementType: rate.settlement_type || '',
       minAmount: String(rate.min_amount ?? '0'),
       maxAmount: rate.max_amount !== null && rate.max_amount !== undefined ? String(rate.max_amount) : '',
-      chargePercent: pctVal,
-      chargeFlat: flatVal,
+      chargePercent: initialMode === 'flat' ? '0' : pctVal,
+      chargeFlat: initialMode === 'percent' ? '0' : flatVal,
       gstRequired: Boolean(rate.gst_required),
       gstPercent: String(rate.gst_rate ?? rate.gst_percent ?? '18'),
       companyName: rate.company_name || '',
@@ -1685,6 +2064,21 @@ const AdminRateSetting = ({
       toast.error("Please set either Flat Rate or Base Rate (%), not both.");
       return;
     }
+
+    // ── Enforce: If the limit/rate set previously is Flat, it cannot be converted to percentage ──
+    const isFlatLocked = isRateLimitFlat(posTxnEditRate);
+    if (isFlatLocked && (posEditChargeMode === 'percent' || parseFloat(posTxnEditForm.chargePercent || '0') > 0)) {
+      toast.error("This rate is configured as Flat Rate and cannot be converted to percentage.");
+      return;
+    }
+
+    // ── Enforce: If the limit/rate set previously is Percentage, it cannot be converted to flat ──
+    const isPercentLocked = isRateLimitPercent(posTxnEditRate);
+    if (isPercentLocked && (posEditChargeMode === 'flat' || parseFloat(posTxnEditForm.chargeFlat || '0') > 0)) {
+      toast.error("This rate is configured as Percentage and cannot be converted to Flat Rate.");
+      return;
+    }
+
     if ((posTxnEditForm.chargePercent === '' || posTxnEditForm.chargePercent === undefined) &&
       (posTxnEditForm.chargeFlat === '' || posTxnEditForm.chargeFlat === undefined)) {
       toast.error('Please enter a charge percentage or flat amount.');
@@ -1712,118 +2106,126 @@ const AdminRateSetting = ({
       }
     }
 
-    // ── Minimum rate / slab guard: admin cannot charge downstream users less than their own cost ──
-    if (activeTab !== 'default' && posTxnEditRate) {
-      const adminCost = Number(
-        posTxnEditRate.base_rate ??
-        posTxnEditRate.admin_rate ??
-        posTxnEditRate.platform_default_rate ??
-        (posTxnEditRate.isInherited ? posTxnEditRate.charge_percent : 0) ??
-        0
-      );
-      const enteredRate = parseFloat(posTxnEditForm.chargePercent || '0');
-      if (adminCost > 0 && !isNaN(enteredRate) && enteredRate < adminCost) {
-        toast.error(
-          `Rate (%) cannot be less than default rate of ${adminCost}% for this rule. You must charge at least ${adminCost}%.`
-        );
-        return;
-      }
-
-      const adminFlatCost = Number(
-        posTxnEditRate.base_flat_rate ??
-        posTxnEditRate.admin_flat_rate ??
-        posTxnEditRate.platform_default_flat_rate ??
-        (posTxnEditRate.isInherited ? posTxnEditRate.charge_flat : 0) ??
-        0
-      );
-      const enteredFlat = parseFloat(posTxnEditForm.chargeFlat || '0');
-      if (adminFlatCost > 0 && !isNaN(enteredFlat) && enteredFlat > 0 && enteredFlat < adminFlatCost) {
-        toast.error(
-          `Flat rate (₹) cannot be less than default flat rate of ₹${adminFlatCost} for this slab. You must charge at least ₹${adminFlatCost}.`
-        );
-        return;
+    // ── Minimum rate / slab guard: cannot edit rate or percentage below the rate set previously ──
+    if (posTxnEditRate && !(isSuperAdmin && activeTab === 'default')) {
+      if (posEditChargeMode === 'percent') {
+        const minPreviousRate = getPreviousRate(posTxnEditRate);
+        const enteredRate = parseFloat(posTxnEditForm.chargePercent || '0');
+        if (minPreviousRate > 0 && (isNaN(enteredRate) || enteredRate < minPreviousRate)) {
+          toast.error(
+            `Rate (%) cannot be less than the previously set rate of ${minPreviousRate}%. You must charge at least ${minPreviousRate}%.`
+          );
+          return;
+        }
+      } else {
+        const minPreviousFlat = getPreviousFlatRate(posTxnEditRate);
+        const enteredFlat = parseFloat(posTxnEditForm.chargeFlat || '0');
+        if (minPreviousFlat > 0 && (isNaN(enteredFlat) || enteredFlat < minPreviousFlat)) {
+          toast.error(
+            `Flat rate (₹) cannot be less than the previously set flat rate of ₹${minPreviousFlat}. You must charge at least ₹${minPreviousFlat}.`
+          );
+          return;
+        }
       }
     }
     setIsSaving(true);
     try {
-      const chosenEditSubType = posTxnEditForm.subType || posTxnEditForm.cardClassification || 'any';
+      const chosenEditSubType = (!isAdminOrSuperAdmin)
+        ? (posTxnEditRate?.sub_type || posTxnEditRate?.card_classification || 'any')
+        : (posTxnEditForm.subType || posTxnEditForm.cardClassification || 'any');
+
       const updates = {
-        payment_mode: posTxnEditForm.method,
-        card_brand: (!posTxnEditForm.network || posTxnEditForm.network === 'ALL') ? null : posTxnEditForm.network,
-        card_type: (!posTxnEditForm.cardType || posTxnEditForm.cardType === 'ALL') ? null : posTxnEditForm.cardType,
+        payment_mode: (!isAdminOrSuperAdmin)
+          ? String(posTxnEditRate?.method || posTxnEditRate?.payment_mode || 'ALL').trim().toUpperCase()
+          : String(posTxnEditForm.method).trim().toUpperCase(),
+        card_brand: (!isAdminOrSuperAdmin)
+          ? (() => {
+              const b = posTxnEditRate?.raw_card_brand || posTxnEditRate?.card_brand || posTxnEditRate?.network;
+              return (!b || String(b).toUpperCase() === 'ALL') ? null : String(b).trim().toUpperCase();
+            })()
+          : ((!posTxnEditForm.network || posTxnEditForm.network === 'ALL') ? null : String(posTxnEditForm.network).trim().toUpperCase()),
+        card_type: (!isAdminOrSuperAdmin)
+          ? (() => {
+              const t = posTxnEditRate?.raw_card_type || posTxnEditRate?.card_type;
+              const cl = t ? String(t).trim().toUpperCase().replace(/[\s_-]/g, '').replace('CARD', '') : null;
+              return (!cl || cl === 'ALL' || cl === 'UNKNOWN') ? null : cl;
+            })()
+          : ((!posTxnEditForm.cardType || posTxnEditForm.cardType === 'ALL') ? null : String(posTxnEditForm.cardType).trim().toUpperCase().replace(/[\s_-]/g, '').replace('CARD', '')),
         card_classification: chosenEditSubType,
         sub_type: chosenEditSubType,
-        settlement_type: posTxnEditForm.settlementType || null,
-        min_amount: posTxnEditForm.minAmount || '0',
-        max_amount: posTxnEditForm.maxAmount || null,
+        settlement_type: (!isAdminOrSuperAdmin) ? (posTxnEditRate?.settlement_type || null) : (posTxnEditForm.settlementType || null),
+        min_amount: (!isAdminOrSuperAdmin) ? String(posTxnEditRate?.min_amount ?? '0') : (posTxnEditForm.minAmount || '0'),
+        max_amount: (!isAdminOrSuperAdmin) ? (posTxnEditRate?.max_amount !== null && posTxnEditRate?.max_amount !== undefined ? String(posTxnEditRate.max_amount) : null) : (posTxnEditForm.maxAmount || null),
         charge_flat: posTxnEditForm.chargeFlat !== '' && posTxnEditForm.chargeFlat !== null && posTxnEditForm.chargeFlat !== undefined ? String(posTxnEditForm.chargeFlat) : '0',
-        gst_required: posTxnEditForm.gstRequired,
-        gst_percent: posTxnEditForm.gstRequired ? posTxnEditForm.gstPercent : '0',
+        gst_required: (!isAdminOrSuperAdmin) ? Boolean(posTxnEditRate?.gst_required) : posTxnEditForm.gstRequired,
+        gst_percent: (!isAdminOrSuperAdmin) ? String(posTxnEditRate?.gst_rate ?? posTxnEditRate?.gst_percent ?? '0') : (posTxnEditForm.gstRequired ? posTxnEditForm.gstPercent : '0'),
         chargePercent: posTxnEditForm.chargePercent !== '' && posTxnEditForm.chargePercent !== null && posTxnEditForm.chargePercent !== undefined ? String(posTxnEditForm.chargePercent) : '0',
         charge_percent: posTxnEditForm.chargePercent !== '' && posTxnEditForm.chargePercent !== null && posTxnEditForm.chargePercent !== undefined ? String(posTxnEditForm.chargePercent) : '0',
-        company_name: posTxnEditForm.companyName || null
+        company_name: (!isAdminOrSuperAdmin) ? (posTxnEditRate?.company_name || null) : (posTxnEditForm.companyName || null)
       };
 
-      // Check for overlap in other existing active rates
-      const editMethod = String(updates.payment_mode || '').trim().toUpperCase();
-      const editNetwork = String(updates.card_brand || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '');
-      const editCardType = String(updates.card_type || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
-      const editSubType = String(updates.card_classification || updates.sub_type || 'any').trim().toLowerCase();
-      const editSettlement = String(updates.settlement_type || '').trim().toLowerCase();
-      const editCompany = String(updates.company_name || '').trim().toLowerCase();
-      const editMin = parseFloat(updates.min_amount || '0');
-      const editMax = updates.max_amount !== null && updates.max_amount !== '' && !isNaN(parseFloat(updates.max_amount))
-        ? parseFloat(updates.max_amount)
-        : null;
-
-      const em1 = editMin;
-      const em2 = editMax !== null ? editMax : Infinity;
-
-      const editConflict = rates.find((r) => {
-        if (r.id === posTxnEditRate?.id) return false;
-        if (r.is_active === false) return false;
-
-        const rMethod = String(r.payment_mode || r.method || '').trim().toUpperCase();
-        const rNetwork = String(r.card_brand || r.network || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '');
-        const rCardType = String(r.raw_card_type || r.card_type || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
-        const rSubType = String(r.sub_type || r.card_classification || 'any').trim().toLowerCase();
-        const rSettlement = String(r.settlement_type || '').trim().toLowerCase();
-        const rCompany = String(r.company_name || '').trim().toLowerCase();
-
-        const specsMatch = (
-          rMethod === editMethod &&
-          (rNetwork === editNetwork || (!rNetwork && !editNetwork)) &&
-          (rCardType === editCardType || (!rCardType && !editCardType)) &&
-          rSubType === editSubType &&
-          rSettlement === editSettlement &&
-          (!editCompany || !rCompany || rCompany === editCompany)
-        );
-
-        if (!specsMatch) return false;
-
-        const rMin = r.min_amount != null ? parseFloat(r.min_amount) : 0;
-        const rawRMax = r.max_amount ?? r.to_amount;
-        const rMax = rawRMax !== null && rawRMax !== undefined && rawRMax !== '' && !isNaN(parseFloat(rawRMax))
-          ? parseFloat(rawRMax)
+      // Only validate specification slab overlap for Admin/Super Admin when creating/editing platform default rules
+      if (isAdminOrSuperAdmin && activeTab === 'default') {
+        const editMethod = String(updates.payment_mode || '').trim().toUpperCase();
+        const editNetwork = String(updates.card_brand || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '');
+        const editCardType = String(updates.card_type || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
+        const editSubType = String(updates.card_classification || updates.sub_type || 'any').trim().toLowerCase();
+        const editSettlement = String(updates.settlement_type || '').trim().toLowerCase();
+        const editCompany = String(updates.company_name || '').trim().toLowerCase();
+        const editMin = parseFloat(updates.min_amount || '0');
+        const editMax = updates.max_amount !== null && updates.max_amount !== '' && !isNaN(parseFloat(updates.max_amount))
+          ? parseFloat(updates.max_amount)
           : null;
 
-        const s1 = rMin;
-        const s2 = rMax !== null ? rMax : Infinity;
+        const em1 = editMin;
+        const em2 = editMax !== null ? editMax : Infinity;
 
-        return em1 <= s2 && em2 >= s1;
-      });
+        const editConflict = rates.find((r) => {
+          if (r.id === posTxnEditRate?.id) return false;
+          if (r.is_active === false) return false;
 
-      if (editConflict) {
-        const existingRange = `${editConflict.min_amount != null ? editConflict.min_amount : 0} - ${editConflict.max_amount != null ? editConflict.max_amount : 'Open'}`;
-        toast.error(`Duplicate rule: An active rate rule with matching specifications and an overlapping amount range (${existingRange}) already exists.`);
-        setIsSaving(false);
-        return;
+          const rMethod = String(r.payment_mode || r.method || '').trim().toUpperCase();
+          const rNetwork = String(r.card_brand || r.network || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '');
+          const rCardType = String(r.raw_card_type || r.card_type || 'ALL').trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
+          const rSubType = String(r.sub_type || r.card_classification || 'any').trim().toLowerCase();
+          const rSettlement = String(r.settlement_type || '').trim().toLowerCase();
+          const rCompany = String(r.company_name || '').trim().toLowerCase();
+
+          const specsMatch = (
+            rMethod === editMethod &&
+            (rNetwork === editNetwork || (!rNetwork && !editNetwork)) &&
+            (rCardType === editCardType || (!rCardType && !editCardType)) &&
+            rSubType === editSubType &&
+            rSettlement === editSettlement &&
+            (!editCompany || !rCompany || rCompany === editCompany)
+          );
+
+          if (!specsMatch) return false;
+
+          const rMin = r.min_amount != null ? parseFloat(r.min_amount) : 0;
+          const rawRMax = r.max_amount ?? r.to_amount;
+          const rMax = rawRMax !== null && rawRMax !== undefined && rawRMax !== '' && !isNaN(parseFloat(rawRMax))
+            ? parseFloat(rawRMax)
+            : null;
+
+          const s1 = rMin;
+          const s2 = rMax !== null ? rMax : Infinity;
+
+          return em1 <= s2 && em2 >= s1;
+        });
+
+        if (editConflict) {
+          const existingRange = `${editConflict.min_amount != null ? editConflict.min_amount : 0} - ${editConflict.max_amount != null ? editConflict.max_amount : 'Open'}`;
+          toast.error(`Duplicate rule: An active rate rule with matching specifications and an overlapping amount range (${existingRange}) already exists.`);
+          setIsSaving(false);
+          return;
+        }
       }
 
       if (isPGTxnMode) {
         if (posTxnEditRate?.isInherited) {
           await createPgChargeRule({
-            gateway: 'ALL',
+            gateway: posTxnEditRate?.gateway || 'ALL',
             payment_mode: updates.payment_mode,
             card_brand: updates.card_brand,
             card_type: updates.card_type,
@@ -1859,7 +2261,7 @@ const AdminRateSetting = ({
             target_user_id: activeTab === 'unassigned'
               ? selectedMerchantId
               : (activeTab === 'specific'
-                  ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? selectedMerchantId : null))
+                  ? (isSuperAdmin ? selectedFranchiseId : (isFranchiseUser ? (selectedMerchantId || selectedFranchiseId) : null))
                   : null),
             target_franchise_id: (activeTab === 'specific' && !isSuperAdmin && !isFranchiseUser) ? selectedFranchiseId : null,
             target_super_franchise_id: activeTab === 'super_franchise' ? selectedSuperFranchiseId : null
@@ -3324,7 +3726,9 @@ const AdminRateSetting = ({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-full">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
               <div>
-                <h3 className="text-lg font-bold text-gray-800">Edit Charge Rule</h3>
+                <h3 className="text-lg font-bold text-gray-800">
+                  {isAdminOrSuperAdmin ? 'Edit Charge Rule' : 'Set Downline Rate'}
+                </h3>
                 {(() => {
                   const badge = getScopeBadge(posTxnEditRate);
                   return badge ? (
@@ -3335,167 +3739,220 @@ const AdminRateSetting = ({
               <button onClick={() => { setIsPosTxnEditModalOpen(false); setPosTxnEditRate(null); }} className="text-gray-400 hover:text-gray-600 transition text-xl leading-none">&times;</button>
             </div>
             <div className="p-6 space-y-4 overflow-y-auto">
-              {/* Method */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                <select
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                  value={posTxnEditForm.method}
-                  onChange={(e) => {
-                    const method = e.target.value;
-                    const isUPI = method === 'UPI';
-                    setPosTxnEditForm(prev => ({
-                      ...prev,
-                      method,
-                      network: isUPI ? '' : prev.network,
-                      cardType: isUPI ? 'UNKNOWN' : prev.cardType,
-                      cardClassification: isUPI ? 'ANY' : prev.cardClassification,
-                    }));
-                  }}
-                >
-                  {methodOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              {/* Company Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-gray-400 font-normal">(optional)</span></label>
-                <select
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                  value={posTxnEditForm.companyName}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, companyName: e.target.value })}
-                >
-                  <option value="">— Any —</option>
-                  <option value="paytm">Paytm</option>
-                  <option value="telering">Telering</option>
-                  <option value="pinelab">Pinelab</option>
-                  <option value="yesbank">Yes Bank (Worldline)</option>
-                </select>
-              </div>
-
-              {/* Classification Sub Type (Required - Admin & Super Admin only, never disabled) */}
-              {isAdminOrSuperAdmin && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Classification Sub Type <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <select
-                    required
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    value={posTxnEditForm.subType || 'any'}
-                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, subType: e.target.value })}
-                  >
-                    {CLASSIFICATION_SUB_TYPE_OPTIONS.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Network */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Network / Card Brand
-                  {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(not applicable for UPI)</span>}
-                </label>
-                <select
-                  className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
-                  value={posTxnEditForm.network}
-                  disabled={posTxnEditForm.method === 'UPI'}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, network: e.target.value })}
-                >
-                  <option value="">— Any —</option>
-                  {networkOptions.filter(n => n.trim()).map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
-              {/* Card Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Card Type
-                  {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(fixed to UNKNOWN for UPI)</span>}
-                </label>
-                <select
-                  className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
-                  value={posTxnEditForm.cardType}
-                  disabled={posTxnEditForm.method === 'UPI'}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, cardType: e.target.value })}
-                >
-                  {cardTypeOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              {/* Card Classification */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Card Classification
-                  {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(fixed to ANY for UPI)</span>}
-                </label>
-                <select
-                  className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
-                  value={posTxnEditForm.cardClassification}
-                  disabled={posTxnEditForm.method === 'UPI'}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, cardClassification: e.target.value })}
-                >
-                  {cardClassificationOptions.map((cl) => <option key={cl} value={cl}>{cl}</option>)}
-                </select>
-              </div>
-              {/* Settlement Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Settlement Type <span className="text-gray-400 font-normal">(optional)</span></label>
-                <select
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                  value={posTxnEditForm.settlementType}
-                  onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, settlementType: e.target.value })}
-                >
-                  <option value="">— Any —</option>
-                  <option value="today_settlement">Today Settlement</option>
-                  <option value="next_day_settlement">Next Day Settlement</option>
-                </select>
-              </div>
-              {/* Amount Slab */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Amount (₹)</label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    placeholder="0"
-                    value={posTxnEditForm.minAmount}
-                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, minAmount: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Amount (₹) <span className="text-gray-400 font-normal">optional</span></label>
-                  <input
-                    type="number" step="0.01" min="0"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    placeholder="No limit"
-                    value={posTxnEditForm.maxAmount}
-                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, maxAmount: e.target.value })}
-                  />
-                </div>
-              </div>
-              {/* Charge Inputs: Rate (%) and Flat (₹) */}
-              {/* Minimum rate hint — shown when admin is editing a downstream user rate */}
-              {!isSuperAdmin && activeTab !== 'default' && posTxnEditRate && (() => {
-                const minRate = posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? null;
-                return minRate !== null ? (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    <span className="mt-0.5 text-amber-500 shrink-0">⚠</span>
-                    <span>
-                      Your applicable rate for this rule is <strong>{minRate}%</strong>. You must set a rate{' '}
-                      <strong>≥ {minRate}%</strong> to avoid loss.
+              {!isAdminOrSuperAdmin ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      Payment Specifications (Admin Configured)
                     </span>
+                    <span className="text-[10px] font-semibold text-slate-600 bg-slate-200 px-2 py-0.5 rounded">Locked</span>
                   </div>
-                ) : null;
-              })()}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div>
+                      <span className="text-gray-500 block">Payment Method</span>
+                      <span className="font-semibold text-gray-800">{posTxnEditRate.method || posTxnEditRate.payment_mode || 'ALL'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Company / Gateway</span>
+                      <span className="font-semibold text-gray-800 uppercase">{posTxnEditRate.company_name || posTxnEditRate.gateway || 'ALL'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Network</span>
+                      <span className="font-semibold text-gray-800">{posTxnEditRate.network || posTxnEditRate.card_brand || 'ALL'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Card Type</span>
+                      <span className="font-semibold text-gray-800">{posTxnEditRate.card_type || 'ALL'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Classification</span>
+                      <span className="font-semibold text-gray-800 capitalize">{posTxnEditRate.card_classification || posTxnEditRate.sub_type || 'any'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Settlement Type</span>
+                      <span className="font-semibold text-gray-800 capitalize">{posTxnEditRate.settlement_type ? String(posTxnEditRate.settlement_type).replace(/_/g, ' ') : 'Any'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">Amount Slab</span>
+                      <span className="font-semibold text-gray-800">
+                        ₹{posTxnEditRate.min_amount != null ? posTxnEditRate.min_amount : '0'} – {posTxnEditRate.max_amount != null ? `₹${posTxnEditRate.max_amount}` : 'No Limit'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-400 pt-1 border-t border-slate-200">
+                    Payment mode, gateway, network, card type, settlement type, and slab amounts are defined by Admin and cannot be edited. You can only set rates for your downline.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Method */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                    <select
+                      className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                      value={posTxnEditForm.method}
+                      onChange={(e) => {
+                        const method = e.target.value;
+                        const isUPI = method === 'UPI';
+                        setPosTxnEditForm(prev => ({
+                          ...prev,
+                          method,
+                          network: isUPI ? '' : prev.network,
+                          cardType: isUPI ? 'UNKNOWN' : prev.cardType,
+                          cardClassification: isUPI ? 'ANY' : prev.cardClassification,
+                        }));
+                      }}
+                    >
+                      {methodOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  {/* Company Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select
+                      className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                      value={posTxnEditForm.companyName}
+                      onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, companyName: e.target.value })}
+                    >
+                      <option value="">— Any —</option>
+                      <option value="paytm">Paytm</option>
+                      <option value="telering">Telering</option>
+                      <option value="pinelab">Pinelab</option>
+                      <option value="yesbank">Yes Bank (Worldline)</option>
+                    </select>
+                  </div>
+
+                  {/* Classification Sub Type (Required - Admin & Super Admin only, never disabled) */}
+                  {isAdminOrSuperAdmin && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Classification Sub Type <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      <select
+                        required
+                        className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                        value={posTxnEditForm.subType || 'any'}
+                        onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, subType: e.target.value })}
+                      >
+                        {CLASSIFICATION_SUB_TYPE_OPTIONS.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Network */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Network / Card Brand
+                      {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(not applicable for UPI)</span>}
+                    </label>
+                    <select
+                      className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
+                      value={posTxnEditForm.network}
+                      disabled={posTxnEditForm.method === 'UPI'}
+                      onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, network: e.target.value })}
+                    >
+                      <option value="">— Any —</option>
+                      {networkOptions.filter(n => n.trim()).map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  {/* Card Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Card Type
+                      {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(fixed to UNKNOWN for UPI)</span>}
+                    </label>
+                    <select
+                      className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
+                      value={posTxnEditForm.cardType}
+                      disabled={posTxnEditForm.method === 'UPI'}
+                      onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, cardType: e.target.value })}
+                    >
+                      {cardTypeOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  {/* Card Classification */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Card Classification
+                      {posTxnEditForm.method === 'UPI' && <span className="ml-2 text-xs text-gray-400">(fixed to ANY for UPI)</span>}
+                    </label>
+                    <select
+                      className={`w-full border rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent ${posTxnEditForm.method === 'UPI' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
+                      value={posTxnEditForm.cardClassification}
+                      disabled={posTxnEditForm.method === 'UPI'}
+                      onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, cardClassification: e.target.value })}
+                    >
+                      {cardClassificationOptions.map((cl) => <option key={cl} value={cl}>{cl}</option>)}
+                    </select>
+                  </div>
+                  {/* Settlement Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Settlement Type <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select
+                      className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                      value={posTxnEditForm.settlementType}
+                      onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, settlementType: e.target.value })}
+                    >
+                      <option value="">— Any —</option>
+                      <option value="today_settlement">Today Settlement</option>
+                      <option value="next_day_settlement">Next Day Settlement</option>
+                    </select>
+                  </div>
+                  {/* Amount Slab */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Min Amount (₹)</label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                        placeholder="0"
+                        value={posTxnEditForm.minAmount}
+                        onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, minAmount: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Max Amount (₹) <span className="text-gray-400 font-normal">optional</span></label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                        placeholder="No limit"
+                        value={posTxnEditForm.maxAmount}
+                        onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, maxAmount: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              {/* Charge Inputs: Rate (%) and Flat (₹) */}
               {/* Charge Type Switcher Pill */}
               <div className="flex items-center justify-between pb-1">
-                <span className="text-xs font-semibold text-gray-600">Charge Mode:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-gray-600">Charge Mode:</span>
+                  {isRateLimitFlat(posTxnEditRate) && (
+                    <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Locked to Flat
+                    </span>
+                  )}
+                  {isRateLimitPercent(posTxnEditRate) && (
+                    <span className="text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Locked to %
+                    </span>
+                  )}
+                </div>
                 <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-xs">
                   <button
                     type="button"
+                    disabled={isRateLimitFlat(posTxnEditRate)}
                     onClick={() => {
+                      if (isRateLimitFlat(posTxnEditRate)) {
+                        toast.error("This rule is configured as Flat Rate and cannot be changed to percentage.");
+                        return;
+                      }
                       setPosEditChargeMode('percent');
                       setPosTxnEditForm(prev => ({
                         ...prev,
@@ -3503,17 +3960,26 @@ const AdminRateSetting = ({
                         chargePercent: prev.chargePercent && parseFloat(prev.chargePercent) > 0 ? prev.chargePercent : ''
                       }));
                     }}
-                    className={`px-3 py-1 font-medium rounded-md transition ${
-                      posEditChargeMode === 'percent'
+                    className={`px-3 py-1 font-medium rounded-md transition flex items-center gap-1 ${
+                      isRateLimitFlat(posTxnEditRate)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 opacity-60'
+                        : posEditChargeMode === 'percent'
                         ? 'bg-[#00D3CD] text-white shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
+                    title={isRateLimitFlat(posTxnEditRate) ? "This rule is configured as Flat Rate and cannot be converted to percentage" : undefined}
                   >
+                    {isRateLimitFlat(posTxnEditRate) && <Lock className="w-3 h-3 text-gray-400" />}
                     % Percentage
                   </button>
                   <button
                     type="button"
+                    disabled={isRateLimitPercent(posTxnEditRate)}
                     onClick={() => {
+                      if (isRateLimitPercent(posTxnEditRate)) {
+                        toast.error("This rule is configured as Percentage and cannot be changed to flat rate.");
+                        return;
+                      }
                       setPosEditChargeMode('flat');
                       setPosTxnEditForm(prev => ({
                         ...prev,
@@ -3521,29 +3987,66 @@ const AdminRateSetting = ({
                         chargeFlat: prev.chargeFlat && parseFloat(prev.chargeFlat) > 0 ? prev.chargeFlat : ''
                       }));
                     }}
-                    className={`px-3 py-1 font-medium rounded-md transition ${
-                      posEditChargeMode === 'flat'
+                    className={`px-3 py-1 font-medium rounded-md transition flex items-center gap-1 ${
+                      isRateLimitPercent(posTxnEditRate)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 opacity-60'
+                        : posEditChargeMode === 'flat'
                         ? 'bg-[#00D3CD] text-white shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
+                    title={isRateLimitPercent(posTxnEditRate) ? "This rule is configured as Percentage and cannot be converted to flat rate" : undefined}
                   >
+                    {isRateLimitPercent(posTxnEditRate) && <Lock className="w-3 h-3 text-gray-400" />}
                     ₹ Flat Rate
                   </button>
                 </div>
               </div>
 
+              {isRateLimitFlat(posTxnEditRate) && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>
+                    The limit/rate set for this rule is <strong>Flat Rate</strong>. It cannot be converted to percentage.
+                  </span>
+                </div>
+              )}
+
+              {isRateLimitPercent(posTxnEditRate) && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                  <Lock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    The limit/rate set for this rule is <strong>Percentage Rate</strong>. It cannot be converted to flat rate.
+                  </span>
+                </div>
+              )}
+
               {/* Charge Input (Single: Percentage or Flat) */}
               {posEditChargeMode === 'percent' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {activeTab === 'specific' ? 'Override Rate (%)' : activeTab === 'default' ? 'Default Base Rate (%)' : 'Rate (%)'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {activeTab === 'specific' ? 'Override Rate (%)' : activeTab === 'default' ? 'Default Base Rate (%)' : 'Rate (%)'}
+                    </label>
+                    {getPreviousRate(posTxnEditRate) > 0 && (
+                      <span className="text-xs text-amber-700 font-medium">
+                        Min allowed: {getPreviousRate(posTxnEditRate)}%
+                      </span>
+                    )}
+                  </div>
+                  {getPreviousRate(posTxnEditRate) > 0 && (
+                    <div className="mb-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+                      <span className="mt-0.5 text-amber-600 shrink-0">⚠</span>
+                      <span>
+                        Rate cannot be less than previously set rate of <strong>{getPreviousRate(posTxnEditRate)}%</strong>.
+                      </span>
+                    </div>
+                  )}
                   <input
                     type="number"
                     step="0.01"
-                    min={!isSuperAdmin && activeTab !== 'default' && posTxnEditRate ? (posTxnEditRate.platform_default_rate ?? posTxnEditRate.admin_rate ?? 0) : 0}
+                    min={getPreviousRate(posTxnEditRate) || 0}
                     className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    placeholder="e.g. 1.7"
+                    placeholder={`e.g. ${getPreviousRate(posTxnEditRate) || 1.7}`}
                     value={posTxnEditForm.chargePercent}
                     onChange={(e) => {
                       setPosTxnEditForm(prev => ({
@@ -3556,15 +4059,30 @@ const AdminRateSetting = ({
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Flat Charge (₹)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Flat Charge (₹)
+                    </label>
+                    {getPreviousFlatRate(posTxnEditRate) > 0 && (
+                      <span className="text-xs text-amber-700 font-medium">
+                        Min allowed: ₹{getPreviousFlatRate(posTxnEditRate)}
+                      </span>
+                    )}
+                  </div>
+                  {getPreviousFlatRate(posTxnEditRate) > 0 && (
+                    <div className="mb-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+                      <span className="mt-0.5 text-amber-600 shrink-0">⚠</span>
+                      <span>
+                        Flat charge cannot be less than previously set flat rate of <strong>₹{getPreviousFlatRate(posTxnEditRate)}</strong>.
+                      </span>
+                    </div>
+                  )}
                   <input
                     type="number"
                     step="0.01"
-                    min="0"
+                    min={getPreviousFlatRate(posTxnEditRate) || 0}
                     className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    placeholder="e.g. 2"
+                    placeholder={`e.g. ${getPreviousFlatRate(posTxnEditRate) || 2}`}
                     value={posTxnEditForm.chargeFlat}
                     onChange={(e) => {
                       setPosTxnEditForm(prev => ({
@@ -3608,28 +4126,39 @@ const AdminRateSetting = ({
                 </div>
               )}
               {/* GST Required */}
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
-                    checked={posTxnEditForm.gstRequired}
-                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, gstRequired: e.target.checked })}
-                  />
-                  <span className="text-sm font-medium text-gray-700">GST Applicable</span>
-                </label>
-              </div>
-              {posTxnEditForm.gstRequired && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GST (%)</label>
-                  <input
-                    type="number" step="0.01" min="0" max="100"
-                    className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
-                    placeholder="18"
-                    value={posTxnEditForm.gstPercent}
-                    onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, gstPercent: e.target.value })}
-                  />
+              {!isAdminOrSuperAdmin ? (
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-xs text-gray-600 flex items-center justify-between">
+                  <span className="font-medium">GST Configuration (Inherited):</span>
+                  <span className="font-semibold text-gray-800">
+                    {posTxnEditRate?.gst_required ? `${posTxnEditRate?.gst_rate ?? posTxnEditRate?.gst_percent ?? 18}% GST Applicable` : 'No GST'}
+                  </span>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 text-[#00D3CD] focus:ring-[#00D3CD]"
+                        checked={posTxnEditForm.gstRequired}
+                        onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, gstRequired: e.target.checked })}
+                      />
+                      <span className="text-sm font-medium text-gray-700">GST Applicable</span>
+                    </label>
+                  </div>
+                  {posTxnEditForm.gstRequired && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">GST (%)</label>
+                      <input
+                        type="number" step="0.01" min="0" max="100"
+                        className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-[#00D3CD] focus:border-transparent"
+                        placeholder="18"
+                        value={posTxnEditForm.gstPercent}
+                        onChange={(e) => setPosTxnEditForm({ ...posTxnEditForm, gstPercent: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
