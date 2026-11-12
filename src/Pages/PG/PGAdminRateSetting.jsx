@@ -307,17 +307,28 @@ const AdminRateSetting = ({
     rate?.rule_key ||
     `${rate?.method || rate?.payment_mode}-${rate?.network || rate?.card_brand}-${rate?.card_type}-${rate?.sub_type || rate?.card_classification || 'any'}-${rate?.settlement_type || ''}-${rate?.min_amount || 0}-${rate?.max_amount || 'OPEN'}`;
 
+  const normalizePgGeneric = (val, fallback = 'ALL') => {
+    if (val === null || val === undefined) return fallback;
+    const s = String(val).trim().toUpperCase();
+    if (['ALL', 'ANY', 'N/A', 'NA', 'UNKNOWN', 'NULL', ''].includes(s)) return fallback;
+    return s;
+  };
+
   const makePgRuleKey = (rule) => {
     const rawGateway = rule?.gateway || 'all';
-    const gateway = String(rawGateway).trim().toLowerCase();
-    const rawMethod = rule?.payment_mode || rule?.method || '';
-    const method = String(rawMethod).trim().toUpperCase();
+    const gateway = normalizePgGeneric(rawGateway, 'ALL').toLowerCase();
+    const rawMethod = rule?.payment_mode || rule?.method || 'ALL';
+    const method = normalizePgGeneric(rawMethod, 'ALL');
     const rawNetwork = rule?.card_brand || rule?.network || 'ALL';
-    const network = String(rawNetwork).trim().toUpperCase().replace(/[\s_\\-]/g, '');
+    const cleanNetwork = String(rawNetwork).trim().toUpperCase().replace(/[\s_\\-]/g, '');
+    const network = normalizePgGeneric(cleanNetwork, 'ALL');
     const rawCardType = rule?.raw_card_type || rule?.card_type || 'ALL';
-    const cardType = String(rawCardType).trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
-    const subType = String(rule?.sub_type || rule?.card_classification || 'any').trim().toLowerCase();
-    const settlement = String(rule?.settlement_type || '').trim().toLowerCase();
+    const cleanCardType = String(rawCardType).trim().toUpperCase().replace(/[\s_\\-]/g, '').replace('CARD', '');
+    const cardType = normalizePgGeneric(cleanCardType, 'ALL');
+    const rawSubType = rule?.sub_type || rule?.card_classification || 'any';
+    const subType = normalizePgGeneric(rawSubType, 'ANY').toLowerCase();
+    const rawSettlement = rule?.settlement_type || 'any';
+    const settlement = normalizePgGeneric(rawSettlement, 'ANY').toLowerCase();
     const minAmount = String(Number(rule?.min_amount || 0));
     const rawMax = rule?.max_amount ?? rule?.to_amount;
     const maxAmount = rawMax !== null && rawMax !== undefined && rawMax !== '' && !isNaN(Number(rawMax)) ? String(Number(rawMax)) : 'OPEN';
@@ -340,7 +351,18 @@ const AdminRateSetting = ({
 
     return Array.from(allKeys).map((key) => {
       const override = overrideByKey.get(key);
-      const def = defaultByKey.get(key);
+      let def = defaultByKey.get(key);
+
+      // If exact key isn't in defaultByKey, search for generic default rule matching gateway/method/amount
+      if (!def && override) {
+        const [gw, meth, net, ct, st, sett, minA, maxA] = key.split('|');
+        const genericKey = [gw, meth, 'ALL', 'ALL', 'any', sett, minA, maxA].join('|');
+        def = defaultByKey.get(genericKey);
+        if (!def) {
+          const genericKey2 = ['all', meth, 'ALL', 'ALL', 'any', 'any', minA, maxA].join('|');
+          def = defaultByKey.get(genericKey2);
+        }
+      }
 
       if (override) {
         return mapRuleToAdminFormat(override, {
@@ -632,7 +654,7 @@ const AdminRateSetting = ({
           const rawSpecific = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
           const specificList = rawSpecific.filter((r) => {
             if (!r) return false;
-            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'franchise_merchant'].includes(r.scope)) {
               return false;
             }
             return String(r.franchaise_id) === String(effectiveUser?.id) || String(r.user_id) === String(effectiveUser?.id);
@@ -1030,7 +1052,7 @@ const AdminRateSetting = ({
             const rawSpecific = Array.isArray(fSpecificRules) ? fSpecificRules : (fSpecificRules?.data || []);
           const specificList = rawSpecific.filter((r) => {
             if (!r) return false;
-            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'franchise_merchant'].includes(r.scope)) {
               return false;
             }
             return String(r.franchaise_id) === String(effectiveUser?.id) || String(r.user_id) === String(effectiveUser?.id);
@@ -1199,7 +1221,7 @@ const AdminRateSetting = ({
           const fList = [...rawFUser, ...rawFFranchise].filter((r) => {
             if (!r) return false;
             // Reject higher-level default rules returned by backend fallback
-            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default'].includes(r.scope)) {
+            if (['super_admin_default', 'super_admin_admin', 'admin_default', 'admin_super_franchise', 'super_franchise_default', 'franchise_merchant'].includes(r.scope)) {
               return false;
             }
             return String(r.franchaise_id) === String(id) || String(r.user_id) === String(id) || ['franchise_default', 'admin_franchise', 'super_franchise_franchise'].includes(r.scope);
