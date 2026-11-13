@@ -237,7 +237,7 @@ export default function SuperFranchiseLayout() {
               <Route path="ledger" element={<Ledger currentUser={currentUser} />} />
               <Route path="ledger-entries" element={<FranchiseLedger currentUser={currentUser} />} />
               <Route path="logout" element={<Logout />} />
-              <Route path="*" element={<Navigate to="dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/super-franchise/dashboard" replace />} />
             </Routes>
           </Suspense>
         </UserCreationProvider>

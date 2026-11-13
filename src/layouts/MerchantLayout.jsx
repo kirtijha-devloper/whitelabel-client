@@ -55,6 +55,8 @@ import PayoutFailure from "../Pages/PayoutFailure";
 import LoginPopupOverlay from "../components/LoginPopupOverlay";
 import { getServiceFlagValue } from "../utils/serviceFlags";
 import PayoutHub from "../Pages/PayoutHub";
+import PGHub from "../Pages/PGHub";
+import CCBillHub from "../Pages/CCBillHub";
 
 const getMerchantPageTitle = (pathname) => {
   const routeTitles = [
@@ -75,6 +77,8 @@ const getMerchantPageTitle = (pathname) => {
     ["/merchant/payout/remitter-details", "Remitter Details"],
     ["/merchant/payout/transaction-history", "Transaction History"],
     ["/merchant/payout-hub", "Payout Services"],
+    ["/merchant/pg-hub", "PG Services"],
+    ["/merchant/cc-bill-hub", "CC Bill Services"],
     ["/merchant/payout", "Payout"],
     ["/merchant/charges", "Charges"],
     ["/merchant/stock-pos", "Stock POS"],
@@ -166,6 +170,8 @@ const MerchantLayout = () => {
     location.pathname === "/merchant" ||
     location.pathname.startsWith("/merchant/dashboard") ||
     location.pathname.startsWith("/merchant/payout-hub") ||
+    location.pathname.startsWith("/merchant/pg-hub") ||
+    location.pathname.startsWith("/merchant/cc-bill-hub") ||
     location.pathname.startsWith("/merchant/vimo-payout") ||
     location.pathname.startsWith("/merchant/sevenpay-payout") ||
     location.pathname.startsWith("/merchant/ndia5-payout") ||
@@ -207,6 +213,14 @@ const MerchantLayout = () => {
           <Route
             path="payout-hub"
             element={<PayoutHub currentUser={currentUser} />}
+          />
+          <Route
+            path="pg-hub"
+            element={<PGHub currentUser={currentUser} />}
+          />
+          <Route
+            path="cc-bill-hub"
+            element={<CCBillHub currentUser={currentUser} />}
           />
           <Route
             path="vimo-payout"

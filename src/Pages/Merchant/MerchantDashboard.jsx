@@ -31,6 +31,12 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
   const ccBillPaymentFailed = data?.ccBillPaymentFailed ?? 0;
   const today_total_payout = data?.today_total_payout ?? 0;
 
+  // PG Transactions stats
+  const pg_transactions = data?.pg_transactions || {};
+  const pgTotal = pg_transactions?.total ?? data?.pgTransactionTXN ?? 0;
+  const pgSuccess = pg_transactions?.success ?? data?.pgTransactionSuccess ?? 0;
+  const pgFail = pg_transactions?.fail ?? data?.pgTransactionFailed ?? 0;
+
   const posMachineCount = pos_machines?.count ?? pos_machines?.total ?? 0;
   const posTotal = pos_transactions?.total ?? 0;
   const posSuccess = pos_transactions?.success ?? 0;
@@ -62,6 +68,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       iconBox: "bg-[#00D3CD]/10 text-[#00a8a3] border border-[#00D3CD]/20",
       cardClass: "bg-white border-gray-100 hover:border-[#00D3CD]/40",
       isHero: false,
+      path: "/merchant/stock-pos",
     },
     {
       title: "Today's Transactions",
@@ -72,6 +79,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       iconBox: "bg-white/20 text-white",
       cardClass: "bg-gradient-to-br from-[#00D3CD] to-[#00b8b3] text-white shadow-sm border-[#00D3CD]/30",
       isHero: true,
+      path: "/merchant/reports?tab=pos",
     },
     {
       title: "Successful",
@@ -84,6 +92,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
       cardClass: "bg-white border-gray-100 hover:border-emerald-200",
       isHero: false,
+      path: "/merchant/reports?tab=pos",
     },
     {
       title: "Failed",
@@ -96,6 +105,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
       cardClass: "bg-white border-gray-100 hover:border-rose-200",
       isHero: false,
+      path: "/merchant/reports?tab=pos",
     },
   ];
 
@@ -107,6 +117,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       subtitle: "Total credit card payments initiated",
       icon: CreditCard,
       iconBox: "bg-sky-50 text-sky-600 border border-sky-100",
+      path: "/merchant/reports/cc-bill",
     },
     {
       label: "Today CC Success",
@@ -116,6 +127,7 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: CheckCircle2,
       iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+      path: "/merchant/reports/cc-bill",
     },
     {
       label: "Today CC Failed",
@@ -125,70 +137,193 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
       badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
       icon: XCircle,
       iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
+      path: "/merchant/reports/cc-bill",
+    },
+  ];
+
+  // PG Payment Breakdown Cards
+  const pgPaymentCards = [
+    {
+      title: "Today's PG Transactions",
+      value: `₹${formatAmount(pgTotal)}`,
+      subtitle: "Total PG transaction volume today",
+      icon: TrendingUp,
+      iconBox: "bg-red-50 text-red-600 border border-red-100",
+      badge: "Today",
+      badgeClass: "bg-red-50 text-red-700 border-red-200",
+      path: "/merchant/reports?tab=pg",
+    },
+    {
+      title: "Successful",
+      value: `₹${formatAmount(pgSuccess)}`,
+      subtitle: "Completed & captured volume",
+      badge: "Success",
+      badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+      iconBox: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+      path: "/merchant/reports?tab=pg&status=success",
+    },
+    {
+      title: "Failed",
+      value: `₹${formatAmount(pgFail)}`,
+      subtitle: "Declined or rejected requests",
+      badge: "Failed",
+      badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+      icon: XCircle,
+      iconBox: "bg-rose-50 text-rose-600 border border-rose-100",
+      path: "/merchant/reports?tab=pg&status=failed",
     },
   ];
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* ================= SECTION 1: TOP SUMMARY STATS ================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {summaryCards.map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className={`group flex min-h-[125px] sm:min-h-[145px] flex-col justify-between rounded-2xl p-3.5 sm:p-5 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${card.cardClass}`}
+      {/* ================= SECTION 1: POS TRANSACTIONS & MACHINES ================= */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-[#00a8a3]" />
+              POS Machine & Transactions
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Monitor active POS terminals and today's in-store card swipe transactions
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/merchant/stock-pos"
+              className="inline-flex h-9 sm:h-10 items-center justify-center rounded-xl bg-gradient-to-r from-[#00D3CD] to-[#00b8b3] px-3.5 sm:px-4 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 active:scale-[0.98]"
             >
-              <div className="flex items-start justify-between gap-2 sm:gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p
-                      className={`text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate ${
-                        card.isHero ? "text-white/90" : "text-gray-500"
-                      }`}
-                    >
-                      {card.title}
-                    </p>
-                    {card.badge && (
-                      <span
-                        className={`px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${card.badgeClass}`}
+              Stock POS
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-4 sm:mt-5 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {summaryCards.map((card, idx) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={idx}
+                onClick={() => card.path && navigate(card.path)}
+                className={`group flex min-h-[125px] sm:min-h-[145px] flex-col justify-between rounded-2xl p-3.5 sm:p-5 border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${card.cardClass}`}
+              >
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p
+                        className={`text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate ${card.isHero ? "text-white/90" : "text-gray-500"
+                          }`}
                       >
-                        {card.badge}
-                      </span>
-                    )}
+                        {card.title}
+                      </p>
+                      {card.badge && (
+                        <span
+                          className={`px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${card.badgeClass}`}
+                        >
+                          {card.badge}
+                        </span>
+                      )}
+                    </div>
+                    <h3
+                      className={`mt-1.5 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight truncate ${card.isHero ? "text-white" : "text-gray-900"
+                        }`}
+                    >
+                      {card.value}
+                    </h3>
                   </div>
-                  <h3
-                    className={`mt-1.5 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight truncate ${
-                      card.isHero ? "text-white" : "text-gray-900"
-                    }`}
+
+                  <div
+                    className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${card.iconBox}`}
                   >
-                    {card.value}
-                  </h3>
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
                 </div>
 
-                <div
-                  className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${card.iconBox}`}
-                >
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-              </div>
-
-              <p
-                className={`mt-2 sm:mt-3 text-[11px] sm:text-xs truncate ${
-                  card.isHero
+                <p
+                  className={`mt-2 sm:mt-3 text-[11px] sm:text-xs truncate ${card.isHero
                     ? "text-white/80"
                     : card.badge === "Settled"
-                    ? "text-emerald-600 font-medium"
-                    : card.badge === "Failed"
-                    ? "text-rose-600 font-medium"
-                    : "text-gray-400"
-                }`}
+                      ? "text-emerald-600 font-medium"
+                      : card.badge === "Failed"
+                        ? "text-rose-600 font-medium"
+                        : "text-gray-400"
+                    }`}
+                >
+                  {card.subtitle}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= SECTION: PAYMENT GATEWAY (PG) TRANSACTIONS ================= */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-red-500" />
+              Payment Gateway Transactions
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Track today's live online checkout collections and gateway success rates
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/merchant/pg-hub"
+              className="inline-flex h-9 sm:h-10 items-center justify-center rounded-xl bg-gradient-to-r from-red-500 to-rose-600 px-3.5 sm:px-4 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 active:scale-[0.98]"
+            >
+              PG Services
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+          {pgPaymentCards.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={index}
+                onClick={() => item.path && navigate(item.path)}
+                className="group flex min-h-[115px] sm:min-h-[130px] flex-col justify-between rounded-xl bg-gray-50/70 p-3.5 sm:p-4 border border-gray-100 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer"
               >
-                {card.subtitle}
-              </p>
-            </div>
-          );
-        })}
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 truncate">
+                        {item.title}
+                      </p>
+                      {item.badge && (
+                        <span
+                          className={`px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${item.badgeClass}`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-extrabold tracking-tight text-gray-900 truncate">
+                      {item.value}
+                    </h4>
+                  </div>
+
+                  <div
+                    className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${item.iconBox}`}
+                  >
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </div>
+                </div>
+
+                <p className="mt-2 sm:mt-3 text-[11px] sm:text-xs text-gray-400 truncate">
+                  {item.subtitle}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
 
@@ -227,7 +362,8 @@ const MerchantDashboard = ({ dashboardData, currentUser }) => {
             return (
               <div
                 key={index}
-                className="group flex min-h-[115px] sm:min-h-[130px] flex-col justify-between rounded-xl bg-gray-50/70 p-3.5 sm:p-4 border border-gray-100 transition-all duration-200 hover:bg-white hover:shadow-md"
+                onClick={() => item.path && navigate(item.path)}
+                className="group flex min-h-[115px] sm:min-h-[130px] flex-col justify-between rounded-xl bg-gray-50/70 p-3.5 sm:p-4 border border-gray-100 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-2 sm:gap-3">
                   <div className="min-w-0">

@@ -678,7 +678,7 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2">
+                    {/* <div className="flex items-center gap-2 pt-2">
                       <input
                         type="checkbox"
                         id="user-active-check-modal"
@@ -689,7 +689,7 @@ const PayoutRateSettings = ({ isSuperAdmin = false }) => {
                       <label htmlFor="user-active-check-modal" className="text-xs font-semibold text-gray-800">
                         Rule Active
                       </label>
-                    </div>
+                    </div> */}
 
                     <div className="flex items-center justify-end gap-3 pt-4 border-t">
                       <button

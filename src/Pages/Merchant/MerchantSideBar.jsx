@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { 
+import {
   Wallet,
   CreditCard,
   BarChart3,
@@ -56,6 +56,14 @@ const MerchantSideBar = ({ currentUser }) => {
   const PAYOUT_KEYS = ["vimo_payout", "sevenpay_payout", "branchx_payout", "ndia5_payout", "mx_payout"];
   const hasAnyPayout = PAYOUT_KEYS.some((k) => serviceFlags[k]);
 
+  // Show the PG Hub entry if at least one PG is enabled
+  const PG_KEYS = ["pg_1", "pg_2"];
+  const hasAnyPg = PG_KEYS.some((k) => serviceFlags[k]);
+
+  // Show the CC Bill Hub entry if at least one CC Bill channel is enabled
+  const CC_BILL_KEYS = ["cc_bill_pay", "ba_cc_bill_pay", "cc_bill_3"];
+  const hasAnyCcBill = CC_BILL_KEYS.some((k) => serviceFlags[k]);
+
   const menuItems = [
     { name: "Dashboard", path: "/merchant/dashboard", icon: <BarChart3 className="w-5 h-5" /> },
     // Single "Payout" hub entry — replaces the individual payout-x/v/s/n/mx items
@@ -74,39 +82,35 @@ const MerchantSideBar = ({ currentUser }) => {
       ],
       disabled: !hasAnyPayout,
     },
+    // Single "PG" hub entry
     {
-      name: "PG 1",
-      path: "/merchant/pg-1",
+      name: "PG",
+      path: "/merchant/pg-hub",
       icon: <Layers className="w-5 h-5" />,
-      serviceKey: "pg_1",
+      activePaths: [
+        "/merchant/pg-hub",
+        "/merchant/pg-1",
+        "/merchant/pg-2",
+      ],
+      disabled: !hasAnyPg,
+      disabledTooltip: "No payment gateway services are enabled for your account",
     },
+    // Single "CC Bill" hub entry
     {
-      name: "PG 2",
-      path: "/merchant/pg-2",
-      icon: <Layers className="w-5 h-5" />,
-      serviceKey: "pg_2",
+      name: "CC Bill Pay",
+      path: "/merchant/cc-bill-hub",
+      icon: <CreditCard className="w-5 h-5" />,
+      activePaths: [
+        "/merchant/cc-bill-hub",
+        "/merchant/cc-bill-pay",
+        "/merchant/ba-cc-bill-pay",
+      ],
+      disabled: !hasAnyCcBill,
+      disabledTooltip: "No credit card bill services are enabled for your account",
     },
     { name: "Ledger", path: "/merchant/ledger", icon: <Wallet className="w-5 h-5" /> },
     { name: "Charges", path: "/merchant/charges", icon: <CreditCard className="w-5 h-5" /> },
     { name: "Stock POS", path: "/merchant/stock-pos", icon: <Box className="w-5 h-5" /> },
-    {
-      name: "CC Bill 1",
-      path: "/merchant/cc-bill-pay",
-      icon: <CreditCard className="w-5 h-5" />,
-      serviceKey: "cc_bill_pay",
-    },
-    {
-      name: "CC Bill 2",
-      path: "/merchant/ba-cc-bill-pay",
-      icon: <CreditCard className="w-5 h-5" />,
-      serviceKey: "ba_cc_bill_pay",
-    },
-    {
-      name: "CC Bill 3",
-      path: "/merchant/ba-cc-bill-pay?flow=cc-bill-3",
-      icon: <CreditCard className="w-5 h-5" />,
-      serviceKey: "cc_bill_3",
-    },
     { name: "Reports", path: "/merchant/reports", icon: <BarChart3 className="w-5 h-5" /> },
     { name: "Help", path: "/merchant/complaint-box", icon: <HelpCircle className="w-5 h-5" /> },
     { name: "Settings", path: "/merchant/setting", icon: <Settings className="w-5 h-5" /> },
@@ -176,11 +180,14 @@ const MerchantSideBar = ({ currentUser }) => {
               const tooltip = isServiceDisabled
                 ? "Service is currently disabled"
                 : item.disabled
-                ? "No payout services are enabled for your account"
-                : item.tooltip;
-              // Support multiple active paths (e.g. Payout hub highlights for all payout sub-routes)
+                  ? (item.disabledTooltip || "Service is currently disabled for your account")
+                  : item.tooltip;
+              // Support multiple active paths (e.g. highlights for hub and all its sub-routes)
               const isActive = item.activePaths
-                ? item.activePaths.some((p) => isActivePath(p))
+                ? item.activePaths.some((p) => {
+                  if (p.includes("?")) return currentFullPath === p;
+                  return location.pathname === p || location.pathname.startsWith(`${p}/`);
+                })
                 : isActivePath(item.path);
 
               return (

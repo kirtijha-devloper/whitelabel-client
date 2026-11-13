@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import Table from '../components/Table'; // Assuming you have a reusable Table component
 import { getAllPosTransactionReport, getWalletReport } from '../api/reportsApi';
+import { getPgTransactions } from '../api/pgApi';
 import { AllUsers } from '../api/FranchiseApi';
 import { calculateFranchisePoolStats } from '../utils/userLimit';
 import ReportTabs from '../components/Reports/ReportTabs';
@@ -265,7 +266,7 @@ const Reports = ({ currentUser }) => {
   const reportsBasePath = `/${roleBase}/reports`;
   const reportType = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    return tab === 'wallet' ? 'wallet' : 'pos';
+    return tab === 'pg' ? 'pg' : 'pos';
   }, [location.search]);
   const [filters, setFilters] = useState(() => buildBaseFilters(today));
   const [selectedUser, setSelectedUser] = useState(null);
@@ -339,15 +340,20 @@ const Reports = ({ currentUser }) => {
     return map;
   }, [allUsersData]);
 
-  // Query for Wallet Transaction Report
+  // Query for PG Transaction Report
   const {
-    data: walletData,
-    isLoading: walletLoading,
-    error: walletError,
+    data: pgData,
+    isLoading: pgLoading,
+    error: pgError,
   } = useQuery({
-    queryKey: ['walletReport', walletTargetUserId, filters],
-    queryFn: () => getWalletReport(walletTargetUserId, filters),
-    enabled: reportType === 'wallet' && !!walletTargetUserId && !!filters.startDate && !!filters.endDate,
+    queryKey: ['pgTransactionsReport', filters.status, filters.userSearch],
+    queryFn: () =>
+      getPgTransactions({
+        status: filters.status ? filters.status.toLowerCase() : undefined,
+        search: filters.userSearch || undefined,
+        limit: 200,
+      }),
+    enabled: reportType === 'pg',
   });
 
   const handleUserSelect = (user) => {
@@ -432,18 +438,18 @@ const Reports = ({ currentUser }) => {
       } finally {
         setIsExporting(false);
       }
-    } else if (reportType === 'wallet' && walletData?.data) {
-      data = walletData.data.map((txn) => ({
-        ID: txn.id,
-        Date: new Date(txn.date_and_time).toLocaleString(),
-        UTR: txn.utr_no,
-        Description: txn.description,
-        Debit: txn.debit,
-        Credit: txn.credit,
-        Balance: txn.balance,
-        Status: txn.status,
+    } else if (reportType === 'pg' && pgRows.length > 0) {
+      data = pgRows.map((txn) => ({
+        'Order ID': txn.order_id || '-',
+        'Payment ID': txn.payment_id || '-',
+        'Date & Time': new Date(txn.created_at || txn.createdAt).toLocaleString(),
+        'Gateway': (txn.gateway || '').toUpperCase(),
+        'Gross (Rs)': parseFloat(txn.amount || 0).toFixed(2),
+        'Fee + GST (Rs)': (Number(txn.fee_amount || 0) + Number(txn.gst_amount || 0)).toFixed(2),
+        'Net Credited (Rs)': parseFloat(txn.net_amount || 0).toFixed(2),
+        'Status': (txn.status || '').toUpperCase(),
       }));
-      fileName = 'WalletTransactionReport.xlsx';
+      fileName = 'PGTransactionReport.xlsx';
     }
 
     if (data.length === 0) {
@@ -591,29 +597,59 @@ const Reports = ({ currentUser }) => {
     },
   ];
 
-  const walletColumns = [
-    { header: 'ID', key: 'id' },
+  const pgColumns = [
+    { header: 'Order ID', key: 'order_id' },
+    { header: 'Payment ID', key: 'payment_id', render: (val) => val || '-' },
     {
       header: 'Date & Time',
-      key: 'date_and_time',
-      render: (date) => new Date(date).toLocaleString(),
+      key: 'createdAt',
+      render: (date, row) => new Date(date || row.created_at).toLocaleString('en-IN'),
     },
-    { header: 'UTR No', key: 'utr_no' },
-    { header: 'Description', key: 'description' },
-    { header: 'Debit', key: 'debit' },
-    { header: 'Credit', key: 'credit' },
-    { header: 'Balance', key: 'balance' },
+    {
+      header: 'Gateway',
+      key: 'gateway',
+      render: (g) => (
+        <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-slate-100 text-slate-700">
+          {g || 'PG'}
+        </span>
+      ),
+    },
+    {
+      header: 'Gross (₹)',
+      key: 'amount',
+      render: (amt) => `₹${parseFloat(amt || 0).toFixed(2)}`,
+    },
+    {
+      header: 'Fee + GST (₹)',
+      key: 'fee_amount',
+      render: (_val, row) => `₹${(Number(row.fee_amount || 0) + Number(row.gst_amount || 0)).toFixed(2)}`,
+    },
+    {
+      header: 'Net Credited (₹)',
+      key: 'net_amount',
+      render: (amt) => `₹${parseFloat(amt || 0).toFixed(2)}`,
+    },
     {
       header: 'Status',
       key: 'status',
-      render: (status) => (
-        <span
-          className={`px-2 py-1 rounded-full text-sm ${status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+      render: (status) => {
+        const st = String(status || '').toLowerCase();
+        const isSuccess = st === 'success' || st === 'captured' || st === 'settled';
+        const isFailed = st === 'failed' || st === 'declined';
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${
+              isSuccess
+                ? 'bg-green-100 text-green-700'
+                : isFailed
+                ? 'bg-red-100 text-red-700'
+                : 'bg-yellow-100 text-yellow-700'
             }`}
-        >
-          {status}
-        </span>
-      ),
+          >
+            {status}
+          </span>
+        );
+      },
     },
   ];
 
@@ -683,8 +719,8 @@ const Reports = ({ currentUser }) => {
       return true;
     });
   }, [posData, reportType, filters]);
-  const walletRows = reportType === 'wallet' ? walletData?.data || [] : [];
-  const data = reportType === 'pos' ? posRows : walletRows;
+  const pgRows = reportType === 'pg' ? (Array.isArray(pgData?.data) ? pgData.data : (Array.isArray(pgData) ? pgData : [])) : [];
+  const data = reportType === 'pos' ? posRows : pgRows;
   const posTotalRows = reportType === 'pos' ? posRows.length : 0;
   const posTotalPages = reportType === 'pos' ? Math.max(1, Math.ceil(posTotalRows / posPageSize)) : 1;
   const posPageSafe = reportType === 'pos' ? Math.min(Math.max(posPage, 1), posTotalPages) : 1;
@@ -695,9 +731,9 @@ const Reports = ({ currentUser }) => {
   }, [data, posPageSafe, posPageSize, reportType]);
   const posStart = posTotalRows > 0 ? (posPageSafe - 1) * posPageSize + 1 : 0;
   const posEnd = posTotalRows > 0 ? Math.min(posPageSafe * posPageSize, posTotalRows) : 0;
-  const columns = reportType === 'pos' ? posColumns : walletColumns;
-  const isLoading = reportType === 'pos' ? posLoading : walletLoading;
-  const error = reportType === 'pos' ? posError : walletError;
+  const columns = reportType === 'pos' ? posColumns : pgColumns;
+  const isLoading = reportType === 'pos' ? posLoading : pgLoading;
+  const error = reportType === 'pos' ? posError : pgError;
 
   return (
     <div className="min-h-screen bg-transparent px-0 py-1 sm:bg-gray-100 sm:p-6">
@@ -882,14 +918,35 @@ const Reports = ({ currentUser }) => {
                 className={inputClassName}
               />
             </div>
-            {canSelectUser && reportType === 'wallet' && (
-              <div>
-                <UserSelectWithSuggestions
-                  selectedUser={selectedUser}
-                  onSelectUser={handleUserSelect}
-                  label="Select User"
-                />
-              </div>
+            
+            {reportType === 'pg' && (
+              <>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className={inputClassName}
+                  >
+                    <option value="">All</option>
+                    <option value="SUCCESS">Success / Captured</option>
+                    <option value="FAILED">Failed</option>
+                    <option value="PENDING">Pending</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Search (Order / Payment ID)</label>
+                  <input
+                    type="text"
+                    name="userSearch"
+                    value={filters.userSearch || ''}
+                    onChange={handleFilterChange}
+                    className={inputClassName}
+                    placeholder="Enter Order ID or Payment ID"
+                  />
+                </div>
+              </>
             )}
             {reportType === 'pos' && (
               <>

@@ -4,7 +4,7 @@ import { isChildRole } from "../../utils/serviceDisplayNames";
 
 const REPORT_TAB_CONFIG = [
   { key: "pos", label: "POS Transactions" },
-  { key: "wallet", label: "Wallet Transactions" },
+  { key: "pg", label: "PG Transactions" },
   { key: "cc-bill", label: "CC Bill Payment" },
   { key: "ba-cc-bill", label: "BA CC Bill Payment" },
   { key: "cc-bill-3", label: "CC Bill 3" },
@@ -17,7 +17,7 @@ const getTargetPath = (basePath, tabKey) => {
     (typeof window !== "undefined" && window.location?.pathname?.startsWith("/super-admin")
       ? "/super-admin/reports"
       : "/admin/reports");
-  if (tabKey === "pos" || tabKey === "wallet") {
+  if (tabKey === "pos" || tabKey === "pg") {
     return `${safeBase}?tab=${tabKey}`;
   }
 
